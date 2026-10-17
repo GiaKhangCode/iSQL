@@ -42,46 +42,54 @@ Xem chi tiết kiến trúc và phân công module tại:
 
 ## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
 
-### Cách 1: Chạy Bằng Docker (Khuyến nghị)
+### Cách 1: Dành Cho Các Dev Đang Chạy Container `laravel_app` (Khuyến nghị cho cả nhóm)
 
-Toàn bộ môi trường đã được cấu hình sẵn trong thư mục [docker/](./docker):
-
-```bash
-# 1. Di chuyển vào thư mục docker
-cd docker
-
-# 2. Khởi động toàn bộ container (PHP-FPM, Nginx, MySQL, Redis)
-docker compose up -d --build
-
-# 3. Chạy migration và seed dữ liệu mẫu
-docker compose exec php php artisan migrate
-docker compose exec php php artisan db:seed
-```
-API Backend sẽ sẵn sàng tại: `http://localhost:8000`
-
----
-
-### Cách 2: Chạy Trên Máy Cục Bộ (Local Environment)
-
-#### Yêu cầu hệ thống:
-* **PHP:** >= 8.2 (kèm extension: `pdo_mysql`, `pdo_sqlsrv`, `redis`, `mbstring`)
-* **Composer:** >= 2.x
-* **MySQL:** >= 8.0
+Nếu bạn và nhóm của bạn đã dựng sẵn stack Docker (`laravel_app` + `laravel_db`) và mở mã nguồn bằng **VS Code Remote - Containers** hoặc Terminal bên trong container `/var/www/html`:
 
 ```bash
-# 1. Cài đặt các thư viện PHP
-composer install
-
-# 2. Cấu hình biến môi trường
+# 1. Tạo file cấu hình môi trường từ mẫu
 cp .env.example .env
+
+# 2. Khởi tạo Application Key
 php artisan key:generate
 
-# 3. Cấu hình thông số DB trong file .env, sau đó chạy migration & seeder:
+# 3. Cấu hình kết nối Database trong file .env:
+#    DB_CONNECTION=mysql
+#    DB_HOST=db           (hoặc laravel_db tùy tên container database của bạn)
+#    DB_PORT=3306
+#    DB_DATABASE=laravel  (hoặc sql_uit)
+#    DB_USERNAME=root
+#    DB_PASSWORD=root
+
+# 4. Chạy Migration tạo 20 bảng CSDL và nạp dữ liệu mẫu
 php artisan migrate
 php artisan db:seed
 
-# 4. Khởi động server API
-php artisan serve --port=8000
+# 5. Chạy kiểm thử tự động để đảm bảo hệ thống sẵn sàng
+php artisan test
+```
+
+> 🌐 **Kiểm tra hoạt động:** Mở trình duyệt trên máy thật (Host) truy cập: `http://localhost:8000/api/problems` hoặc `http://localhost:8000/api/auth/me`.
+
+---
+
+### Cách 2: Dành Cho Người Mới Bắt Đầu Từ Con Số 0 (Chưa có Container nào)
+
+Nếu bạn vừa clone repository này về một máy tính hoàn toàn mới và chưa cài môi trường gì, hệ thống đã chuẩn bị sẵn trọn gói trong thư mục [docker/](./docker):
+
+```bash
+# 1. Di chuyển vào thư mục docker của dự án
+cd docker
+
+# 2. Khởi động 4 container (PHP-FPM 8.2 có sẵn pdo_sqlsrv, Nginx, MySQL 8.0, Redis)
+docker compose up -d --build
+
+# 3. Chạy migration và seed dữ liệu từ bên ngoài máy host:
+docker compose exec php php artisan migrate
+docker compose exec php php artisan db:seed
+```
+
+API Backend sẽ sẵn sàng tại: `http://localhost:8000`
 
 # 5. (Tùy chọn) Khởi động Queue Worker xử lý chấm bài nền:
 php artisan queue:work redis --queue=grading
