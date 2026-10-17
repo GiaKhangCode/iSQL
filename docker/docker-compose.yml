@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: isql_php
+    restart: unless-stopped
+    volumes:
+      - ../:/var/www/html
+    environment:
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - isql_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: isql_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ../:/var/www/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+    networks:
+      - isql_network
+
+  mysql:
+    image: mysql:8.0
+    container_name: isql_mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: sql_uit
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - isql_mysql_data:/var/lib/mysql
+    networks:
+      - isql_network
+
+  redis:
+    image: redis:alpine
+    container_name: isql_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - isql_redis_data:/data
+    networks:
+      - isql_network
+
+networks:
+  isql_network:
+    driver: bridge
+
+volumes:
+  isql_mysql_data:
+  isql_redis_data:
