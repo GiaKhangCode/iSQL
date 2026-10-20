@@ -6,9 +6,9 @@ use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
-    public function test_login_validation(): void
+    public function test_login_endpoint_is_not_exposed(): void
     {
         $response = $this->postJson('/api/auth/login', []);
-        $response->assertStatus(422);
+        $response->assertNotFound();
     }
 }

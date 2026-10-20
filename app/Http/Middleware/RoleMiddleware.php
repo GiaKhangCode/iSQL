@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,7 +27,14 @@ class RoleMiddleware
         $allowedRoles = [];
         foreach ($roles as $role) {
             foreach (explode(',', $role) as $r) {
-                $allowedRoles[] = trim($r);
+                $role = trim($r);
+                $allowedRoles[] = $role;
+
+                // Existing feature routes use `instructor` as a generic
+                // faculty permission. Keep both split faculty roles compatible.
+                if ($role === User::LEGACY_INSTRUCTOR_ROLE) {
+                    $allowedRoles = array_merge($allowedRoles, User::INSTRUCTOR_ROLES);
+                }
             }
         }
 

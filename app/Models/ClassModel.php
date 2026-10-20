@@ -15,7 +15,9 @@ class ClassModel extends Model
     protected $fillable = [
         'id',
         'course',
+        'course_id',
         'term',
+        'term_id',
         'instructor_id',
         'start_date',
         'end_date',
@@ -30,6 +32,22 @@ class ClassModel extends Model
     public function instructor()
     {
         return $this->belongsTo(User::class, 'instructor_id');
+    }
+
+    public function instructors()
+    {
+        return $this->belongsToMany(User::class, 'class_instructors', 'class_id', 'instructor_id')
+            ->withPivot('assignment_type', 'assigned_at');
+    }
+
+    public function courseRecord()
+    {
+        return $this->belongsTo(Course::class, 'course_id');
+    }
+
+    public function academicTerm()
+    {
+        return $this->belongsTo(AcademicTerm::class, 'term_id');
     }
 
     public function enrollments()

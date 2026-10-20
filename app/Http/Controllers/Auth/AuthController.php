@@ -3,14 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\RegisterRequest;
-use App\Http\Requests\Auth\RegisterLecturerRequest;
-use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Exception;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -21,70 +17,21 @@ class AuthController extends Controller
         $this->userService = $userService;
     }
 
-    public function login(LoginRequest $request): JsonResponse
-    {
-        try {
-            $user = $this->userService->authenticate($request->email, $request->password);
-            $token = $user->createToken('auth-token')->plainTextToken;
-
-            return response()->json([
-                'access_token' => $token,
-                'token_type'   => 'bearer',
-                'user'         => $user,
-            ]);
-        } catch (Exception $e) {
-            $status = $e->getCode() ?: 401;
-            return response()->json(['detail' => $e->getMessage()], $status);
-        }
-    }
-
-    public function register(RegisterRequest $request): JsonResponse
-    {
-        $user = $this->userService->registerStudent($request->validated());
-        $token = $user->createToken('auth-token')->plainTextToken;
-
-        return response()->json([
-            'access_token' => $token,
-            'token_type'   => 'bearer',
-            'user'         => $user,
-        ], 201);
-    }
-
-    public function registerLecturer(RegisterLecturerRequest $request): JsonResponse
-    {
-        $user = $this->userService->registerLecturer($request->validated());
-
-        return response()->json([
-            'message' => 'Registration submitted. Please wait for administrator approval.',
-            'user'    => $user,
-        ], 201);
-    }
-
-    public function demoLogin(Request $request): JsonResponse
-    {
-        $role = $request->input('role', 'student');
-        $user = User::where('role', $role)->first();
-
-        if (!$user) {
-            return response()->json(['detail' => 'Demo user not found'], 404);
-        }
-
-        $token = $user->createToken('demo-token')->plainTextToken;
-
-        return response()->json([
-            'access_token' => $token,
-            'token_type'   => 'bearer',
-            'user'         => $user,
-        ]);
-    }
-
-    public function tokenLogin(Request $request): JsonResponse
-    {
-        return $this->login(app(LoginRequest::class));
-    }
-
     public function me(Request $request): JsonResponse
     {
         return response()->json($request->user());
+    }
+
+    public function updateMe(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id, 'id')],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'initials' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'department' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        return response()->json($this->userService->updateUser($user->id, $data));
     }
 }

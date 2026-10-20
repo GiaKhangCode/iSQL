@@ -12,6 +12,30 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasUuid;
 
+    public const ROLE_STUDENT = 'student';
+    public const ROLE_INSTRUCTOR_PRACTICAL = 'instructor_practical';
+    public const ROLE_INSTRUCTOR_THEORY = 'instructor_theory';
+    public const ROLE_DEPARTMENT_HEAD = 'department_head';
+    public const ROLE_ADMIN = 'admin';
+
+    /** New role values accepted for account creation and role changes. */
+    public const ROLES = [
+        self::ROLE_STUDENT,
+        self::ROLE_INSTRUCTOR_PRACTICAL,
+        self::ROLE_INSTRUCTOR_THEORY,
+        self::ROLE_DEPARTMENT_HEAD,
+        self::ROLE_ADMIN,
+    ];
+
+    /** `instructor` is retained for accounts created before the role split. */
+    public const LEGACY_INSTRUCTOR_ROLE = 'instructor';
+
+    public const INSTRUCTOR_ROLES = [
+        self::ROLE_INSTRUCTOR_PRACTICAL,
+        self::ROLE_INSTRUCTOR_THEORY,
+        self::LEGACY_INSTRUCTOR_ROLE,
+    ];
+
     protected $table = 'users';
 
     protected $fillable = [
@@ -52,6 +76,23 @@ class User extends Authenticatable
     public function enrollments()
     {
         return $this->hasMany(ClassEnrollment::class, 'student_id');
+    }
+
+    public function enrolledClasses()
+    {
+        return $this->belongsToMany(ClassModel::class, 'class_enrollments', 'student_id', 'class_id')
+            ->withPivot('role', 'joined_at');
+    }
+
+    public function taughtClasses()
+    {
+        return $this->hasMany(ClassModel::class, 'instructor_id');
+    }
+
+    public function assignedClasses()
+    {
+        return $this->belongsToMany(ClassModel::class, 'class_instructors', 'instructor_id', 'class_id')
+            ->withPivot('assigned_at');
     }
 
     public function favorites()

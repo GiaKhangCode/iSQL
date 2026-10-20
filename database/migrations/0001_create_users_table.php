@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('hashed_password', 255);
             $table->string('name', 255);
             $table->string('initials', 10);
-            $table->string('role', 50)->default('student');      // student | instructor | admin
+            $table->string('role', 50)->default('student');      // student | instructor_practical | instructor_theory | department_head | admin
             $table->string('status', 50)->default('Active');     // Active | Inactive | Pending
             $table->string('department', 255)->nullable();
             $table->integer('current_streak')->default(0);
