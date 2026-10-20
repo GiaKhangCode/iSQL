@@ -34,28 +34,23 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    /**
+     * Chỉ định cột dùng làm mật khẩu xác thực (mặc định của Laravel là 'password')
+     */
     public function getAuthPasswordName(): string
     {
         return 'hashed_password';
     }
 
-    public function notifications()
+    public function roleGroups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
-        return $this->hasMany(Notification::class);
+        return $this->belongsToMany(RoleGroup::class, 'account_assign_role_group', 'account_id', 'role_group_id')
+                    ->withTimestamps();
     }
 
-    public function submissions()
+    public function directRoles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
-        return $this->hasMany(Submission::class);
-    }
-
-    public function enrollments()
-    {
-        return $this->hasMany(ClassEnrollment::class, 'student_id');
-    }
-
-    public function favorites()
-    {
-        return $this->hasMany(Favorite::class);
+        return $this->belongsToMany(Role::class, 'account_assign_role', 'account_id', 'role_id')
+                    ->withTimestamps();
     }
 }
