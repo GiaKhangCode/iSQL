@@ -30,7 +30,7 @@ class UserSeeder extends Seeder
                 'name'            => 'Dr. Nguyen Van A',
                 'initials'        => 'NA',
                 'hashed_password' => Hash::make('password123'),
-                'role'            => 'instructor',
+                'role'            => 'instructor_practical',
                 'status'          => 'Active',
                 'department'      => 'Faculty of Software Engineering',
             ]

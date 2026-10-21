@@ -4,7 +4,12 @@ namespace App\Services;
 
 use App\Models\ClassModel;
 use App\Models\ClassEnrollment;
+use App\Models\AcademicTerm;
+use App\Models\Course;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ClassService
 {
@@ -13,7 +18,25 @@ class ClassService
      */
     public function getAllClasses(): Collection
     {
-        return ClassModel::with(['instructor', 'students'])->orderBy('created_at', 'desc')->get();
+        return ClassModel::with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm'])
+            ->orderBy('created_at', 'desc')->get();
+    }
+
+    /**
+     * Get one class, optionally limited to its instructor.
+     */
+    public function getClass(string $classId, ?string $instructorId = null): ClassModel
+    {
+        $query = ClassModel::with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm'])->whereKey($classId);
+
+        if ($instructorId !== null) {
+            $query->where(function ($query) use ($instructorId): void {
+                $query->where('instructor_id', $instructorId)
+                    ->orWhereHas('instructors', fn ($instructors) => $instructors->where('users.id', $instructorId));
+            });
+        }
+
+        return $query->firstOrFail();
     }
 
     /**
@@ -21,25 +44,257 @@ class ClassService
      */
     public function getInstructorClasses(string $instructorId): Collection
     {
-        return ClassModel::where('instructor_id', $instructorId)
-            ->with(['students'])
+        return ClassModel::where(function ($query) use ($instructorId): void {
+                $query->where('instructor_id', $instructorId)
+                    ->orWhereHas('instructors', fn ($instructors) => $instructors->where('users.id', $instructorId));
+            })
+            ->with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm'])
+            ->distinct()
             ->orderBy('created_at', 'desc')
             ->get();
     }
 
-    /**
-     * Create a new class
-     */
-    public function createClass(array $data, string $instructorId): ClassModel
+    public function getStudentClasses(string $studentId): Collection
     {
-        return ClassModel::create([
+        return User::findOrFail($studentId)->enrolledClasses()
+            ->with(['instructor', 'instructors', 'courseRecord', 'academicTerm'])
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    /**
+     * Create a class for an administrator, department head, or owning instructor.
+     */
+    public function createManagedClass(array $data, ?string $instructorId = null): ClassModel
+    {
+        $data = $this->resolveCatalogLabels($data);
+        $class = ClassModel::create([
             'course'        => $data['course'],
+            'course_id'     => $data['course_id'] ?? null,
             'term'          => $data['term'],
+            'term_id'       => $data['term_id'] ?? null,
             'instructor_id' => $instructorId,
             'start_date'    => $data['start_date'] ?? null,
             'end_date'      => $data['end_date'] ?? null,
-            'status'        => 'Active',
+            'status'        => $data['status'] ?? 'Active',
         ]);
+
+        if ($instructorId !== null) {
+            $this->assignInstructor($class->id, 'practical', $instructorId);
+        }
+
+        return $class->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    /**
+     * Assign an instructor to a class.
+     */
+    public function assignInstructor(string $classId, string $assignmentType, string $instructorId): ClassModel
+    {
+        $this->assertActiveInstructor($instructorId);
+        $class = ClassModel::findOrFail($classId);
+
+        DB::transaction(function () use ($class, $assignmentType, $instructorId): void {
+            DB::table('class_instructors')
+                ->where('class_id', $class->id)
+                ->where('assignment_type', $assignmentType)
+                ->delete();
+            DB::table('class_instructors')->insert([
+                'class_id' => $class->id,
+                'instructor_id' => $instructorId,
+                'assignment_type' => $assignmentType,
+                'assigned_at' => now(),
+            ]);
+            $this->syncLegacyInstructorId($class->id);
+        });
+
+        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    public function syncInstructorAssignments(string $classId, string $theoryInstructorId, string $practicalInstructorId): ClassModel
+    {
+        $class = ClassModel::findOrFail($classId);
+        $this->assertActiveInstructor($theoryInstructorId);
+        $this->assertActiveInstructor($practicalInstructorId);
+
+        DB::transaction(function () use ($class, $theoryInstructorId, $practicalInstructorId): void {
+            DB::table('class_instructors')->where('class_id', $class->id)->delete();
+            DB::table('class_instructors')->insert([
+                [
+                    'class_id' => $class->id,
+                    'instructor_id' => $theoryInstructorId,
+                    'assignment_type' => 'theory',
+                    'assigned_at' => now(),
+                ],
+                [
+                    'class_id' => $class->id,
+                    'instructor_id' => $practicalInstructorId,
+                    'assignment_type' => 'practical',
+                    'assigned_at' => now(),
+                ],
+            ]);
+            $this->syncLegacyInstructorId($class->id);
+        });
+
+        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    public function removeInstructorAssignment(string $classId, string $assignmentType): ClassModel
+    {
+        $class = ClassModel::findOrFail($classId);
+
+        DB::transaction(function () use ($class, $assignmentType): void {
+            DB::table('class_instructors')
+                ->where('class_id', $class->id)
+                ->where('assignment_type', $assignmentType)
+                ->delete();
+            $this->syncLegacyInstructorId($class->id);
+        });
+
+        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    private function assertActiveInstructor(string $instructorId): void
+    {
+        $valid = User::whereKey($instructorId)
+            ->whereIn('role', User::INSTRUCTOR_ROLES)
+            ->where('status', 'Active')
+            ->exists();
+
+        if (! $valid) {
+            throw ValidationException::withMessages([
+                'instructor_id' => ['The instructor must be an active practical or theory instructor.'],
+            ]);
+        }
+    }
+
+    private function syncLegacyInstructorId(string $classId): void
+    {
+        $practicalId = DB::table('class_instructors')
+            ->where('class_id', $classId)
+            ->where('assignment_type', 'practical')
+            ->value('instructor_id');
+        $theoryId = DB::table('class_instructors')
+            ->where('class_id', $classId)
+            ->where('assignment_type', 'theory')
+            ->value('instructor_id');
+
+        DB::table('classes')->where('id', $classId)->update([
+            'instructor_id' => $practicalId ?? $theoryId,
+        ]);
+    }
+
+    /**
+     * Update a class, optionally requiring it to belong to an instructor.
+     */
+    public function updateClass(string $classId, array $data, ?string $instructorId = null): ClassModel
+    {
+        $class = $this->findClassForManagement($classId, $instructorId);
+        $data = $this->resolveCatalogLabels($data, creating: false);
+        $class->fill($data);
+        $class->save();
+
+        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    /**
+     * Delete a class, optionally requiring it to belong to an instructor.
+     */
+    public function deleteClass(string $classId, ?string $instructorId = null): void
+    {
+        $this->findClassForManagement($classId, $instructorId)->delete();
+    }
+
+    private function findClassForManagement(string $classId, ?string $instructorId): ClassModel
+    {
+        $query = ClassModel::whereKey($classId);
+
+        if ($instructorId !== null) {
+            $query->where(function ($query) use ($instructorId): void {
+                $query->where('instructor_id', $instructorId)
+                    ->orWhereHas('instructors', fn ($instructors) => $instructors->where('users.id', $instructorId));
+            });
+        }
+
+        return $query->firstOrFail();
+    }
+
+    public function addStudents(string $classId, array $studentIds, ?string $instructorId = null): ClassModel
+    {
+        $class = $this->findClassForManagement($classId, $instructorId);
+        $this->assertStudentAccounts($studentIds);
+
+        DB::transaction(function () use ($class, $studentIds): void {
+            $class->students()->syncWithoutDetaching($studentIds);
+        });
+
+        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    public function replaceStudents(string $classId, array $studentIds, ?string $instructorId = null): ClassModel
+    {
+        $class = $this->findClassForManagement($classId, $instructorId);
+        $this->assertStudentAccounts($studentIds);
+
+        DB::transaction(function () use ($class, $studentIds): void {
+            $class->students()->sync($studentIds);
+        });
+
+        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    public function removeStudent(string $classId, string $studentId, ?string $instructorId = null): ClassModel
+    {
+        $class = $this->findClassForManagement($classId, $instructorId);
+        if ($class->students()->detach($studentId) === 0) {
+            abort(404, 'Student is not enrolled in this class.');
+        }
+
+        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    private function assertStudentAccounts(array $studentIds): void
+    {
+        if ($studentIds === []) {
+            return;
+        }
+
+        $uniqueIds = array_values(array_unique($studentIds));
+        $studentCount = User::whereIn('id', $uniqueIds)->where('role', User::ROLE_STUDENT)->count();
+        if ($studentCount !== count($uniqueIds) || count($uniqueIds) !== count($studentIds)) {
+            throw ValidationException::withMessages([
+                'student_ids' => ['Each student ID must identify a distinct student account.'],
+            ]);
+        }
+    }
+
+    private function resolveCatalogLabels(array $data, bool $creating = true): array
+    {
+        if (array_key_exists('course_id', $data) && $data['course_id'] !== null) {
+            $course = Course::findOrFail($data['course_id']);
+            if (isset($data['course']) && $data['course'] !== $course->name) {
+                throw ValidationException::withMessages(['course_id' => ['The course name does not match course_id.']]);
+            }
+            $data['course'] = $course->name;
+        } elseif (array_key_exists('course', $data)) {
+            $data['course_id'] = Course::where('name', $data['course'])->value('id');
+        } elseif ($creating) {
+            throw ValidationException::withMessages(['course' => ['A course name or course_id is required.']]);
+        }
+
+        if (array_key_exists('term_id', $data) && $data['term_id'] !== null) {
+            $term = AcademicTerm::findOrFail($data['term_id']);
+            if (isset($data['term']) && $data['term'] !== $term->name) {
+                throw ValidationException::withMessages(['term_id' => ['The term name does not match term_id.']]);
+            }
+            $data['term'] = $term->name;
+        } elseif (array_key_exists('term', $data)) {
+            $data['term_id'] = AcademicTerm::where('name', $data['term'])->value('id');
+        } elseif ($creating) {
+            throw ValidationException::withMessages(['term' => ['A term name or term_id is required.']]);
+        }
+
+        return $data;
     }
 
     /**

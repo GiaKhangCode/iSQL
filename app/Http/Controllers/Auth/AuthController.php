@@ -12,6 +12,7 @@ use App\Http\Requests\Auth\RegisterLecturerRequest;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Exception;
 
 class AuthController extends Controller
@@ -25,16 +26,10 @@ class AuthController extends Controller
 
     public function register(RegisterRequest $request): JsonResponse
     {
-        // 1. Lấy dữ liệu đã được validate an toàn
         $validatedData = $request->validated();
-
-        // 2. Gọi tầng Service thực hiện lưu CSDL
         $user = $this->userService->registerStudent($validatedData);
-
-        // 3. Cấp Sanctum Token (Bearer Token) để Frontend tự động đăng nhập
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        // 4. Trả về đúng định dạng mà Frontend React đang chờ (HTTP 201 Created)
         return response()->json([
             'access_token' => $token,
             'token_type'   => 'bearer',
@@ -47,27 +42,20 @@ class AuthController extends Controller
         $validatedData = $request->validated();
         $user = $this->userService->registerLecturer($validatedData);
         $token = $user->createToken('auth-token')->plainTextToken;
+
         return response()->json([
             'access_token' => $token,
             'token_type'   => 'bearer',
             'user'         => $user,
         ], 201);
-        // return response()->json([
-        //     'message' => 'Registration submitted. Please wait for administrator approval.',
-        //     'user'    => $user,
-        // ], 201);
     }
 
     public function login(LoginRequest $request): JsonResponse
     {
         try {
-            // 1. Gọi service kiểm tra email, password, status
             $user = $this->userService->authenticate($request->email, $request->password);
-
-            // 2. Cấp Token Bearer
             $token = $user->createToken('auth-token')->plainTextToken;
-            
-            // 3. Trả về đúng format mà Frontend mong đợi
+
             return response()->json([
                 'access_token' => $token,
                 'token_type'   => 'bearer',
@@ -85,13 +73,25 @@ class AuthController extends Controller
         return response()->json($request->user());
     }
 
+    public function updateMe(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'email'      => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id, 'id')],
+            'name'       => ['sometimes', 'required', 'string', 'max:255'],
+            'initials'   => ['sometimes', 'nullable', 'string', 'max:10'],
+            'department' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        return response()->json($this->userService->updateUser($user->id, $data));
+    }
+
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         try {
             $otp = $this->userService->sendPasswordResetOtp($request->email);
             return response()->json([
-                'message' => 'Mã xác thực đã được gửi đến email của bạn.',
-                // Trả kèm otp ở môi trường local để bạn dễ test trực tiếp trên UI
+                'message'   => 'Mã xác thực đã được gửi đến email của bạn.',
                 'debug_otp' => app()->isLocal() ? $otp : null,
             ], 200);
         } catch (\Throwable $e) {
@@ -101,6 +101,7 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse
     {
         try {
@@ -110,6 +111,7 @@ class AuthController extends Controller
             return response()->json(['detail' => $e->getMessage()], 400);
         }
     }
+
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
         try {

@@ -1,140 +1,191 @@
 # 📘 iSQL Backend — Hệ Thống Luyện Tập & Thi Thực Hành SQL (UIT)
 
 [![Laravel](https://img.shields.io/badge/Laravel-11.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
-[![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
+[![PHP](https://img.shields.io/badge/PHP-8.3-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
-[![SQL Server](https://img.shields.io/badge/SQL_Server-Azure_/_MSSQL-CC292B?style=for-the-badge&logo=microsoftsqlserver&logoColor=white)](https://www.microsoft.com/sql-server)
+[![SQL Server](https://img.shields.io/badge/SQL_Server-Sandbox-CC292B?style=for-the-badge&logo=microsoftsqlserver&logoColor=white)](https://www.microsoft.com/sql-server)
 [![Redis](https://img.shields.io/badge/Redis-Queue-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![phpMyAdmin](https://img.shields.io/badge/phpMyAdmin-Ready-6C78AF?style=for-the-badge&logo=phpmyadmin&logoColor=white)](https://www.phpmyadmin.net/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-Hệ thống Backend API-Only phục vụ Luyện tập & Thi thực hành Cơ sở dữ liệu SQL dành cho sinh viên và giảng viên trường **Đại học Công nghệ Thông tin — ĐHQG-HCM (UIT)**.
+Hệ thống Backend API phục vụ việc **Luyện tập, Kiểm tra & Thi thực hành Cơ sở dữ liệu SQL** dành cho sinh viên và giảng viên trường **Đại học Công nghệ Thông tin — ĐHQG-HCM (UIT)**.
 
 ---
 
 ## 🏗️ Kiến Trúc Hệ Thống (Dual-Database Architecture)
 
-Hệ thống sử dụng mô hình kiến trúc cơ sở dữ liệu kép độc đáo:
-* **MySQL 8.0 (Nghiệp vụ):** Lưu trữ toàn bộ dữ liệu người dùng (`users`), bài tập (`problems`), lớp học (`classes`), kỳ thi (`assignments`), và lịch sử nộp bài (`submissions`).
-* **SQL Server (Azure SQL / MSSQL Sandbox):** Cơ sở dữ liệu cách ly phục vụ sinh viên thực thi lệnh DDL (`CREATE TABLE`), DML (`INSERT`), và các câu truy vấn SQL trong phòng thi theo từng schema riêng biệt.
+Hệ thống áp dụng mô hình kiến trúc cơ sở dữ liệu kép:
+
+- **MySQL 8.0 (Nghiệp vụ cốt lõi):** Quản lý người dùng, lớp học, ngân hàng câu hỏi, bài thi và ma trận phân quyền linh hoạt (RBAC).
+- **SQL Server Sandbox (Azure / Local):** Môi trường thực thi độc lập cho sinh viên chạy lệnh DDL (`CREATE TABLE`), DML (`INSERT`), và câu lệnh truy vấn SQL theo từng schema riêng biệt, đảm bảo an toàn tuyệt đối.
 
 ```
                   [React Frontend (Vite)]
-                 http://localhost:5173
-                          │
-                          │ RESTful JSON API
-                          ▼
-            ┌───────────────────────────┐
-            │  PHP Backend (Laravel 11) │
-            │  (API-Only, Service-Arch) │
-            └──────┬─────────────┬──────┘
-                   │             │
-      ┌────────────▼──┐    ┌─────▼─────────────┐
-      │  MySQL 8.0    │    │  SQL Server Azure │
-      │  (Nghiệp vụ) │    │  (Sandbox Thi cử) │
-      └───────────────┘    └───────────────────┘
+                  http://localhost:5173
+                           │
+                           │ RESTful JSON API
+                           ▼
+             ┌───────────────────────────┐
+             │  PHP Backend (Laravel 11) │
+             │  (API-Only, Service-Arch) │
+             └──────┬─────────────┬──────┘
+                    │             │
+       ┌────────────▼──┐    ┌─────▼─────────────┐
+       │  MySQL 8.0    │    │  SQL Server Azure │
+       │  (Nghiệp vụ)  │    │  (Sandbox Thi cử) │
+       └───────────────┘    └───────────────────┘
 ```
-
-Xem chi tiết kiến trúc và phân công module tại:
-* 📖 [Bản thiết kế kỹ thuật (Blueprint)](./backend_laravel_blueprint.md)
-* 🗺️ [Cẩm nang cấu trúc thư mục chi tiết (Project Structure)](./PROJECT_STRUCTURE.md)
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
+## 🚀 Hướng Dẫn Cài Đặt & Chạy Hệ Thống Nhanh (Docker)
 
-### Cách 1: Dành Cho Các Dev Đang Chạy Container `laravel_app` (Khuyến nghị cho cả nhóm)
+Toàn bộ hệ thống Backend, Database, Cache và Công cụ quản trị CSDL đã được đóng gói sẵn trong Docker. Bạn chỉ cần làm theo các bước dưới đây để chạy hệ thống từ con số 0.
 
-Nếu bạn và nhóm của bạn đã dựng sẵn stack Docker (`laravel_app` + `laravel_db`) và mở mã nguồn bằng **VS Code Remote - Containers** hoặc Terminal bên trong container `/var/www/html`:
+### Bước 1: Chuẩn bị file môi trường `.env`
+
+Đứng tại thư mục gốc dự án (`d:\PROJECTS\iSQL`), sao chép file `.env.example` thành `.env`:
 
 ```bash
-# 1. Tạo file cấu hình môi trường từ mẫu
+# Trên Windows (PowerShell / CMD):
+copy .env.example .env
+
+# Hoặc trên Linux / macOS:
 cp .env.example .env
-
-# 2. Khởi tạo Application Key
-php artisan key:generate
-
-# 3. Cấu hình kết nối Database trong file .env:
-#    DB_CONNECTION=mysql
-#    DB_HOST=db           (hoặc laravel_db tùy tên container database của bạn)
-#    DB_PORT=3306
-#    DB_DATABASE=laravel  (hoặc sql_uit)
-#    DB_USERNAME=root
-#    DB_PASSWORD=root
-
-# 4. Chạy Migration tạo 20 bảng CSDL và nạp dữ liệu mẫu
-php artisan migrate
-php artisan db:seed
-
-# 5. Chạy kiểm thử tự động để đảm bảo hệ thống sẵn sàng
-php artisan test
 ```
 
-> 🌐 **Kiểm tra hoạt động:** Mở trình duyệt trên máy thật (Host) truy cập: `http://localhost:8000/api/problems` hoặc `http://localhost:8000/api/auth/me`.
+> 💡 **Cấu hình CSDL mặc định trong `.env` đã được thiết lập sẵn sàng kết nối Docker:**
+>
+> ```env
+> DB_CONNECTION=mysql
+> DB_HOST=mysql
+> DB_PORT=3306
+> DB_DATABASE=sql_uit
+> DB_USERNAME=root
+> DB_PASSWORD=root
+> REDIS_HOST=redis
+> REDIS_PORT=6379
+> ```
 
 ---
 
-### Cách 2: Dành Cho Người Mới Bắt Đầu Từ Con Số 0 (Chưa có Container nào)
+### Bước 2: Khởi động các dịch vụ Docker
 
-Nếu bạn vừa clone repository này về một máy tính hoàn toàn mới và chưa cài môi trường gì, hệ thống đã chuẩn bị sẵn trọn gói trong thư mục [docker/](./docker):
+Tại thư mục gốc dự án, chạy lệnh:
 
 ```bash
-# 1. Di chuyển vào thư mục docker của dự án
-cd docker
-
-# 2. Khởi động 4 container (PHP-FPM 8.2 có sẵn pdo_sqlsrv, Nginx, MySQL 8.0, Redis)
-docker compose up -d --build
-
-# 3. Chạy migration và seed dữ liệu từ bên ngoài máy host:
-docker compose exec php php artisan migrate
-docker compose exec php php artisan db:seed
+docker compose -f docker/docker-compose.yml up -d --build
 ```
 
-API Backend sẽ sẵn sàng tại: `http://localhost:8000`
+Lệnh này sẽ tự động khởi động 5 containers:
 
-# 5. (Tùy chọn) Khởi động Queue Worker xử lý chấm bài nền:
-php artisan queue:work redis --queue=grading
+1. `isql_php`: PHP 8.3-FPM tích hợp sẵn extension `pdo_mysql`, `pdo_sqlsrv`, `sqlsrv`, `redis`.
+2. `isql_nginx`: Web Server Nginx lắng nghe tại cổng `8000`.
+3. `isql_mysql`: CSDL MySQL 8.0 lắng nghe tại cổng `3306`.
+4. `isql_redis`: In-memory cache & hàng đợi xử lý chấm điểm lắng nghe tại cổng `6379`.
+5. `isql_phpmyadmin`: Giao diện quản trị CSDL MySQL lắng nghe tại cổng `8080`.
+
+---
+
+### Bước 3: Cài đặt thư viện Dependencies (Composer)
+
+Do thư mục mã nguồn được mount trực tiếp từ máy vào container, chạy lệnh sau để cài đặt gói `vendor`:
+
+```bash
+docker exec isql_php composer install
 ```
+
+---
+
+### Bước 4: Khởi tạo App Key, Chạy Migrations & Seed Dữ Liệu
+
+Chạy chuỗi lệnh sau để tạo cấu trúc CSDL và nạp dữ liệu mẫu ban đầu:
+
+```bash
+# 1. Tạo khóa mã hóa ứng dụng Laravel
+docker exec isql_php php artisan key:generate
+
+# 2. Chạy migration tạo 27 bảng CSDL
+docker exec isql_php php artisan migrate
+
+# 3. Nạp dữ liệu mẫu (Tài khoản, Ma trận phân quyền, Danh mục bài tập)
+docker exec isql_php php artisan db:seed
+```
+
+---
+
+### Bước 5: Chạy Kiểm Thử Hệ Thống (Automated Testing)
+
+Chạy bộ test suite (31 tests) để xác thực toàn bộ hệ thống hoạt động chính xác 100%:
+
+```bash
+docker exec isql_php php artisan test
+```
+
+---
+
+## 🌐 Các Cổng Dịch Vụ & Địa Chỉ Truy Cập
+
+| Dịch vụ              | URL / Địa chỉ                                  | Thông tin đăng nhập / Ghi chú                               |
+| :------------------- | :--------------------------------------------- | :---------------------------------------------------------- |
+| **Backend REST API** | [http://localhost:8000](http://localhost:8000) | Gốc API của Nginx (VD: `http://localhost:8000/api/auth/me`) |
+| **phpMyAdmin**       | [http://localhost:8080](http://localhost:8080) | Server: `mysql` \| User: `root` \| Password: `root`         |
+| **MySQL 8.0**        | `localhost:3306`                               | User: `root` \| Password: `root` \| Database: `sql_uit`     |
+| **Redis**            | `localhost:6379`                               | Cache & Job Queue                                           |
 
 ---
 
 ## 🔑 Tài Khoản Demo Mặc Định
 
-Sau khi chạy `php artisan db:seed`, hệ thống có sẵn 3 tài khoản demo:
+Sau khi chạy `db:seed`, bạn có thể sử dụng ngay các tài khoản sau:
 
-| Vai trò | Email | Mật khẩu mặc định |
-| :--- | :--- | :--- |
-| **Quản trị viên (Admin)** | `admin@uit.edu.vn` | `password123` |
-| **Giảng viên (Instructor)** | `teacher@uit.edu.vn` | `password123` |
-| **Sinh viên (Student)** | `student@gm.uit.edu.vn` | `password123` |
-
----
-
-## 📡 Danh Mục API Endpoints
-
-Hệ thống cung cấp **46 API endpoints** được phân chia theo module sạch sẽ trong [routes/](./routes):
-
-* `/api/auth/*`: Đăng nhập, Đăng ký sinh viên, Đăng ký giảng viên, Demo login, `/me`.
-* `/api/admin/*`: Quản lý danh sách người dùng, kích hoạt tài khoản giảng viên, đổi quyền, thống kê hệ thống.
-* `/api/teacher/*`: Giảng viên quản lý lớp học.
-* `/api/problems/*`: Ngân hàng câu hỏi SQL (CRUD, chạy thử câu lệnh, nộp bài luyện tập).
-* `/api/assignments/*`: Quản lý bài tập & kỳ thi contest (liên kết lớp học, câu hỏi, điểm DDL/DML/SQL).
-* `/api/student/*`: Dashboard sinh viên, streak ngày làm bài, danh sách bài tập được giao, database cá nhân.
-* `/api/contests/*`: **Sandbox phòng thi SQL Server** (`setup-db`, `run-ddl`, `seed-dml`, `inspect-schema`, `run-query`, `submit-exam`).
-* `/api/submissions/*`: Lịch sử nộp bài, xem chi tiết bài làm, chấm điểm thủ công.
-* `/api/notifications/*`: Danh sách thông báo, đánh dấu đã đọc.
+| Vai trò                     | Email                   | Mật khẩu mặc định | Ghi chú quyền hạn                                                  |
+| :-------------------------- | :---------------------- | :---------------- | :----------------------------------------------------------------- |
+| **Quản trị viên (Admin)**   | `admin@uit.edu.vn`      | `password123`     | **Superadmin Bypass**: Toàn quyền trên mọi module                  |
+| **Giảng viên (Instructor)** | `teacher@uit.edu.vn`    | `password123`     | Quản lý lớp học, phân công giảng viên, tạo đề thi, quản lý bài tập |
+| **Sinh viên (Student)**     | `student@gm.uit.edu.vn` | `password123`     | Luyện tập SQL, nộp bài kiểm tra, xem danh sách lớp học             |
 
 ---
 
-## 🧪 Kiểm Thử Tự Động (Automated Testing)
+## 🛡️ Hệ Thống Ma Trận Phân Quyền (RBAC Permission Matrix)
 
-Dự án được viết sẵn bộ kiểm thử tự động (Unit & Feature tests):
+Hệ thống kết hợp ma trận phân quyền động dựa trên các Chức năng (**Functions**) và Hành động (**Actions**):
 
-```bash
-php artisan test
-```
+### 1. Bảng Chức Năng (Functions):
+
+- `USER_MGMT`: Quản lý tài khoản người dùng, duyệt giảng viên, import CSV.
+- `PERMISSION_MGMT`: Cấu hình vai trò chi tiết, nhóm quyền và gán quyền người dùng.
+- `CLASS_MGMT`: Quản lý lớp học, phân công giảng viên lý thuyết/thực hành, quản lý danh sách sinh viên.
+- `PROBLEM_MGMT`: Soạn thảo và quản lý kho bài tập thực hành SQL.
+- `ASSIGNMENT_MGMT`: Quản lý kỳ thi, bài kiểm tra, cấu hình sandbox và chấm điểm.
+- `PRACTICE_MGMT`: Luyện tập truy vấn SQL và nộp bài cá nhân.
+
+### 2. Các hành động (Actions):
+
+Mỗi quyền được phân tách thành 5 hành vi độc lập: `view` (Xem), `add` (Thêm), `edit` (Sửa), `delete` (Xóa), `download` (Tải về/Export).
+
+### 3. Quy tắc đăng ký tài khoản:
+
+- **Sinh viên (`POST /api/auth/register`):** Tự động kích hoạt (`status = 'Active'`) và gán vào Nhóm quyền **Sinh viên**.
+- **Giảng viên (`POST /api/auth/register-lecturer`):** Đăng ký ở trạng thái chờ duyệt (`status = 'Pending'`). Sau khi Quản trị viên duyệt (`POST /api/admin/users/{id}/approve`), tài khoản được chuyển sang `Active` và tự động gán vào Nhóm quyền **Giảng viên**.
+
+---
+
+## 📡 Danh Mục API Endpoints Chính
+
+- `/api/auth/*`: Đăng nhập, Đăng ký sinh viên/giảng viên, Quên mật khẩu qua OTP email, Thông tin cá nhân (`/me`), Ma trận quyền cá nhân (`/my-permissions`).
+- `/api/admin/users/*`: Quản lý người dùng, nhập danh sách qua CSV, duyệt giảng viên, reset mật khẩu sinh viên.
+- `/api/admin/courses` & `/api/admin/terms`: Quản lý danh mục Môn học và Học kỳ.
+- `/api/admin/roles` & `/api/admin/role-groups`: Quản trị ma trận phân quyền chi tiết.
+- `/api/teacher/classes/*`: Quản lý lớp học, phân công giảng viên lý thuyết/thực hành, quản lý danh sách sinh viên lớp.
+- `/api/student/*`: Dashboard tiến độ học tập cá nhân, danh sách lớp theo học, database cá nhân.
+- `/api/problems/*`: Ngân hàng bài tập SQL (CRUD, chạy thử câu lệnh, nộp bài chấm điểm).
+- `/api/assignments/*`: Quản lý kỳ thi, liên kết lớp học, cấu hình bài thi DDL/DML/Query.
+- `/api/contests/*`: **Sandbox phòng thi SQL Server** (khởi tạo schema, chạy DDL/DML/Query, nộp bài).
+- `/api/submissions/*`: Lịch sử nộp bài và kết quả chấm điểm.
 
 ---
 
 ## 👥 Đội Ngũ Phát Triển
 
-Dự án phục vụ giảng dạy và thực hành môn Cơ sở dữ liệu tại **Trường Đại học Công nghệ Thông tin — ĐHQG-HCM**.
+Dự án được xây dựng phục vụ công tác giảng dạy & thực hành môn Cơ sở dữ liệu tại **Trường Đại học Công nghệ Thông tin — ĐHQG-HCM (UIT)**.

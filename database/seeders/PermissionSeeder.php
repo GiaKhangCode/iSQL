@@ -49,6 +49,7 @@ class PermissionSeeder extends Seeder
 
             // CLASS_MGMT
             ['function_id' => $functionIds['CLASS_MGMT'], 'name' => 'Toàn quyền lớp học', 'add' => 1, 'edit' => 1, 'delete' => 1, 'download' => 1, 'view' => 1],
+            ['function_id' => $functionIds['CLASS_MGMT'], 'name' => 'Chỉ xem lớp học', 'add' => 0, 'edit' => 0, 'delete' => 0, 'download' => 0, 'view' => 1],
 
             // ASSIGNMENT_MGMT
             ['function_id' => $functionIds['ASSIGNMENT_MGMT'], 'name' => 'Toàn quyền bài thi & chấm điểm', 'add' => 1, 'edit' => 1, 'delete' => 1, 'download' => 1, 'view' => 1],
@@ -125,17 +126,43 @@ class PermissionSeeder extends Seeder
             );
         }
 
-        // Sinh viên: Luyện tập, nộp bài
-        DB::table('role_group_assign_role')->updateOrInsert(
-            ['role_group_id' => $groupIds['Sinh viên'], 'role_id' => $roleIds['Quyền luyện tập & nộp bài']],
-            ['created_at' => now(), 'updated_at' => now()]
-        );
+        // Sinh viên: Luyện tập, nộp bài, xem lớp học
+        $studentRoles = [
+            $roleIds['Quyền luyện tập & nộp bài'],
+            $roleIds['Chỉ xem lớp học'],
+        ];
 
-        // 5. Gán nhóm Admin cho tài khoản admin hiện có
-        $adminUser = User::where('role', 'admin')->first();
-        if ($adminUser) {
+        foreach ($studentRoles as $rid) {
+            DB::table('role_group_assign_role')->updateOrInsert(
+                ['role_group_id' => $groupIds['Sinh viên'], 'role_id' => $rid],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+        }
+
+        // 5. Gán nhóm cho các tài khoản demo hiện có
+        // Admin
+        $adminUsers = User::where('role', 'admin')->get();
+        foreach ($adminUsers as $u) {
             DB::table('account_assign_role_group')->updateOrInsert(
-                ['account_id' => $adminUser->id, 'role_group_id' => $groupIds['Admin (Quản trị viên)']],
+                ['account_id' => $u->id, 'role_group_id' => $groupIds['Admin (Quản trị viên)']],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+        }
+
+        // Giảng viên
+        $lecturerUsers = User::whereIn('role', User::INSTRUCTOR_ROLES)->orWhere('role', 'instructor')->get();
+        foreach ($lecturerUsers as $u) {
+            DB::table('account_assign_role_group')->updateOrInsert(
+                ['account_id' => $u->id, 'role_group_id' => $groupIds['Giảng viên']],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+        }
+
+        // Sinh viên
+        $studentUsers = User::where('role', 'student')->get();
+        foreach ($studentUsers as $u) {
+            DB::table('account_assign_role_group')->updateOrInsert(
+                ['account_id' => $u->id, 'role_group_id' => $groupIds['Sinh viên']],
                 ['created_at' => now(), 'updated_at' => now()]
             );
         }

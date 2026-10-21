@@ -10,8 +10,34 @@ use App\Models\User;
 
 class PermissionService
 {
+    protected array $cache = [];
+
     public function getUserPermission(string $accountID): array
     {
+        if (isset($this->cache[$accountID])) {
+            return $this->cache[$accountID];
+        }
+
+        // 1. Kiểm tra nếu là Admin thì luôn có toàn quyền (Superadmin Bypass)
+        $user = User::find($accountID);
+        if ($user && ($user->role === User::ROLE_ADMIN || $user->role === 'admin')) {
+            $functions = FunctionModel::all();
+            $permission = [];
+            foreach ($functions as $f) {
+                $permission[$f->code] = [
+                    'name'     => $f->name,
+                    'view'     => true,
+                    'add'      => true,
+                    'edit'     => true,
+                    'delete'   => true,
+                    'download' => true,
+                ];
+            }
+            $this->cache[$accountID] = $permission;
+            return $permission;
+        }
+
+        // 2. Tra cứu ma trận quyền tổng hợp từ Nhóm quyền và Quyền trực tiếp
         $rows = DB::select("
             SELECT 
                 f.code,
@@ -34,20 +60,30 @@ class PermissionService
             JOIN roles r ON user_roles.role_id = r.id
             JOIN functions f ON r.function_id = f.id
             GROUP BY f.code, f.name
-        ",[$accountID,$accountID]);
+        ", [$accountID, $accountID]);
 
         $permission = [];
-        foreach ($rows as $row){
+        foreach ($rows as $row) {
             $permission[$row->code] = [
-                'name' => $row->name,
-                'view' => (bool) $row->can_view,
-                'add' => (bool) $row->can_add,
-                'edit' => (bool) $row->can_edit,
-                'delete' => (bool) $row->can_delete,
+                'name'     => $row->name,
+                'view'     => (bool) $row->can_view,
+                'add'      => (bool) $row->can_add,
+                'edit'     => (bool) $row->can_edit,
+                'delete'   => (bool) $row->can_delete,
                 'download' => (bool) $row->can_download,
             ];
         }
 
+        $this->cache[$accountID] = $permission;
         return $permission;
+    }
+
+    public function clearCache(?string $accountID = null): void
+    {
+        if ($accountID) {
+            unset($this->cache[$accountID]);
+        } else {
+            $this->cache = [];
+        }
     }
 }
