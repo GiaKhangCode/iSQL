@@ -33,7 +33,7 @@ class AuthController extends Controller
         return response()->json([
             'access_token' => $token,
             'token_type'   => 'bearer',
-            'user'         => $user,
+            'user'         => $this->formatAuthUser($user),
         ], 201);
     }
 
@@ -46,7 +46,7 @@ class AuthController extends Controller
         return response()->json([
             'access_token' => $token,
             'token_type'   => 'bearer',
-            'user'         => $user,
+            'user'         => $this->formatAuthUser($user),
         ], 201);
     }
 
@@ -59,7 +59,7 @@ class AuthController extends Controller
             return response()->json([
                 'access_token' => $token,
                 'token_type'   => 'bearer',
-                'user'         => $user,
+                'user'         => $this->formatAuthUser($user),
             ], 200);
         } catch (Exception $e) {
             \Log::error('Login Exception: ' . $e->getMessage(), ['exception' => $e]);
@@ -70,7 +70,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json($request->user());
+        return response()->json($this->formatAuthUser($request->user()));
     }
 
     public function updateMe(Request $request): JsonResponse
@@ -83,7 +83,13 @@ class AuthController extends Controller
             'department' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
-        return response()->json($this->userService->updateUser($user->id, $data));
+        $updated = $this->userService->updateUser($user->id, $data);
+        return response()->json($this->formatAuthUser($updated));
+    }
+
+    protected function formatAuthUser(\App\Models\User $user): array
+    {
+        return $user->toAuthArray();
     }
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse

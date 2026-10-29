@@ -18,13 +18,14 @@ class User extends Authenticatable
     public const ROLE_DEPARTMENT_HEAD = 'department_head';
     public const ROLE_ADMIN = 'admin';
 
-    /** New role values accepted for account creation and role changes. */
+    /** Accepted role values for account creation and role changes. */
     public const ROLES = [
         self::ROLE_STUDENT,
         self::ROLE_INSTRUCTOR_PRACTICAL,
         self::ROLE_INSTRUCTOR_THEORY,
         self::ROLE_DEPARTMENT_HEAD,
         self::ROLE_ADMIN,
+        self::LEGACY_INSTRUCTOR_ROLE,
     ];
 
     /** `instructor` is retained for accounts created before the role split. */
@@ -78,13 +79,73 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
+    public function isInstructor(): bool
+    {
+        return in_array($this->role, self::INSTRUCTOR_ROLES, true)
+            || str_contains(strtolower((string) $this->role), 'instructor')
+            || $this->role === self::ROLE_DEPARTMENT_HEAD
+            || str_contains(strtolower((string) $this->role), 'lecturer');
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN || $this->role === 'admin';
+    }
+
+    public function getFrontendRole(): string
+    {
+        if ($this->isAdmin()) {
+            return 'admin';
+        }
+        if ($this->isInstructor()) {
+            return 'instructor';
+        }
+        return 'student';
+    }
+
+    public function toAuthArray(): array
+    {
+        return array_merge($this->toArray(), [
+            'id'             => (string) $this->id,
+            'name'           => $this->name,
+            'email'          => $this->email,
+            'initials'       => $this->initials ?? mb_strtoupper(mb_substr(trim($this->name ?: ''), 0, 2, 'UTF-8'), 'UTF-8'),
+            'role'           => $this->getFrontendRole(),
+            'technical_role' => $this->role,
+            'status'         => $this->status,
+        ]);
+    }
+
     /**
      * Kiểm tra quyền hạn theo ma trận Function & Action (view, add, edit, delete, download)
      */
     public function canDo(string $functionCode, string $action = 'view'): bool
     {
-        if ($this->role === self::ROLE_ADMIN || $this->role === 'admin') {
+        if ($this->isAdmin()) {
             return true;
+        }
+
+        // Student default permissions
+        if ($this->role === self::ROLE_STUDENT || $this->role === 'student') {
+            if ($functionCode === 'PRACTICE_MGMT' && in_array($action, ['view', 'add'])) {
+                return true;
+            }
+            if ($functionCode === 'CLASS_MGMT' && $action === 'view') {
+                return true;
+            }
+        }
+
+        // Instructor default permissions
+        if ($this->isInstructor()) {
+            if ($functionCode === 'CLASS_MGMT' && $action === 'view') {
+                return true;
+            }
+            if ($functionCode === 'PROBLEM_MGMT') {
+                return true;
+            }
+            if ($functionCode === 'ASSIGNMENT_MGMT') {
+                return true;
+            }
         }
 
         $permissions = app(\App\Services\PermissionService::class)->getUserPermission($this->id);

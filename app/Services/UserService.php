@@ -137,15 +137,23 @@ class UserService
      */
     public function createUser(array $data): User
     {
-        return User::create([
+        $role = $data['role'];
+        if ($role === 'lecturer') {
+            $role = User::ROLE_INSTRUCTOR_PRACTICAL;
+        }
+
+        $initials = $data['initials'] ?? null;
+        if (!$initials && !empty($data['name'])) {
+            $initials = mb_strtoupper(mb_substr(trim($data['name']), 0, 2, 'UTF-8'), 'UTF-8');
+        }
+
+        $user = User::create([
             'email'           => $data['email'],
             'hashed_password' => Hash::make($data['password']),
             'name'            => $data['name'],
-            'initials'        => $data['initials'] ?? strtoupper(substr($data['name'], 0, 2)),
-            'role'            => $data['role'],
-            'status'          => $data['status'] ?? (
-                in_array($data['role'], User::INSTRUCTOR_ROLES, true) ? 'Pending' : 'Active'
-            ),
+            'initials'        => $initials ?: 'US',
+            'role'            => $role,
+            'status'          => $data['status'] ?? 'Active',
             'department'      => $data['department'] ?? null,
         ]);
 
@@ -167,23 +175,35 @@ class UserService
     }
 
     /**
-     * Find one user by its ID.
+     * Find one user by ID or Email.
      */
-    public function getUser(string $id): User
+    public function getUser(string $idOrEmail): User
     {
-        return User::findOrFail($id);
+        return User::where('id', $idOrEmail)->orWhere('email', $idOrEmail)->firstOrFail();
     }
 
     /**
      * Update the supplied profile fields and optionally replace the password.
      */
-    public function updateUser(string $id, array $data): User
+    public function updateUser(string $idOrEmail, array $data): User
     {
-        $user = User::findOrFail($id);
+        $user = $this->getUser($idOrEmail);
         $credentialsChanged = false;
 
-        if (isset($data['role']) && $data['role'] !== $user->role) {
-            $this->assertRoleChangeAllowed($user, $data['role']);
+        if (isset($data['role'])) {
+            $role = strtolower((string) $data['role']);
+            if ($role === 'lecturer' || $role === 'instructor') {
+                $role = User::ROLE_INSTRUCTOR_PRACTICAL;
+            } elseif ($role === 'student') {
+                $role = User::ROLE_STUDENT;
+            } elseif ($role === 'admin') {
+                $role = User::ROLE_ADMIN;
+            }
+            $data['role'] = $role;
+
+            if ($data['role'] !== $user->role) {
+                $this->assertRoleChangeAllowed($user, $data['role']);
+            }
         }
 
         if (array_key_exists('initials', $data) && $data['initials'] === null) {
@@ -206,6 +226,40 @@ class UserService
         }
 
         return $user->refresh();
+    }
+
+    /**
+     * Format a user model for Admin frontend response
+     */
+    public function formatUserResponse(User $user): array
+    {
+        $roleDisplay = 'Student';
+        $frontendRole = 'Student';
+
+        if (in_array($user->role, User::INSTRUCTOR_ROLES, true) || str_contains(strtolower((string) $user->role), 'instructor')) {
+            $roleDisplay = 'Lecturer';
+            $frontendRole = 'Lecturer';
+        } elseif ($user->role === User::ROLE_ADMIN || $user->role === 'admin') {
+            $roleDisplay = 'Admin';
+            $frontendRole = 'Admin';
+        }
+
+        $joined = $user->created_at ? $user->created_at->format('M d, Y') : 'Unknown';
+        $lastActive = $user->last_active ? $user->last_active->format('M d, Y') : ($user->updated_at ? $user->updated_at->format('M d, Y') : 'Unknown');
+
+        return array_merge($user->toArray(), [
+            'id'             => $user->id,
+            'name'           => $user->name,
+            'email'          => $user->email,
+            'role'           => $frontendRole,
+            'technical_role' => $user->role,
+            'roleDisplay'    => $roleDisplay,
+            'status'         => $user->status ?? 'Active',
+            'lastActive'     => $lastActive,
+            'last_active'    => $lastActive,
+            'joined'         => $joined,
+            'detail'         => $user->department ?: '',
+        ]);
     }
 
     /**

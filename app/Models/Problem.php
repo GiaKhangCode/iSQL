@@ -9,7 +9,7 @@ class Problem extends Model
 {
     use HasUuid;
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'id',
@@ -24,6 +24,10 @@ class Problem extends Model
         'practice_listed',
         'database_type',
         'creator_id',
+        'workspace_parts',
+        'schema_file_name',
+        'database_description',
+        'database_description_visible',
         'tables',
         'expected',
         'test_cases',
@@ -35,6 +39,9 @@ class Problem extends Model
         'expected' => 'array',
         'test_cases' => 'array',
         'practice_listed' => 'boolean',
+        'workspace_parts' => 'array',
+        'database_description' => 'array',
+        'database_description_visible' => 'boolean',
     ];
 
     public function creator()
@@ -49,7 +56,12 @@ class Problem extends Model
 
     public function testCases()
     {
-        return $this->hasMany(TestCase::class, 'problem_id');
+        return $this->hasMany(TestCase::class, 'problem_id')->orderBy('order_index');
+    }
+
+    public function sqlSolutions()
+    {
+        return $this->hasMany(ProblemSqlSolution::class, 'problem_id')->orderBy('order_index');
     }
 
     public function submissions()

@@ -3,13 +3,16 @@
 namespace App\Models;
 
 use App\Models\Traits\HasUuid;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class AssignmentClass extends Model
+class AssignmentClass extends Pivot
 {
     use HasUuid;
 
+    public $incrementing = false;
+    protected $keyType = 'string';
     public $timestamps = false;
+    protected $table = 'assignment_classes';
 
     protected $fillable = [
         'id',
