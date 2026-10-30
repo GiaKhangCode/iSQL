@@ -38,10 +38,11 @@ Route::middleware(['auth:sanctum', 'active', 'permission:CLASS_MGMT,view'])->gro
     Route::post('/classes/{id}/students/{studentId}/reset-password', [ClassRosterController::class, 'resetStudentPassword'])->middleware('permission:CLASS_MGMT,edit');
 });
 
-Route::middleware(['auth:sanctum', 'active'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'permission:PROBLEM_MGMT,view'])->group(function () {
     Route::get('/database-library', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'index']);
-    Route::post('/database-library', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'store']);
+    Route::post('/database-library', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'store'])->middleware('permission:PROBLEM_MGMT,add');
+    Route::post('/database-library/test-run', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'testRun'])->middleware('permission:PROBLEM_MGMT,add');
     Route::get('/database-library/{id}', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'show']);
-    Route::put('/database-library/{id}', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'update']);
-    Route::delete('/database-library/{id}', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'destroy']);
+    Route::put('/database-library/{id}', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'update'])->middleware('permission:PROBLEM_MGMT,edit');
+    Route::delete('/database-library/{id}', [\App\Http\Controllers\Teacher\DatabaseLibraryController::class, 'destroy'])->middleware('permission:PROBLEM_MGMT,delete');
 });
