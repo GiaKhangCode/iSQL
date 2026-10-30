@@ -67,8 +67,24 @@ class ClassService
      */
     public function createManagedClass(array $data, ?string $instructorId = null): ClassModel
     {
+        if (isset($data['semester']) && !isset($data['term'])) {
+            $data['term'] = $data['semester'];
+        }
+        if (isset($data['startDate']) && !isset($data['start_date'])) {
+            $data['start_date'] = $data['startDate'];
+        }
+        if (isset($data['endDate']) && !isset($data['end_date'])) {
+            $data['end_date'] = $data['endDate'];
+        }
+
+        $lecturerInput = $data['lecturer_id'] ?? $data['lecturerId'] ?? $data['instructor_id'] ?? null;
+        if ($lecturerInput !== null && $lecturerInput !== 'Unassigned' && $lecturerInput !== '') {
+            $instructorId = $lecturerInput;
+        }
+
         $data = $this->resolveCatalogLabels($data);
-        $class = ClassModel::create([
+
+        $attributes = [
             'course'        => $data['course'],
             'course_id'     => $data['course_id'] ?? null,
             'term'          => $data['term'],
@@ -77,22 +93,33 @@ class ClassService
             'start_date'    => $data['start_date'] ?? null,
             'end_date'      => $data['end_date'] ?? null,
             'status'        => $data['status'] ?? 'Active',
-        ]);
+        ];
 
-        if ($instructorId !== null) {
-            $this->assignInstructor($class->id, 'practical', $instructorId);
+        if (!empty($data['id'])) {
+            $attributes['id'] = $data['id'];
+        }
+
+        $class = ClassModel::create($attributes);
+
+        if ($instructorId !== null && $instructorId !== 'Unassigned' && $instructorId !== '') {
+            $this->assignInstructor($class->id, $data['assignment_type'] ?? 'practical', $instructorId);
         }
 
         return $class->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
     }
 
     /**
-     * Assign an instructor to a class.
+     * Assign an instructor to a class (or unassign if instructorId is Unassigned / null).
      */
-    public function assignInstructor(string $classId, string $assignmentType, string $instructorId): ClassModel
+    public function assignInstructor(string $classId, string $assignmentType = 'practical', ?string $instructorId = null): ClassModel
     {
-        $this->assertActiveInstructor($instructorId);
         $class = ClassModel::findOrFail($classId);
+
+        if ($instructorId === null || $instructorId === 'Unassigned' || $instructorId === '') {
+            return $this->removeInstructorAssignment($classId, $assignmentType);
+        }
+
+        $this->assertActiveInstructor($instructorId);
 
         DB::transaction(function () use ($class, $assignmentType, $instructorId): void {
             DB::table('class_instructors')
@@ -190,11 +217,85 @@ class ClassService
     public function updateClass(string $classId, array $data, ?string $instructorId = null): ClassModel
     {
         $class = $this->findClassForManagement($classId, $instructorId);
+
+        if (isset($data['semester']) && !isset($data['term'])) {
+            $data['term'] = $data['semester'];
+        }
+        if (isset($data['startDate']) && !isset($data['start_date'])) {
+            $data['start_date'] = $data['startDate'];
+        }
+        if (isset($data['endDate']) && !isset($data['end_date'])) {
+            $data['end_date'] = $data['endDate'];
+        }
+
         $data = $this->resolveCatalogLabels($data, creating: false);
+
+        $hasLecturerInput = array_key_exists('lecturer_id', $data)
+            || array_key_exists('lecturerId', $data)
+            || array_key_exists('instructor_id', $data);
+
+        if ($hasLecturerInput) {
+            $lecturerId = $data['lecturer_id'] ?? $data['lecturerId'] ?? $data['instructor_id'] ?? null;
+            $assignmentType = $data['assignment_type'] ?? 'practical';
+
+            if ($lecturerId === 'Unassigned' || $lecturerId === null || $lecturerId === '') {
+                DB::table('class_instructors')->where('class_id', $class->id)->delete();
+                $data['instructor_id'] = null;
+            } else {
+                $this->assignInstructor($class->id, $assignmentType, $lecturerId);
+                $data['instructor_id'] = $lecturerId;
+            }
+        }
+
         $class->fill($data);
         $class->save();
 
         return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+    }
+
+    /**
+     * Format a class model for JSON responses compatible with Frontend and AdminClassResponse.
+     */
+    public function formatClassResponse(ClassModel $class): array
+    {
+        $lecturerName = 'Unassigned';
+        $lecturerId = $class->instructor_id;
+
+        if ($class->relationLoaded('instructor') && $class->instructor) {
+            $lecturerName = $class->instructor->name;
+        } elseif ($class->instructor_id) {
+            $inst = User::find($class->instructor_id);
+            if ($inst) {
+                $lecturerName = $inst->name;
+            }
+        }
+
+        $studentsCount = $class->relationLoaded('students')
+            ? $class->students->count()
+            : $class->students()->count();
+
+        $startDate = $class->start_date ? \Carbon\Carbon::parse($class->start_date)->format('Y-m-d') : null;
+        $endDate = $class->end_date ? \Carbon\Carbon::parse($class->end_date)->format('Y-m-d') : null;
+        $dates = ($startDate && $endDate) ? "{$startDate} – {$endDate}" : 'Sep 07 – Nov 28, 2026';
+
+        $base = $class->toArray();
+
+        return array_merge($base, [
+            'id'          => $class->id,
+            'course'      => $class->course,
+            'lecturer'    => $lecturerName,
+            'lecturer_id' => $lecturerId,
+            'lecturerId'  => $lecturerId,
+            'students'    => $studentsCount,
+            'status'      => $class->status,
+            'semester'    => $class->term,
+            'term'        => $class->term,
+            'dates'       => $dates,
+            'start_date'  => $startDate,
+            'startDate'   => $startDate,
+            'end_date'    => $endDate,
+            'endDate'     => $endDate,
+        ]);
     }
 
     /**

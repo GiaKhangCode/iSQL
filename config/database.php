@@ -100,17 +100,16 @@ return [
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
-            'host' => env('SQLSRV_HOST', 'localhost'),
+            'host' => env('SQLSRV_HOST', '127.0.0.1'),
             'port' => env('SQLSRV_PORT', '1433'),
             'database' => env('SQLSRV_DATABASE', 'sql_practice'),
             'username' => env('SQLSRV_USERNAME', 'sa'),
-            'password' => env('SQLSRV_PASSWORD', ''),
+            'password' => env('SQLSRV_PASSWORD', 'YourSecurePassword123!'),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'options' => [
-                PDO::ATTR_TIMEOUT => 5,
-            ],
+            'trust_server_certificate' => env('SQLSRV_TRUST_SERVER_CERTIFICATE', 'true'),
+            'options' => [],
         ],
     ],
 

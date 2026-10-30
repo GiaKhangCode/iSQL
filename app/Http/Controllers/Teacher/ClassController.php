@@ -19,7 +19,7 @@ class ClassController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $canManageAll = $user->canDo('CLASS_MGMT', 'delete')
+        $canManageAll = $user->isAdmin()
             || $user->role === User::ROLE_DEPARTMENT_HEAD
             || $user->role === 'admin';
 
@@ -27,13 +27,15 @@ class ClassController extends Controller
             ? $this->classService->getAllClasses()
             : $this->classService->getInstructorClasses($user->id);
 
-        return response()->json($classes);
+        $formatted = $classes->map(fn ($class) => $this->classService->formatClassResponse($class));
+
+        return response()->json($formatted);
     }
 
     public function show(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
-        $canManageAll = $user->canDo('CLASS_MGMT', 'delete')
+        $canManageAll = $user->isAdmin()
             || $user->role === User::ROLE_DEPARTMENT_HEAD
             || $user->role === 'admin';
 
@@ -41,7 +43,7 @@ class ClassController extends Controller
             ? $this->classService->getClass($id)
             : $this->classService->getClass($id, $user->id);
 
-        return response()->json($class);
+        return response()->json($this->classService->formatClassResponse($class));
     }
 
     public function store(Request $request): JsonResponse
@@ -61,14 +63,14 @@ class ClassController extends Controller
             'status' => ['sometimes', 'in:Active,Archived'],
         ]);
 
-        $canManageAll = $user->canDo('CLASS_MGMT', 'delete') || $user->role === User::ROLE_DEPARTMENT_HEAD || $user->role === 'admin';
+        $canManageAll = $user->isAdmin() || $user->role === User::ROLE_DEPARTMENT_HEAD || $user->role === 'admin';
 
         $class = $this->classService->createManagedClass(
             $data,
             !$canManageAll ? $user->id : null
         );
 
-        return response()->json($class, 201);
+        return response()->json($this->classService->formatClassResponse($class), 201);
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -78,7 +80,7 @@ class ClassController extends Controller
             abort(403, 'Permission denied');
         }
 
-        $canManageAll = $user->canDo('CLASS_MGMT', 'delete') || $user->role === User::ROLE_DEPARTMENT_HEAD || $user->role === 'admin';
+        $canManageAll = $user->isAdmin() || $user->role === User::ROLE_DEPARTMENT_HEAD || $user->role === 'admin';
         $instructorId = !$canManageAll ? $user->id : null;
 
         $data = $request->validate([
@@ -91,7 +93,9 @@ class ClassController extends Controller
             'status' => ['sometimes', 'in:Active,Archived'],
         ]);
 
-        return response()->json($this->classService->updateClass($id, $data, $instructorId));
+        $class = $this->classService->updateClass($id, $data, $instructorId);
+
+        return response()->json($this->classService->formatClassResponse($class));
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -101,7 +105,7 @@ class ClassController extends Controller
             abort(403, 'Permission denied');
         }
 
-        $canManageAll = $user->role === User::ROLE_DEPARTMENT_HEAD || $user->role === 'admin';
+        $canManageAll = $user->isAdmin() || $user->role === User::ROLE_DEPARTMENT_HEAD || $user->role === 'admin';
         $instructorId = !$canManageAll ? $user->id : null;
 
         $this->classService->deleteClass($id, $instructorId);
@@ -112,26 +116,31 @@ class ClassController extends Controller
     public function assignInstructor(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->canDo('CLASS_MGMT', 'edit') || $user->role === User::ROLE_DEPARTMENT_HEAD, 403, 'Chỉ người có quyền quản lý lớp học mới có thể phân công giảng viên.');
+        abort_unless($user->isAdmin() || $user->role === User::ROLE_DEPARTMENT_HEAD, 403, 'Chỉ Trưởng bộ môn hoặc Quản trị viên mới có thể phân công giảng viên.');
 
         $data = $request->validate([
-            'assignment_type' => ['required', Rule::in(['theory', 'practical'])],
-            'instructor_id' => [
-                'required',
-                'string',
-                Rule::exists('users', 'id')->where(fn ($query) => $query
-                    ->whereIn('role', User::INSTRUCTOR_ROLES)
-                    ->where('status', 'Active')),
-            ],
+            'assignment_type' => ['sometimes', 'nullable', Rule::in(['theory', 'practical'])],
+            'instructor_id'   => ['sometimes', 'nullable', 'string'],
+            'lecturer_id'     => ['sometimes', 'nullable', 'string'],
+            'lecturerId'      => ['sometimes', 'nullable', 'string'],
         ]);
 
-        return response()->json($this->classService->assignInstructor($id, $data['assignment_type'], $data['instructor_id']));
+        $assignmentType = $data['assignment_type'] ?? 'practical';
+        $instructorId = $data['instructor_id'] ?? $data['lecturer_id'] ?? $data['lecturerId'] ?? null;
+
+        if ($instructorId === null) {
+            abort(422, 'Cần cung cấp instructor_id hoặc lecturer_id.');
+        }
+
+        $class = $this->classService->assignInstructor($id, $assignmentType, $instructorId);
+
+        return response()->json($this->classService->formatClassResponse($class));
     }
 
     public function syncInstructors(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->canDo('CLASS_MGMT', 'edit') || $user->role === User::ROLE_DEPARTMENT_HEAD, 403, 'Chỉ người có quyền quản lý lớp học mới có thể phân công giảng viên.');
+        abort_unless($user->isAdmin() || $user->role === User::ROLE_DEPARTMENT_HEAD, 403, 'Chỉ Trưởng bộ môn hoặc Quản trị viên mới có thể phân công giảng viên.');
 
         $data = $request->validate([
             'theory_instructor_id' => ['required', 'string', Rule::exists('users', 'id')->where(fn ($query) => $query
@@ -142,18 +151,22 @@ class ClassController extends Controller
                 ->where('status', 'Active'))],
         ]);
 
-        return response()->json($this->classService->syncInstructorAssignments(
+        $class = $this->classService->syncInstructorAssignments(
             $id,
             $data['theory_instructor_id'],
             $data['practical_instructor_id']
-        ));
+        );
+
+        return response()->json($this->classService->formatClassResponse($class));
     }
 
     public function removeInstructorAssignment(Request $request, string $id, string $assignmentType): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->canDo('CLASS_MGMT', 'edit') || $user->role === User::ROLE_DEPARTMENT_HEAD, 403, 'Chỉ người có quyền quản lý lớp học mới có thể phân công giảng viên.');
+        abort_unless($user->isAdmin() || $user->role === User::ROLE_DEPARTMENT_HEAD, 403, 'Chỉ Trưởng bộ môn hoặc Quản trị viên mới có thể phân công giảng viên.');
 
-        return response()->json($this->classService->removeInstructorAssignment($id, $assignmentType));
+        $class = $this->classService->removeInstructorAssignment($id, $assignmentType);
+
+        return response()->json($this->classService->formatClassResponse($class));
     }
 }

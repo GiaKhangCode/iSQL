@@ -77,13 +77,14 @@ Tại thư mục gốc dự án, chạy lệnh:
 docker compose -f docker/docker-compose.yml up -d --build
 ```
 
-Lệnh này sẽ tự động khởi động 5 containers:
+Lệnh này sẽ tự động khởi động các containers:
 
 1. `isql_php`: PHP 8.3-FPM tích hợp sẵn extension `pdo_mysql`, `pdo_sqlsrv`, `sqlsrv`, `redis`.
 2. `isql_nginx`: Web Server Nginx lắng nghe tại cổng `8000`.
 3. `isql_mysql`: CSDL MySQL 8.0 lắng nghe tại cổng `3306`.
 4. `isql_redis`: In-memory cache & hàng đợi xử lý chấm điểm lắng nghe tại cổng `6379`.
 5. `isql_phpmyadmin`: Giao diện quản trị CSDL MySQL lắng nghe tại cổng `8080`.
+6. `isql_mssql`: CSDL Microsoft SQL Server 2022 (Sandbox chạy thử truy vấn & chấm bài) lắng nghe tại cổng `1433`. Database `sql_practice` sẽ được hệ thống tự động khởi tạo khi chạy lần đầu.
 
 ---
 
@@ -131,6 +132,7 @@ docker exec isql_php php artisan test
 | **Backend REST API** | [http://localhost:8000](http://localhost:8000) | Gốc API của Nginx (VD: `http://localhost:8000/api/auth/me`) |
 | **phpMyAdmin**       | [http://localhost:8080](http://localhost:8080) | Server: `mysql` \| User: `root` \| Password: `root`         |
 | **MySQL 8.0**        | `localhost:3306`                               | User: `root` \| Password: `root` \| Database: `sql_uit`     |
+| **SQL Server 2022**  | `localhost:1433`                               | User: `sa` \| Password: `YourSecurePassword123!` \| Database: `sql_practice` (Sandbox) |
 | **Redis**            | `localhost:6379`                               | Cache & Job Queue                                           |
 
 ---

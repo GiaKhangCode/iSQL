@@ -16,11 +16,19 @@ services:
       - DB_PASSWORD=root
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SQLSRV_HOST=mssql
+      - SQLSRV_PORT=1433
+      - SQLSRV_DATABASE=sql_practice
+      - SQLSRV_USERNAME=sa
+      - SQLSRV_PASSWORD=YourSecurePassword123!
+      - SQLSRV_TRUST_SERVER_CERTIFICATE=true
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_started
+      mssql:
+        condition: service_healthy
     networks:
       - isql_network
 
@@ -84,6 +92,27 @@ services:
     networks:
       - isql_network
 
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: isql_mssql
+    restart: unless-stopped
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourSecurePassword123!"
+      MSSQL_PID: "Developer"
+    volumes:
+      - isql_mssql_data:/var/opt/mssql
+    networks:
+      - isql_network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourSecurePassword123!' -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
 networks:
   isql_network:
     driver: bridge
@@ -91,3 +120,4 @@ networks:
 volumes:
   isql_mysql_data:
   isql_redis_data:
+  isql_mssql_data:

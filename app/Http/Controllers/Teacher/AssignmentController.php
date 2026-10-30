@@ -17,10 +17,29 @@ class AssignmentController extends Controller
         $this->assignmentService = $assignmentService;
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $assignments = $this->assignmentService->getAllAssignments();
+        $assignments = $this->assignmentService->getAllAssignments($request->user());
         return response()->json($assignments);
+    }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $assignment = $this->assignmentService->getAssignmentById($id, $request->user());
+        return response()->json($assignment);
+    }
+
+    public function audienceCount(Request $request): JsonResponse
+    {
+        $audienceType = $request->query('audience_type', 'classes');
+        $classIds = (array) $request->query('class_ids', []);
+
+        $count = $this->assignmentService->getAudienceCount($audienceType, $classIds, $request->user());
+        return response()->json([
+            'eligibleStudents'  => $count,
+            'eligible_students' => $count,
+            'class_count'       => count($classIds),
+        ]);
     }
 
     public function store(AssignmentRequest $request): JsonResponse
@@ -35,13 +54,18 @@ class AssignmentController extends Controller
 
     public function update(AssignmentRequest $request, string $id): JsonResponse
     {
-        $assignment = $this->assignmentService->updateAssignment($id, $request->validated());
+        $assignment = $this->assignmentService->updateAssignment(
+            $id,
+            $request->validated(),
+            $request->user()
+        );
+
         return response()->json($assignment);
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->assignmentService->deleteAssignment($id);
+        $this->assignmentService->deleteAssignment($id, $request->user());
         return response()->json(['message' => 'Assignment deleted successfully']);
     }
 }

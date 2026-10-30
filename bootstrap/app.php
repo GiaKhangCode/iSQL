@@ -28,4 +28,24 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request, Throwable $exception): bool =>
                 $request->is('api/*') || $request->expectsJson()
         );
+
+        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                $firstError = collect($e->errors())->flatten()->first();
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'detail'  => $firstError ?: $e->getMessage(),
+                    'errors'  => $e->errors(),
+                ], $e->status);
+            }
+        });
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'detail'  => $e->getMessage(),
+                ], $e->getStatusCode());
+            }
+        });
     })->create();

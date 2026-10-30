@@ -37,14 +37,23 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->group(function () {
     Route::get('/overview', [OverviewController::class, 'index']);
     Route::get('/classes', [ClassController::class, 'index']);
     Route::post('/classes', [ClassController::class, 'store']);
+    Route::get('/classes/students', [ClassRosterController::class, 'getAllStudents']);
     Route::get('/classes/{id}', [ClassController::class, 'show']);
     Route::put('/classes/{id}', [ClassController::class, 'update']);
     Route::patch('/classes/{id}', [ClassController::class, 'update']);
     Route::delete('/classes/{id}', [ClassController::class, 'destroy']);
     Route::put('/classes/{id}/instructor', [ClassController::class, 'assignInstructor']);
+    Route::post('/classes/{id}/instructor', [ClassController::class, 'assignInstructor']);
+    Route::put('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
+    Route::post('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
     Route::put('/classes/{id}/instructors', [ClassController::class, 'syncInstructors']);
     Route::delete('/classes/{id}/instructors/{assignmentType}', [ClassController::class, 'removeInstructorAssignment'])
         ->whereIn('assignmentType', ['theory', 'practical']);
+
+    Route::get('/classes/{id}/members', [ClassRosterController::class, 'getMembers']);
+    Route::post('/classes/{id}/members', [ClassRosterController::class, 'addMember']);
+    Route::delete('/classes/{id}/members/{studentId}', [ClassRosterController::class, 'removeMember']);
+    Route::post('/classes/{id}/members/import', [ClassRosterController::class, 'importMembers']);
 
     Route::get('/classes/{id}/students', [ClassRosterController::class, 'index']);
     Route::post('/classes/{id}/students', [ClassRosterController::class, 'add']);

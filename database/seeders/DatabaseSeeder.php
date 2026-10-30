@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             PermissionSeeder::class,
             TopicSeeder::class,
+            TestProblemAndAssignmentSeeder::class,
+            DatabaseLibrarySeeder::class,
         ]);
     }
 }

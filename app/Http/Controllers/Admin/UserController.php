@@ -25,26 +25,28 @@ class UserController extends Controller
     public function index(): JsonResponse
     {
         $users = $this->userService->getAllUsers();
-        return response()->json($users);
+        $formatted = $users->map(fn ($u) => $this->userService->formatUserResponse($u));
+        return response()->json($formatted);
     }
 
     public function store(StoreUserRequest $request): JsonResponse
     {
         $user = $this->userService->createUser($request->validated());
 
-        return response()->json($user, 201);
+        return response()->json($this->userService->formatUserResponse($user), 201);
     }
 
     public function show(string $id): JsonResponse
     {
-        return response()->json($this->userService->getUser($id));
+        $user = $this->userService->getUser($id);
+        return response()->json($this->userService->formatUserResponse($user));
     }
 
     public function update(UpdateUserRequest $request, string $id): JsonResponse
     {
         $user = $this->userService->updateUser($id, $request->validated());
 
-        return response()->json($user);
+        return response()->json($this->userService->formatUserResponse($user));
     }
 
     public function updateStatus(Request $request, string $id): JsonResponse
