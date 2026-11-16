@@ -76,6 +76,7 @@ class PermissionSeeder extends Seeder
         $groups = [
             ['name' => 'Admin (Quản trị viên)', 'description' => 'Toàn quyền trên tất cả các tính năng hệ thống'],
             ['name' => 'Giảng viên', 'description' => 'Quản lý lớp học, biên soạn bài tập và chấm thi'],
+            ['name' => 'Giáo vụ khoa', 'description' => 'Quản lý các kỳ thi, ca thi, danh sách dự thi và chấm điểm'],
             ['name' => 'Sinh viên', 'description' => 'Luyện tập, nộp bài tập và xem kết quả'],
         ];
 
@@ -126,6 +127,21 @@ class PermissionSeeder extends Seeder
             );
         }
 
+        // Giáo vụ khoa: Xem danh sách, xem bài tập, xem lớp học, toàn quyền bài thi & chấm điểm
+        $officeRoles = [
+            $roleIds['Chỉ xem danh sách người dùng'],
+            $roleIds['Chỉ xem kho bài tập'],
+            $roleIds['Chỉ xem lớp học'],
+            $roleIds['Toàn quyền bài thi & chấm điểm'],
+        ];
+
+        foreach ($officeRoles as $rid) {
+            DB::table('role_group_assign_role')->updateOrInsert(
+                ['role_group_id' => $groupIds['Giáo vụ khoa'], 'role_id' => $rid],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+        }
+
         // Sinh viên: Luyện tập, nộp bài, xem lớp học
         $studentRoles = [
             $roleIds['Quyền luyện tập & nộp bài'],
@@ -145,6 +161,15 @@ class PermissionSeeder extends Seeder
         foreach ($adminUsers as $u) {
             DB::table('account_assign_role_group')->updateOrInsert(
                 ['account_id' => $u->id, 'role_group_id' => $groupIds['Admin (Quản trị viên)']],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+        }
+
+        // Giáo vụ khoa
+        $officeUsers = User::where('role', 'faculty_office')->get();
+        foreach ($officeUsers as $u) {
+            DB::table('account_assign_role_group')->updateOrInsert(
+                ['account_id' => $u->id, 'role_group_id' => $groupIds['Giáo vụ khoa']],
                 ['created_at' => now(), 'updated_at' => now()]
             );
         }

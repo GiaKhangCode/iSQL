@@ -7,6 +7,7 @@ use App\Models\ClassEnrollment;
 use App\Models\AcademicTerm;
 use App\Models\Course;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -30,26 +31,21 @@ class ClassService
         $query = ClassModel::with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm'])->whereKey($classId);
 
         if ($instructorId !== null) {
-            $query->where(function ($query) use ($instructorId): void {
-                $query->where('instructor_id', $instructorId)
-                    ->orWhereHas('instructors', fn ($instructors) => $instructors->where('users.id', $instructorId));
-            });
+            $this->scopeToPracticalInstructor($query, $instructorId);
         }
 
         return $query->firstOrFail();
     }
 
     /**
-     * Get classes taught by a specific instructor
+     * Get classes taught by a specific practical instructor
      */
     public function getInstructorClasses(string $instructorId): Collection
     {
-        return ClassModel::where(function ($query) use ($instructorId): void {
-                $query->where('instructor_id', $instructorId)
-                    ->orWhereHas('instructors', fn ($instructors) => $instructors->where('users.id', $instructorId));
-            })
-            ->with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm'])
-            ->distinct()
+        $query = ClassModel::with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+        $this->scopeToPracticalInstructor($query, $instructorId);
+
+        return $query->distinct()
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -280,21 +276,35 @@ class ClassService
 
         $base = $class->toArray();
 
+        $practiceInstructorId = $class->practice_instructor_id ?? $lecturerId;
+        $practiceLecturer = $lecturerName;
+        if ($class->practice_instructor_id && $class->practice_instructor_id !== $lecturerId) {
+            $pInst = User::find($class->practice_instructor_id);
+            if ($pInst) {
+                $practiceLecturer = $pInst->name;
+            }
+        }
+
         return array_merge($base, [
-            'id'          => $class->id,
-            'course'      => $class->course,
-            'lecturer'    => $lecturerName,
-            'lecturer_id' => $lecturerId,
-            'lecturerId'  => $lecturerId,
-            'students'    => $studentsCount,
-            'status'      => $class->status,
-            'semester'    => $class->term,
-            'term'        => $class->term,
-            'dates'       => $dates,
-            'start_date'  => $startDate,
-            'startDate'   => $startDate,
-            'end_date'    => $endDate,
-            'endDate'     => $endDate,
+            'id'                     => $class->id,
+            'course'                 => $class->course,
+            'course_code'            => $class->course_code ?? $class->courseRecord?->code ?? '',
+            'theory_class'           => $class->theory_class ?? $class->id,
+            'practice_class'         => $class->practice_class ?? $class->id,
+            'lecturer'               => $lecturerName,
+            'lecturer_id'            => $lecturerId,
+            'lecturerId'             => $lecturerId,
+            'practice_instructor_id' => $practiceInstructorId,
+            'practice_lecturer'      => $practiceLecturer,
+            'students'               => $studentsCount,
+            'status'                 => $class->status,
+            'semester'               => $class->term,
+            'term'                   => $class->term,
+            'dates'                  => $dates,
+            'start_date'             => $startDate,
+            'startDate'              => $startDate,
+            'end_date'               => $endDate,
+            'endDate'                => $endDate,
         ]);
     }
 
@@ -311,13 +321,29 @@ class ClassService
         $query = ClassModel::whereKey($classId);
 
         if ($instructorId !== null) {
-            $query->where(function ($query) use ($instructorId): void {
-                $query->where('instructor_id', $instructorId)
-                    ->orWhereHas('instructors', fn ($instructors) => $instructors->where('users.id', $instructorId));
-            });
+            $this->scopeToPracticalInstructor($query, $instructorId);
         }
 
         return $query->firstOrFail();
+    }
+
+    /**
+     * Limit a class query to classes where the user is the practical instructor.
+     */
+    private function scopeToPracticalInstructor(Builder $query, string $instructorId): void
+    {
+        $query->where(function (Builder $q) use ($instructorId): void {
+            $q->where('practice_instructor_id', $instructorId)
+                ->orWhereHas('instructors', function (Builder $instructors) use ($instructorId): void {
+                    $instructors->where('users.id', $instructorId)
+                        ->where('class_instructors.assignment_type', 'practical');
+                })
+                ->orWhere(function (Builder $fallback) use ($instructorId): void {
+                    $fallback->whereNull('practice_instructor_id')
+                        ->whereDoesntHave('instructors')
+                        ->where('instructor_id', $instructorId);
+                });
+        });
     }
 
     public function addStudents(string $classId, array $studentIds, ?string $instructorId = null): ClassModel

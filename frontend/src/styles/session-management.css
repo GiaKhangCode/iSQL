@@ -1,0 +1,64 @@
+.session-management-builder { min-width:0; max-width:none; }
+.session-management-builder .teacher-builder-main { container-type:inline-size; min-width:0; padding:20px; }
+.session-management-builder .teacher-builder-main > div,.session-management-builder .session-embedded,.session-management-builder .teacher-builder-class-assignment { min-width:0; max-width:100%; }
+.session-management-builder .session-setup-tabs { margin:8px 0 12px; gap:18px; }
+.session-management-builder .teacher-builder-audience { padding:0; gap:0; }
+.session-management-builder .teacher-builder-class-assignment { margin:0; }
+.session-management-builder .teacher-contest-page-nav button { padding-block:9px; }
+.session-management-builder .session-embedded .teacher-page { padding:0; width:100%; min-width:0; }
+.session-management-builder .session-room-toolbar { gap:8px; margin:0 0 12px; }
+.session-management-builder .session-allocation-heading { align-items:center; }
+.session-management-builder .session-allocation-heading h2 { margin:0 0 4px; font-size:15px; }
+.session-management-builder .session-allocation-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.session-management-builder .session-allocation-metrics { display:flex; flex-wrap:wrap; gap:4px; font-size:11px; color:var(--muted); margin:0 0 12px; padding:8px 10px; border-radius:8px; background:var(--subtle); }
+.session-management-builder .session-room-layout { grid-template-columns:minmax(150px,190px) minmax(0,1fr); gap:14px; min-width:0; }
+.session-management-builder .session-room-list,.session-management-builder .session-room-detail { min-width:0; }
+.session-management-builder .session-room-list { gap:8px; }
+.session-management-builder .session-room-detail { padding:14px; }
+.session-management-builder .session-room-detail h2 { margin:0 0 10px; font-size:15px; }
+.session-management-builder .session-room-detail fieldset { margin:8px 0; }
+.session-management-builder .session-room-class-filter { margin-top:10px; }
+.session-management-builder :is(input,select,.button) { max-width:100%; box-sizing:border-box; }
+.session-management-builder .session-room-detail .session-room-toolbar select { width:auto; flex:1 1 140px; min-width:0; }
+.session-management-builder .session-students-table { overflow-x:auto; min-width:0; margin-top:12px; }
+.session-management-builder .session-students-table table { min-width:500px; }
+.session-management-builder .office-admissions-card { padding:0; border:0; box-shadow:none; min-width:0; }
+.session-management-builder .office-admissions-guidance { display:grid; gap:4px; padding:0 0 10px; font-size:11px; line-height:1.6; }
+.session-management-builder .office-admission-tools { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:10px 0; }
+.session-management-builder .office-admission-tools label { min-width:0; }
+.session-management-builder .office-admission-tools .button { white-space:normal; min-width:0; line-height:1.5; }
+.session-management-builder .office-admission-conditions:has(p) { padding:8px 10px; border-radius:8px; background:var(--subtle); margin:0 0 12px; }
+.session-management-builder .office-admissions-notice { margin:0 0 4px; line-height:1.6; }
+.session-management-builder .office-admission-table { min-width:0; max-width:100%; }
+@container (max-width:680px) { .session-management-builder .session-room-layout { grid-template-columns:minmax(0,1fr); } .session-management-builder .session-room-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@container (max-width:440px) { .session-management-builder .office-admission-tools { grid-template-columns:minmax(0,1fr); } .session-management-builder .session-room-list { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:760px) { .session-management-builder .teacher-builder-main { padding:14px; } .session-management-builder .session-allocation-actions { width:100%; } .session-management-builder .session-allocation-actions .button { flex:1; white-space:normal; } }
+
+
+
+.session-management-builder .session-setup-tabs { scroll-margin-top:calc(var(--header-height) + 12px); }
+/* Match the participant picker inside the session editor. */
+.session-management-builder .session-embedded { color:var(--text); font-size:12px; line-height:1.6; }
+.session-management-builder .session-room-layout { padding:12px; gap:0; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+.session-management-builder .session-room-list { padding-right:14px; }
+.session-management-builder .session-room-detail { border:0; border-left:1px solid var(--border); border-radius:0; padding:0 0 0 14px; }
+.session-management-builder .session-room-list > .button { justify-content:flex-start; text-align:left; min-height:48px; padding:10px 12px; border-color:var(--border); border-radius:9px; background:var(--surface); color:var(--text); font-size:12px; font-weight:500; }
+.session-management-builder .session-room-list > .button[aria-pressed="true"] { background:var(--accent-subtle); border-color:var(--accent); color:var(--accent); }
+.session-management-builder .session-room-detail :is(h2,legend) { font-size:12px; font-weight:600; }
+.session-management-builder .session-embedded :is(label,.access-permission) { font-size:12px; }
+.session-management-builder .session-embedded :is(input:not([type="checkbox"]),select) { font:inherit; font-size:12px; min-height:34px; padding:8px 10px; border:1px solid var(--border); border-radius:7px; color:var(--text); background:var(--subtle); }
+.session-management-builder .session-embedded input[type="checkbox"] { accent-color:var(--accent); }
+.session-management-builder .session-embedded .button { font-size:12px; line-height:18px; font-weight:500; }
+.session-management-builder .office-admissions-card { border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--surface); }
+.session-management-builder .office-admission-tools label { color:var(--muted); font-size:11px; }
+.session-management-builder .session-students-table,.session-management-builder .office-admission-table { border:1px solid var(--border); border-radius:9px; }
+.session-management-builder :is(.session-students-table,.office-admission-table) table { border-collapse:collapse; font-size:12px; text-align:left; }
+.session-management-builder :is(.session-students-table,.office-admission-table) th { padding:10px 12px; background:var(--subtle); color:var(--muted); font-size:11px; line-height:18px; font-weight:500; }
+.session-management-builder :is(.session-students-table,.office-admission-table) td { padding:12px; border-top:1px solid var(--border); border-bottom:0; font-size:12px; line-height:18px; color:var(--text); }
+.session-management-builder :is(.session-students-table,.office-admission-table) td small { display:block; margin-top:4px; font-size:11px; color:var(--muted); line-height:18px; }
+.session-management-builder :is(.session-students-table,.office-admission-table) tbody tr:hover { background:var(--accent-subtle); }
+.session-management-builder .session-students-table tr:has(input[type="checkbox"]:checked) { background:var(--accent-subtle); }
+.session-management-builder .office-admission-actions .button { min-height:30px; padding:5px 8px; font-size:11px; }
+@container (max-width:680px) { .session-management-builder .session-room-list { padding:0 0 12px; } .session-management-builder .session-room-detail { border-left:0; border-top:1px solid var(--border); padding:12px 0 0; } }
+
+.session-management-builder #session-rooms { padding-top:20px; scroll-margin-top:calc(var(--header-height) + 24px); }

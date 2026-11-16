@@ -29,6 +29,8 @@ class StoreUserRequest extends FormRequest
                 $role = User::ROLE_STUDENT;
             } elseif ($role === 'admin') {
                 $role = User::ROLE_ADMIN;
+            } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
+                $role = User::ROLE_FACULTY_OFFICE;
             }
             $this->merge(['role' => $role]);
         }
@@ -46,7 +48,7 @@ class StoreUserRequest extends FormRequest
             'password'   => 'required|string|min:8',
             'name'       => 'required|string|max:255',
             'initials'   => 'nullable|string|max:10',
-            'role'       => ['required', Rule::in(array_merge(User::ROLES, ['lecturer', 'instructor', 'student', 'admin']))],
+            'role'       => ['required', Rule::in(array_merge(User::ROLES, ['lecturer', 'instructor', 'student', 'admin', 'faculty office', 'faculty_office', 'giáo vụ khoa']))],
             'status'     => 'sometimes|in:Active,Inactive,Pending',
             'department' => 'nullable|string|max:255',
         ];

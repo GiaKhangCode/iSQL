@@ -14,4 +14,5 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::patch('/me', [AuthController::class, 'updateMe']);
     Route::get('/my-permissions', [\App\Http\Controllers\PermissionController::class, 'getPermission']);
+    Route::get('/permissions', [\App\Http\Controllers\PermissionController::class, 'getEffectivePermissions']);
 });

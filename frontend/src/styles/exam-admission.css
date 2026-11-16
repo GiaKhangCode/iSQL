@@ -1,0 +1,57 @@
+.exam-admission-card{max-width:680px;margin:36px auto;padding:30px;border:1px solid var(--border,#d3d8e6);border-radius:14px;background:var(--surface,#fff)}
+.exam-admission-card>header{display:flex;align-items:center;gap:10px;color:var(--muted,#667085);font-size:14px}
+.exam-admission-card h1{font-size:25px;line-height:1.4;margin:18px 0}
+.exam-admission-schedule{display:flex;align-items:center;gap:10px;padding-bottom:22px;border-bottom:1px solid var(--border,#d3d8e6)}
+.exam-admission-card form{display:grid;gap:18px;max-width:470px}
+.exam-admission-card label{display:grid;gap:8px;font-size:14px}
+.exam-admission-card input{width:100%;padding:12px;border:1px solid var(--border,#cbd2e2);border-radius:7px;background:var(--surface,#fff);color:inherit;font:inherit}
+.exam-admission-card small{color:var(--muted,#667085);line-height:1.6}
+.exam-admission-card button{justify-self:start}
+.office-admissions-intro { align-items:center; }
+.office-admissions-intro h1 { margin:7px 0 0; }
+.office-admissions-back { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:10px; }
+.office-admissions-back:hover { color:var(--accent); }
+.office-admissions-card { padding:20px; border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--surface); box-shadow:var(--shadow-xs,0 1px 3px #16162508); }
+.office-admission-session-tabs { margin:0 0 16px; }
+.office-admissions-guidance { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:4px 20px; padding:2px 0 14px; }
+.office-admissions-guidance p { margin:0; }
+.office-admission-tools { display:flex; align-items:end; gap:12px; flex-wrap:wrap; padding:14px 0; border-top:1px solid var(--border-subtle,var(--border)); }
+.office-admission-tools label { display:grid; gap:6px; min-width:170px; color:var(--muted); font-size:10px; }
+.office-admissions-page input { width:100%; min-height:38px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius-sm,5px); background:var(--surface); color:var(--text); font:inherit; font-size:11px; }
+.office-admission-tools .button { min-height:38px; padding:8px 12px; font-size:10px; }
+.office-admissions-notice { margin:2px 0 12px; font-size:10px; }
+.office-admission-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.office-admission-actions button { min-height:30px; padding:6px 9px; font-size:9px; }
+.office-admission-reason { display:flex; align-items:end; gap:10px; flex-wrap:wrap; margin:12px 0; padding:14px; border:1px solid var(--border); border-radius:var(--radius-md,8px); background:var(--surface-muted,var(--subtle)); }
+.office-admission-reason label { display:grid; flex:1; min-width:240px; gap:7px; font-size:10px; }
+.office-admission-reason button { min-height:36px; padding:7px 11px; font-size:10px; }
+.office-admission-table { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-md,8px); }
+.office-admission-table table { width:100%; min-width:760px; border-collapse:collapse; background:var(--surface); text-align:left; }
+.office-admission-table th { height:40px; padding:10px 12px; background:var(--subtle); color:var(--muted); font-size:9px; font-weight:500; text-transform:uppercase; white-space:nowrap; }
+.office-admission-table td { padding:12px; border-top:1px solid var(--border-subtle,var(--border)); font-size:10px; vertical-align:middle; }
+.office-admission-table td small { display:block; margin-top:4px; color:var(--muted); font-size:9px; }
+.office-admission-table > p { margin:0; padding:18px 12px; color:var(--muted); font-size:11px; }
+@media(max-width:700px) {
+  .exam-admission-card { margin:16px; padding:20px; }
+  .office-admissions-card { padding:14px; }
+  .office-admissions-intro { align-items:flex-start; }
+  .office-admissions-intro > .button { align-self:flex-start; }
+  .office-admission-tools { align-items:stretch; }
+  .office-admission-tools label,.office-admission-tools .button { flex:1 1 100%; }
+}
+.credential-export h2,.credential-export h3 { margin:0 0 12px; }
+.credential-export-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.credential-export-layout { display:grid; grid-template-columns:minmax(220px, 280px) minmax(0,1fr); gap:20px; }
+.credential-export-rooms { display:grid; align-content:start; gap:10px; }
+.credential-room { display:flex; align-items:center; gap:8px; padding:10px; border:1px solid #d9deef; border-radius:10px; }
+.credential-room.is-active { border-color:#5546d7; background:#efedff; }
+.credential-room-select { flex:1; min-width:0; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; }
+.credential-room-select strong,.credential-room-select small { display:block; }
+.credential-room-select small { margin-top:5px; color:#69748e; }
+.credential-room-details { min-width:0; }
+.credential-dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+@media(max-width:760px) { .credential-export-layout { grid-template-columns:1fr; } .credential-export-heading .button { max-width:100%; } }
+dialog.exam-credentials-dialog { width:min(1100px,calc(100vw - 32px)); max-height:90dvh; }
+dialog.exam-credentials-dialog > .office-admissions-page { min-height:0; padding:0; }
+dialog.exam-credentials-dialog .office-admissions-card { padding:0; border:0; box-shadow:none; }
+@media(max-width:760px) { dialog.exam-credentials-dialog { width:calc(100vw - 16px); max-height:94dvh; padding:16px; } }

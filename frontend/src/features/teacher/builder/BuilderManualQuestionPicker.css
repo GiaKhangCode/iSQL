@@ -1,0 +1,27 @@
+.builder-manual-picker { display: grid; gap: var(--space-2); }
+.builder-manual-picker-hint { margin: 0; }
+.builder-manual-picker-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.builder-manual-picker-toolbar > .app-select { flex: 1 1 220px; min-width: 0; }
+.builder-manual-picker-count { margin: 0; color: var(--muted); font-size: var(--text-caption-size); }
+.builder-manual-picker-group { border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.builder-manual-picker-group-heading { display: flex; align-items: center; gap: var(--space-2); padding: 8px 12px; background: var(--subtle); cursor: pointer; }
+.builder-manual-picker-group-heading { cursor: default; }
+.builder-manual-picker-group-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.builder-manual-picker-group-toggle strong { flex: 1; min-width: 0; }
+.builder-manual-picker-group-toggle span { color: var(--muted); font-size: var(--text-caption-size); }
+.builder-manual-picker-group-toggle svg { flex: none; transform: rotate(-90deg); transition: transform 0.15s ease; }
+.builder-manual-picker-group-toggle svg.is-expanded { transform: none; }
+.builder-manual-picker-fold-all { justify-self: end; }
+@media (prefers-reduced-motion: reduce) { .builder-manual-picker-group-toggle svg { transition: none; } }
+.builder-manual-picker-group ul { margin: 0; padding: 0; list-style: none; }
+.builder-manual-picker-group li + li { border-top: 1px solid var(--border-subtle); }
+.builder-manual-picker-question { display: flex; align-items: flex-start; gap: var(--space-2); padding: 8px 12px; cursor: pointer; }
+/* global.css gives every input width:100% / min-height:40px / padding, which blows checkboxes up. */
+.builder-manual-picker input[type="checkbox"] { flex: none; width: 16px; height: 16px; min-width: 0; min-height: 0; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; }
+.builder-manual-picker-question input[type="checkbox"] { margin-top: 3px; }
+.builder-manual-picker-group-heading strong { min-width: 0; font-size: 12px; line-height: 18px; }
+.builder-manual-picker-question > span { flex: 1; min-width: 0; }
+.builder-manual-picker-question .problem-markdown { color: var(--muted); font-size: 11px; }
+.builder-manual-picker-question .problem-markdown p { margin: 4px 0 0; font-size: 11px; }
+.builder-manual-picker-question-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; }
+.builder-manual-picker-question-title small { color: var(--muted); font-weight: 400; }

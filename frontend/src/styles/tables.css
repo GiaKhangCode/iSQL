@@ -1,0 +1,42 @@
+/* Shared table states; page styles still own widths, density and scrolling. */
+:root {
+  --table-heading: #f5f6fa;
+  --table-row-hover: #f5f5fc;
+  --table-row-selected: #e1e4ff;
+  --table-row-selected-hover: #d7dcfb;
+  --table-row-marker: #5a50cf;
+}
+:root[data-theme="dark"] {
+  --table-heading: #20263b;
+  --table-row-hover: #232b43;
+  --table-row-selected: #343c65;
+  --table-row-selected-hover: #3d4774;
+  --table-row-marker: #b5b0ff;
+}
+:where(.app-table) { width: 100%; }
+.app-table { border-collapse: separate; border-spacing: 0; background: var(--surface); }
+.app-table.app-table > thead > tr > th { background: var(--table-heading); color: var(--muted); border-bottom: 1px solid var(--border); }
+.app-table > tbody > tr > td { border-bottom-color: var(--border-subtle); transition: background-color .14s ease; }
+.app-table > tbody > tr:hover > td { background: var(--table-row-hover); }
+.app-table.app-table > tbody > tr:is(.selected, .is-selected, [aria-selected="true"]) > td { background: var(--table-row-selected); }
+.app-table.app-table > tbody > tr[aria-selected="true"] { background: var(--table-row-selected); }
+.app-table.app-table > tbody > tr:is(.selected, .is-selected, [aria-selected="true"]) > td:first-child { box-shadow: inset 3px 0 0 var(--table-row-marker); }
+.app-table.app-table > tbody > tr:is(.selected, .is-selected, [aria-selected="true"]):hover > td { background: var(--table-row-selected-hover); }
+.app-table > tbody > tr:focus-within > td { position: relative; }
+.app-table[data-density="compact"] > :is(thead, tbody) > tr > :is(th, td) { padding-block: 8px; }
+.app-table[data-density="comfortable"] > :is(thead, tbody) > tr > :is(th, td) { padding-block: 14px; }
+/* Inner headers meet the filter panel squarely; the surrounding card owns the corners. */
+.teacher-list-detail-main:has(> .assignment-filters-u027) .sticky-list-table > thead { clip-path: none; }
+.teacher-list-detail-main:has(> .assignment-filters-u027) .teacher-list-table-scroll { border-radius: 0; }
+/* Mobile list alternatives use the same selection language. */
+.page :is(.continue-select-row, .submission-mobile-row, .detail-work-row, .assignment-problem-select, .problem-row):is(.selected, .is-selected) {
+  background: var(--table-row-selected);
+  box-shadow: inset 3px 0 0 var(--table-row-marker);
+}
+@media (max-width: 760px) {
+  .app-table > tbody > tr[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--table-row-marker); }
+  .app-table > tbody > tr[aria-selected="true"] > td:first-child { box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-table > tbody > tr > td { transition: none; }
+}

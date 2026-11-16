@@ -22,15 +22,17 @@ class AssignmentProblem extends Pivot
         'order_index',
         'workspace_parts',
         'dataset_visibility',
+        'question_selection',
         'database_structure_visible',
         'database_description_visible',
     ];
 
     protected $casts = [
-        'points' => 'integer',
+        'points' => 'float',
         'order_index' => 'integer',
         'workspace_parts' => 'array',
         'dataset_visibility' => 'array',
+        'question_selection' => 'array',
         'database_structure_visible' => 'boolean',
         'database_description_visible' => 'boolean',
     ];

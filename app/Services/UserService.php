@@ -138,8 +138,10 @@ class UserService
     public function createUser(array $data): User
     {
         $role = $data['role'];
-        if ($role === 'lecturer') {
+        if ($role === 'lecturer' || $role === 'instructor') {
             $role = User::ROLE_INSTRUCTOR_PRACTICAL;
+        } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
+            $role = User::ROLE_FACULTY_OFFICE;
         }
 
         $initials = $data['initials'] ?? null;
@@ -167,6 +169,11 @@ class UserService
                 $lecturerGroup = \App\Models\RoleGroup::where('name', 'like', '%Giảng viên%')->first();
                 if ($lecturerGroup) {
                     $user->roleGroups()->syncWithoutDetaching([$lecturerGroup->id]);
+                }
+            } elseif ($user->isFacultyOffice()) {
+                $officeGroup = \App\Models\RoleGroup::where('name', 'like', '%Giáo vụ%')->first();
+                if ($officeGroup) {
+                    $user->roleGroups()->syncWithoutDetaching([$officeGroup->id]);
                 }
             }
         }
@@ -198,6 +205,8 @@ class UserService
                 $role = User::ROLE_STUDENT;
             } elseif ($role === 'admin') {
                 $role = User::ROLE_ADMIN;
+            } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
+                $role = User::ROLE_FACULTY_OFFICE;
             }
             $data['role'] = $role;
 
@@ -242,6 +251,9 @@ class UserService
         } elseif ($user->role === User::ROLE_ADMIN || $user->role === 'admin') {
             $roleDisplay = 'Admin';
             $frontendRole = 'Admin';
+        } elseif ($user->isFacultyOffice() || $user->role === User::ROLE_FACULTY_OFFICE || $user->role === 'faculty_office' || strtolower((string)$user->role) === 'faculty office') {
+            $roleDisplay = 'Faculty office';
+            $frontendRole = 'Faculty office';
         }
 
         $joined = $user->created_at ? $user->created_at->format('M d, Y') : 'Unknown';

@@ -1,0 +1,40 @@
+import assert from "node:assert/strict";
+import { build } from "esbuild";
+import { writeFile, unlink } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const output = await build({
+  stdin: { contents: `
+    import { createElement } from "react";
+    import { renderToStaticMarkup } from "react-dom/server";
+    import { WorkspaceNavigation } from "./src/features/workspace/components/WorkspaceNavigation";
+    export * from "./src/shared/lib/workspace/workspaceParts";
+    export const renderNavigation = (parts, active) => renderToStaticMarkup(createElement(WorkspaceNavigation, { parts, active, onChange: () => {} }));
+  `, resolveDir: process.cwd(), loader: "tsx" },
+  bundle: true, write: false, platform: "node", format: "cjs", jsx: "automatic",
+  loader: { ".css": "empty" }, define: { "process.env.NODE_ENV": '"production"', "import.meta.hot": "undefined" },
+});
+const filename = join(tmpdir(), `sqluit-workspace-parts-${process.pid}.cjs`);
+try {
+  await writeFile(filename, output.outputFiles[0].contents);
+  const { workspaceParts, workspaceDraftKey, WORKSPACE_PARTS, renderNavigation } = createRequire(import.meta.url)(filename);
+  assert.deepEqual(WORKSPACE_PARTS, ["DDL", "DML", "SQL", "TRIGGER"]);
+  assert.deepEqual(workspaceParts(undefined), ["SQL"]);
+  assert.deepEqual(workspaceParts(["SQL", "DDL", "DDL", "invalid"]), ["DDL", "SQL"]);
+  assert.deepEqual(workspaceParts([]), []);
+  for (let mask = 1; mask < 16; mask++) {
+    const parts = ["DDL", "DML", "SQL", "TRIGGER"].filter((_, index) => mask & (1 << index));
+    const navigation = renderNavigation(parts, parts[0]);
+    assert.equal((navigation.match(/<button/g) || []).length, parts.length);
+    assert.equal((navigation.match(/aria-current="page"/g) || []).length, 1);
+    for (const part of ["DDL", "DML", "SQL", "TRIGGER"]) assert.equal(navigation.includes(`aria-controls="workspace-stage-${part}"`), parts.includes(part));
+  }
+  const key = workspaceDraftKey("u1", "p1", "a1");
+  assert.notEqual(key, workspaceDraftKey("u2", "p1", "a1"));
+  assert.notEqual(key, workspaceDraftKey("u1", "p2", "a1"));
+  assert.notEqual(key, workspaceDraftKey("u1", "p1", "a2"));
+  assert.notEqual(workspaceDraftKey("a:b", "c", "d"), workspaceDraftKey("a", "b:c", "d"));
+  console.log("PASS: activity workspace modes, navigation rendering, defaults and draft isolation.");
+} finally { await unlink(filename); }

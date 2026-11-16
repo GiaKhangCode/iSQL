@@ -18,7 +18,10 @@ class PracticeController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $problems = $this->problemService->getAllProblems(true);
+        $problems = $this->problemService
+            ->getAllProblems($request->user())
+            ->filter(fn (array $problem) => !empty($problem['practiceListed']))
+            ->values();
         return response()->json($problems);
     }
 }

@@ -20,10 +20,14 @@ class DatabaseLibraryEntry extends Model
         'create_table_sql',
         'insert_into_sql',
         'datasets_json',
+        'bundle_json',
+        'revision',
     ];
 
     protected $casts = [
         'datasets_json' => 'array',
+        'bundle_json'   => 'array',
+        'revision'      => 'integer',
     ];
 
     public function instructor(): BelongsTo
@@ -56,6 +60,8 @@ class DatabaseLibraryEntry extends Model
             'createTableSql'      => (string) $this->create_table_sql,
             'insertIntoSql'       => (string) $this->insert_into_sql,
             'datasets'            => $this->datasets,
+            'bundle'              => $this->bundle_json,
+            'revision'            => (int) ($this->revision ?? 1),
             'createdAt'           => $this->created_at ? $this->created_at->toISOString() : null,
             'updatedAt'           => $this->updated_at ? $this->updated_at->toISOString() : null,
         ];

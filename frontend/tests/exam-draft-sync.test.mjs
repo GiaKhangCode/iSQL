@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+const source=fs.readFileSync(new URL('../src/shared/lib/exam/draftSync.ts',import.meta.url),'utf8');
+const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022}});
+const {draftsSynced}=await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+assert.equal(draftsSynced({},{}),true);
+assert.equal(draftsSynced({P:{revision:2}},{}),false);
+assert.equal(draftsSynced({P:{revision:2}},{P:{revision:1}}),false);
+assert.equal(draftsSynced({P:{revision:2}},{P:{revision:2}}),true);
+assert.equal(draftsSynced({P:{revision:2},Q:{revision:4}},{P:{revision:2},Q:{revision:3}}),false);
+assert.equal(draftsSynced({P:{revision:2}},{P:{revision:3}}),true);
+console.log('Exam draft revision synchronization checks passed');

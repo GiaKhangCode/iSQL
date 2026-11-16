@@ -1,0 +1,17 @@
+.dialog.teacher-audience-import-dialog { width:min(540px,calc(100vw - 32px)); }
+.teacher-audience-import-body { display:flex; flex-direction:column; gap:16px; padding-top:12px; }
+.teacher-audience-dropzone { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; min-height:170px; padding:24px; border:1.5px dashed var(--border); border-radius:10px; background:var(--surface); color:var(--muted); cursor:pointer; transition:border-color .2s,background .2s; }
+.teacher-audience-dropzone:hover,.teacher-audience-dropzone.is-dragging { border-color:var(--accent); background:var(--accent-subtle); }
+.teacher-audience-dropzone strong { color:var(--text); font-size:13px; font-weight:500; overflow-wrap:anywhere; max-width:100%; }
+.teacher-audience-dropzone small { font-size:11px; }
+.teacher-audience-dropzone:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.teacher-import-help { margin:0; font-size:12px; color:var(--muted); line-height:1.7; }
+.teacher-import-help small { display:block; margin-top:6px; font-size:10px; }
+.teacher-import-templates { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:12px; border-radius:8px; background:var(--subtle); }
+.teacher-import-templates > span { flex:1; font-size:11px; color:var(--muted); }
+.teacher-import-templates .button { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:6px 9px; }
+.teacher-import-remove { display:inline-flex; align-items:center; gap:5px; align-self:flex-end; font-size:10px; }
+.teacher-import-error { margin:0; padding:10px 12px; background:color-mix(in srgb,var(--danger,#d0354b) 8%,var(--surface)); border-radius:6px; color:var(--danger,#d0354b); font-size:11px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(prefers-reduced-motion:reduce) { .teacher-audience-dropzone { transition:none; } }
+
+.teacher-import-example { flex:0 0 100%; box-sizing:border-box; margin:4px 0 0; padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:12px; line-height:1.8; overflow:auto; }
