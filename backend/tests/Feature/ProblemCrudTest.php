@@ -107,12 +107,12 @@ class ProblemCrudTest extends TestCase
         $this->assertTrue($t1Ids->contains($pub->id));
         $this->assertTrue($t1Ids->contains($priv1->id));
 
-        // 3. Instructor 2 sees public but NOT Instructor 1's private
+        // 3. Instructor 2 only sees their own (or shared) problems, NOT Instructor 1's problems
         Sanctum::actingAs($this->instructor2);
         $t2Resp = $this->getJson('/api/problems');
         $t2Resp->assertStatus(200);
         $t2Ids = collect($t2Resp->json())->pluck('id');
-        $this->assertTrue($t2Ids->contains($pub->id));
+        $this->assertFalse($t2Ids->contains($pub->id));
         $this->assertFalse($t2Ids->contains($priv1->id));
 
         // 4. Student sees only public problems

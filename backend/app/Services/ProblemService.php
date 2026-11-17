@@ -41,8 +41,7 @@ class ProblemService
                 ->pluck('resource_id');
 
             $problems = Problem::where(function ($q) use ($user, $sharedProblemIds) {
-                $q->where('practice_listed', true)
-                    ->orWhere('creator_id', $user->id);
+                $q->where('creator_id', $user->id);
                 if ($sharedProblemIds->isNotEmpty()) {
                     $q->orWhereIn('id', $sharedProblemIds);
                 }
