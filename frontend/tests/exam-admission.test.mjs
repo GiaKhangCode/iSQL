@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import {writeFile,unlink} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
+for(const name of ['window','document','navigator','HTMLElement','Element','localStorage','DOMParser','Node'])Object.defineProperty(globalThis,name,{configurable:true,value:dom.window[name]});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const dialogProto=dom.window.HTMLDialogElement.prototype;dialogProto.showModal||=function(){this.setAttribute('open','');};dialogProto.close||=function(){this.removeAttribute('open');};
+globalThis.ResizeObserver=class{observe(){}disconnect(){}};window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
+const calls=[];let reject=true,unlocked=0;
+globalThis.__admissionRows=[{id:'cred',studentId:'s',student:'Nguyễn An',email:'s@gm.uit.edu.vn',username:'UIT-001',status:'claimed',generation:1},{id:null,studentId:'s2',student:'Bình',email:'b@gm.uit.edu.vn',username:null,status:'not_issued',generation:0}];
+globalThis.__admissionApi={exportClass:async(...args)=>{calls.push({kind:'export',args});},issueAll:async(...args)=>{calls.push({kind:'all',args});return 'all-csv';},list:async()=>structuredClone(globalThis.__admissionRows),unlock:async(...args)=>{calls.push({kind:'unlock',args});if(reject)throw new Error('Mật khẩu chưa đúng.');return {admissionUnlocked:true};},issue:async(...args)=>{calls.push({kind:'issue',args});globalThis.__admissionRows[1]={...globalThis.__admissionRows[1],id:'c2',status:'issued',username:'new'};return 'csv';},manage:async(...args)=>{calls.push({kind:'manage',args});globalThis.__admissionRows[0].status='issued';return {ok:true};}};
+globalThis.__allocation={confirmedAt:'2030-01-01',students:[{id:'s',name:'Nguyễn An',email:'s@gm.uit.edu.vn',studentCode:'24520663',classIds:['IT004.R11']},{id:'s2',name:'Bình',email:'b@gm.uit.edu.vn',studentCode:'24520664',classIds:['IT004.R11']}],classes:[{classId:'IT004.R11',studentIds:['s','s2'],proctorIds:['lect']}]};
+const parent={id:'exam',title:'Thi cuối kỳ',examDate:'2030-12-01',sessions:[1,2,3,4].map(index=>({id:`slot${index}`,index,starts:'07:30',ends:'09:00',published:true}))};
+globalThis.__teacherAdmission={getExamination:async()=>parent};globalThis.__downloads=[];
+const output=await build({stdin:{contents:`import React from 'react';export {act} from 'react';export {Simulate} from 'react-dom/test-utils';export {createRoot} from 'react-dom/client';import {MemoryRouter,Routes,Route} from 'react-router-dom';import {ContestDetailView} from './src/shared/components/ContestDetailView';import {ExamAdmissionsPage} from './src/features/office/ExamAdmissionsPage';import {ExamAdmissionForm} from './src/features/student/ExamAdmissionForm';export const form=(contest,onUnlocked)=><MemoryRouter><ContestDetailView contest={contest} phase='Live' now={Date.now()} onUnlocked={onUnlocked} AdmissionForm={ExamAdmissionForm}/></MemoryRouter>;export const office=()=> <MemoryRouter key='office' initialEntries={['/office/examinations/exam/admissions']}><Routes><Route path='/office/examinations/:examId/admissions' element={<ExamAdmissionsPage/>}/></Routes></MemoryRouter>;`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',define:{'import.meta.hot':'undefined','import.meta.env.VITE_API_URL':'""'},plugins:[{name:'admission',setup(b){b.onLoad({filter:/shared[\\/]api[\\/]examAdmission\.ts$/},()=>({contents:'export const examAdmission=globalThis.__admissionApi;export const downloadExamCredentials=(...args)=>globalThis.__downloads.push(args);',loader:'js'}));b.onLoad({filter:/shared[\\/]api[\\/]apiClient\.ts$/},()=>({contents:'export const apiFetch=async()=>structuredClone(globalThis.__allocation);',loader:'js'}));b.onLoad({filter:/shared[\\/]api[\\/]teacherService\.ts$/},()=>({contents:'export const teacherService=globalThis.__teacherAdmission;',loader:'js'}));}}]});
+const file=join(tmpdir(),`exam-admission-${process.pid}.cjs`);await writeFile(file,output.outputFiles[0].contents);let root;
+try{
+ const api=createRequire(import.meta.url)(file);root=api.createRoot(document.getElementById('root'));
+ const edit=(node,value)=>api.act(async()=>{node.value=value;api.Simulate.change(node);});
+ const click=node=>api.act(async()=>{assert.ok(node,'Expected control');node.click();});
+ const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
+ const contest={id:'slot',title:'Thi SQL',admissionRequired:true,admissionUnlocked:false,problemIds:[],problemDetails:[],leaderboard:[],description:'PRIVATE DESCRIPTION',shortDescription:'PRIVATE SUMMARY',opensAt:new Date().toISOString(),closesAt:new Date().toISOString(),date:'01/12/2030',time:'07:30',endTime:'09:00'};
+ await api.act(async()=>root.render(api.form(contest,()=>unlocked++)));
+ assert.equal(document.body.textContent.includes('PRIVATE'),false);
+ await edit(document.querySelector('input:not([type=password])'),'UIT-001');await edit(document.querySelector('input[type=password]'),'secret');
+ await click(button('Xác nhận dự thi'));assert.ok(document.querySelector('[role=alert]').textContent.includes('chưa đúng'));
+ assert.equal(unlocked,0);reject=false;await click(button('Xác nhận dự thi'));assert.equal(unlocked,1);assert.equal(document.querySelector('input[type=password]').value,'');
+ assert.deepEqual(calls[0].args,['slot','UIT-001','secret']);assert.equal(localStorage.length,0,'No admission password persisted');
+ await api.act(async()=>root.render(api.office()));assert.equal(document.querySelectorAll('[role=tab]').length,4);
+ assert.ok(button('Xuất tất cả tài khoản (.zip)'));
+ await click(button('Xuất CSV'));assert.ok(document.body.textContent.includes('Xác nhận cấp lại mật khẩu'));
+ await click(button('Hủy'));assert.equal(calls.some(c=>c.kind==='export'),false);
+ await click(button('Xuất CSV'));await click(button('Cấp lại và xuất'));
+ assert.deepEqual(calls.find(c=>c.kind==='export').args,['exam','slot1','IT004.R11',true]);
+ await click(button('Cho phép đổi máy'));assert.ok(button('Xác nhận').disabled);
+ await edit(document.querySelector('[role=dialog] input'),'Máy hỏng');await click(button('Xác nhận'));
+ assert.deepEqual(calls.find(c=>c.kind==='manage').args,['exam','slot1','cred','transfer','Máy hỏng']);
+ assert.equal(button('Cho phép đổi máy'),undefined,'Only claimed credentials offer transfer');
+ console.log('PASS: locked schedule-only view, retry/unlock, no password storage, class export confirmation and audited computer change controls.');
+}finally{if(root){const api=createRequire(import.meta.url)(file);await api.act(async()=>root.unmount());}await unlink(file);dom.window.close();}
+// Bundled React's Node scheduler keeps its MessageChannel alive after teardown.
+process.exit(0);

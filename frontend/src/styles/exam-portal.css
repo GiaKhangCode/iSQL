@@ -1,0 +1,319 @@
+.exam-login { display:grid; place-items:center; min-height:70vh; padding:24px; }
+.exam-login form { display:grid; gap:16px; width:min(420px,100%); padding:28px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.exam-login label { display:grid; gap:6px; }
+.exam-login input { min-width:0; width:100%; padding:10px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; }
+.exam-login-status { max-width:420px; margin:0 auto 24px; padding:16px; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+.exam-portal header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 24px; border-bottom:1px solid var(--border); background:var(--surface); }
+.exam-portal section { display:grid; gap:16px; max-width:800px; margin:32px auto; padding:24px; background:var(--surface); border:1px solid var(--border); border-radius:10px; }
+.proctor-rooms { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
+.proctor-incident { padding:16px; margin:12px 0; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+.proctor-incident.is-locked { border-color:var(--accent); }
+.proctor-incident label { display:grid; gap:6px; }
+.proctor-room-details { overflow-y:auto; }
+.proctor-room-details > h2 { margin-bottom:8px; }
+.proctor-room-details .proctor-incident { padding:12px; margin:12px 0; }
+.proctor-room-details .proctor-incident h3 { margin:0 0 6px; font-size:14px; }
+.proctor-room-details .proctor-incident p { overflow-wrap:anywhere; }
+.proctor-incident.is-violation-locked { border-color: #ef4444; background: rgba(239, 68, 68, 0.04); }
+.proctor-candidate-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+.proctor-student-code { font-size: 0.85em; font-weight: normal; color: var(--muted); }
+.proctor-candidate-email { margin: 0 0 4px; font-size: 13px; color: var(--muted); }
+.proctor-candidate-status { margin: 0 0 6px; font-size: 12px; }
+.proctor-badge-locked { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: #ef4444; background: rgba(239, 68, 68, 0.12); padding: 2px 8px; border-radius: 9999px; }
+.proctor-violation-alert { margin: 8px 0; padding: 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); display: flex; flex-direction: column; gap: 6px; }
+.proctor-violation-alert p { margin: 0; font-size: 13px; color: #dc2626; }
+.proctor-unlock-btn { align-self: flex-start; margin-top: 4px; display: inline-flex; align-items: center; gap: 6px; }
+.proctor-add-student-box { margin: 16px 0; padding: 14px; background: var(--surface-subtle, #f8fafc); border: 1px solid var(--border); border-radius: 8px; }
+.proctor-add-student-box label { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block; }
+.proctor-add-student-row { display: flex; gap: 8px; }
+.proctor-add-student-row input { flex: 1; min-width: 0; padding: 6px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+.proctor-add-feedback { margin-top: 6px; font-size: 12px; }
+
+/* Proctor Overview & Summary Panel */
+.proctor-status-indicator { margin: 8px 0 12px; }
+.proctor-status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+.proctor-status-pill.active { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+.proctor-status-pill.upcoming { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.proctor-status-pill.finished { background: rgba(100, 116, 139, 0.12); color: #64748b; }
+
+.proctor-summary-classes { margin: 16px 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-subtle, #f8fafc); }
+.proctor-summary-classes-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; color: var(--text); }
+.proctor-class-tag-list { display: flex; flex-direction: column; gap: 6px; }
+.proctor-class-tag { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-weight: 500; }
+.proctor-class-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #6366f1); flex-shrink: 0; }
+.proctor-summary-actions { margin-top: 20px; }
+.proctor-open-dashboard-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+/* Main Proctoring Dashboard */
+.proctor-dashboard-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 24px 16px;
+  width: 100%;
+  height: calc(100dvh - var(--header-height, 64px));
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Integrated Side Header in Left Panel */
+.proctor-side-header { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; flex: none; }
+.proctor-side-header-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.proctor-side-title { margin: 0; font-size: 14px !important; font-weight: 700; color: var(--text); line-height: 1.35; }
+.proctor-side-time { color: var(--muted); }
+.proctor-back-link { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 0; font-size: 13px; color: var(--muted); cursor: pointer; transition: color 0.15s ease; }
+.proctor-back-link:hover { color: var(--text); text-decoration: underline; }
+.proctor-compact-live { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #16a34a; }
+.proctor-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #16a34a; }
+
+/* Unified 13px font across /teacher/exams */
+:is(.proctor-list-page, .proctor-dashboard-wrap) { font-size: 13px !important; }
+:is(.proctor-list-page, .proctor-dashboard-wrap) * { font-size: 13px; }
+:is(.proctor-list-page, .proctor-dashboard-wrap) :is(
+  table, thead, tbody, th, td, tr,
+  p, span, label, input, select, button, a, small, b, strong,
+  h2, h3, h4,
+  .teacher-table, .teacher-table th, .teacher-table td, .teacher-table-link,
+  .proctor-side-title, .proctor-side-time, .proctor-compact-live, .proctor-back-link,
+  .proctor-panel-card-header h3, .proctor-incident-count-badge,
+  .proctor-feed-tab, .proctor-tab-badge,
+  .proctor-incident-user, .proctor-incident-meta, .proctor-incident-type-badge, .proctor-incident-message,
+  .proctor-incident-time, .proctor-feed-action-btn,
+  .proctor-empty-incidents h4, .proctor-empty-incidents p,
+  .proctor-class-tab, .proctor-stat-chip,
+  .proctor-check-name, .proctor-check-meta, .proctor-check-status-badge, .proctor-check-prev-session,
+  .proctor-check-reason, .proctor-check-error,
+  .teacher-detail-eyebrow, .proctor-summary-classes-header, .proctor-class-tag, .proctor-open-dashboard-btn,
+  .teacher-list-pagination, .teacher-list-pagination span, .teacher-list-pagination button,
+  .teacher-problem-filters, .teacher-problem-filters input, .teacher-problem-filters select,
+  .teacher-problem-filters button, .filter-trigger, .filter-trigger span
+) { font-size: 13px !important; }
+
+:is(.proctor-list-page, .proctor-dashboard-wrap) .teacher-table th {
+  font-size: 13px !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  letter-spacing: normal !important;
+}
+:is(.proctor-list-page, .proctor-dashboard-wrap) .teacher-table td { font-size: 13px !important; }
+
+/* Dashboard 2-column layout - Always equal height and stretch to full container */
+.proctor-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(500px, 1.4fr);
+  gap: 16px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+@media (max-width: 1024px) {
+  .proctor-dashboard-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow-y: auto;
+  }
+  .proctor-dashboard-wrap {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+}
+
+/* Left panel: Incident Feed */
+.proctor-incidents-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.proctor-panel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+.proctor-panel-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.proctor-panel-card-header h3 { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.proctor-incident-count-badge { font-size: 12px; padding: 2px 8px; border-radius: 9999px; background: rgba(239, 68, 68, 0.12); color: #dc2626; font-weight: 600; }
+
+/* 3-Tab Feed: Tất cả / Thông báo / Cảnh báo */
+.proctor-feed-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.proctor-feed-tab { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 13px; font-weight: 500; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s ease; }
+.proctor-feed-tab:hover { background: var(--surface-subtle, #f8fafc); color: var(--text); }
+.proctor-feed-tab.active { background: var(--surface-subtle, #f1f5f9); color: var(--text); border-color: var(--border); font-weight: 600; }
+.proctor-tab-badge { margin-left: 4px; padding: 1px 6px; border-radius: 9999px; font-size: 11px; font-weight: 700; line-height: 1.2; }
+.proctor-tab-badge.danger { background: #ef4444; color: #fff; }
+.proctor-tab-badge.info { background: #3b82f6; color: #fff; }
+
+.proctor-incident-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.proctor-incident-item { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 3px; }
+.proctor-incident-item.violation-locked { border-color: #ef4444; background: rgba(239, 68, 68, 0.04); }
+.proctor-incident-item.violation-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.04); }
+.proctor-incident-item.duplicate-locked { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.04); }
+.proctor-incident-item.notice-item { border-color: rgba(22, 163, 74, 0.3); background: rgba(22, 163, 74, 0.04); }
+
+.proctor-incident-item-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.proctor-incident-user { font-size: 13px !important; font-weight: 600; margin: 0; line-height: 1.25; }
+.proctor-incident-meta { font-size: 11px !important; color: var(--muted); margin: 0; }
+.proctor-incident-type-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px !important; font-weight: 600; padding: 1px 6px; border-radius: 9999px; white-space: nowrap; line-height: 1.2; }
+.proctor-incident-type-badge.danger { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+.proctor-incident-type-badge.warning { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+.proctor-incident-type-badge.info { background: rgba(139, 92, 246, 0.15); color: #7c3aed; }
+.proctor-incident-type-badge.success { background: rgba(22, 163, 74, 0.15); color: #16a34a; }
+
+.proctor-incident-message { font-size: 12px !important; margin: 1px 0; line-height: 1.35; color: var(--text); }
+.proctor-incident-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 2px; padding-top: 4px; border-top: 1px dashed var(--border); }
+.proctor-incident-time { font-size: 11px !important; color: var(--muted); }
+.proctor-incident-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.proctor-feed-action-btn { display: inline-flex; align-items: center; justify-content: center; font-size: 12px !important; padding: 2px 8px; font-weight: 600; cursor: pointer; height: 26px; border-radius: 4px; }
+
+.proctor-empty-incidents {
+  text-align: center;
+  padding: 36px 16px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+}
+.proctor-empty-incidents.compact { padding: 24px 16px; gap: 4px; }
+.proctor-empty-incidents.compact h4 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.proctor-empty-incidents.compact p { margin: 0; font-size: 12px; color: var(--muted); }
+.proctor-empty-incidents svg { color: #16a34a; }
+.proctor-empty-incidents h4 { margin: 0; font-size: 15px; color: var(--text); }
+.proctor-empty-incidents p { margin: 0; font-size: 13px; }
+
+/* Right panel: Roster & Classes */
+.proctor-roster-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.proctor-add-student-box {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  background: var(--surface-subtle, #f8fafc);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+  transition: all 0.15s ease;
+}
+.proctor-add-student-box.collapsed {
+  padding: 6px 12px;
+}
+.proctor-add-student-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.proctor-add-student-toggle-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text);
+}
+.proctor-add-toggle-btn {
+  font-size: 12px !important;
+  height: 26px;
+  padding: 2px 8px;
+}
+.proctor-add-student-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.proctor-class-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  flex: none;
+}
+.proctor-class-tab { padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
+.proctor-class-tab:hover { background: var(--surface-subtle, #f8fafc); color: var(--text); }
+.proctor-class-tab.active { background: var(--accent, #6366f1); color: #fff; border-color: var(--accent, #6366f1); font-weight: 600; }
+
+.proctor-roster-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 10px;
+  flex: none;
+}
+.proctor-stat-chip { padding: 4px 10px; border-radius: 6px; font-size: 12px !important; background: var(--surface-subtle, #f8fafc); border: 1px solid var(--border); color: var(--text); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.15s ease; user-select: none; }
+.proctor-stat-chip:hover { background: var(--surface-subtle, #f1f5f9); border-color: var(--accent, #6366f1); }
+.proctor-stat-chip.active { background: rgba(99, 102, 241, 0.12); border-color: var(--accent, #6366f1); font-weight: 600; box-shadow: 0 0 0 1px var(--accent, #6366f1); }
+.proctor-stat-chip strong { color: var(--text); }
+
+.proctor-search-row {
+  margin: 4px 0 12px;
+  position: relative;
+  flex: none;
+}
+.proctor-search-row input { width: 100%; height: 36px; padding: 6px 12px 6px 34px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+.proctor-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+
+.proctor-candidate-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Check student result card */
+.proctor-check-error { padding: 8px 12px; border-radius: 6px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #dc2626; font-size: 13px; }
+.proctor-check-result-card { padding: 12px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+.proctor-check-result-card.eligible { border-color: rgba(22, 163, 74, 0.4); background: rgba(22, 163, 74, 0.03); }
+.proctor-check-result-card.ineligible { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.03); }
+.proctor-check-result-body { display: flex; flex-direction: column; gap: 6px; }
+.proctor-check-result-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.proctor-check-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.proctor-check-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.proctor-check-status-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; white-space: nowrap; }
+.proctor-check-status-badge.success { background: rgba(22, 163, 74, 0.15); color: #16a34a; }
+.proctor-check-status-badge.danger { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+.proctor-check-prev-session { font-size: 12px; padding: 6px 10px; background: var(--surface-subtle, #f1f5f9); border-radius: 4px; color: var(--text); }
+.proctor-check-prev-label { color: var(--muted); }
+.proctor-check-reason { font-size: 13px; color: var(--text); }
+.proctor-check-result-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border); }

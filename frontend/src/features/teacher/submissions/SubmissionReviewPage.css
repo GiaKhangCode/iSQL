@@ -1,0 +1,110 @@
+.teacher-page.teacher-activity-submissions,.teacher-page.teacher-review-workspace { width:100%; max-width:1800px; padding:22px clamp(16px,2vw,32px) 32px; }
+.review-back-link { display:inline-flex; align-items:center; gap:7px; color:var(--muted); font-size:11px; margin-bottom:16px; }
+.review-page-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; margin-bottom:22px; }
+.review-page-heading h1 { font-size:20px; line-height:1.5; letter-spacing:0; margin:4px 0; }
+.review-page-heading p { margin:0; font-size:11px; line-height:1.7; }
+.review-activity-stats { display:flex; flex:none; gap:28px; margin:0; }
+.review-activity-stats dt { color:var(--muted); font-size:11px; }
+.review-activity-stats dd { margin:6px 0 0; font-size:23px; font-weight:500; line-height:1.4; }
+.review-submissions-list { border:1px solid var(--border); border-radius:10px; background:var(--surface); overflow:hidden; }
+.review-list-filters { display:grid; grid-template-columns:minmax(220px,1.5fr) minmax(180px,1fr) minmax(130px,.65fr) minmax(160px,.8fr); gap:14px; padding:18px; border-bottom:1px solid var(--border-subtle); }
+.review-list-filters label { display:grid; gap:7px; color:var(--muted); font-size:11px; }
+.review-list-filters input,.review-list-filters select { color:var(--text); font-size:12px; }
+.review-submissions-table { width:100%; min-width:950px; table-layout:auto; }
+.review-submissions-table th { white-space:nowrap; }
+.review-submissions-table td { padding-top:18px; padding-bottom:18px; vertical-align:middle; }
+.review-submissions-table td:nth-child(2) { width:30%; }
+.review-submissions-table td:nth-child(2) strong { font-weight:500; line-height:1.7; }
+.review-submissions-table .button { font-size:11px; white-space:nowrap; }
+.review-part-labels { display:flex; gap:6px; flex-wrap:wrap; }
+.review-part-labels > span { padding:3px 5px; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-size:10px; }
+.review-score-cell { white-space:nowrap; font-variant-numeric:tabular-nums; font-weight:600; }
+.review-score-cell small,.review-date-cell { font-size:10px; color:var(--muted); font-weight:400; }
+.review-list-footer,.review-list-footer nav { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.review-list-footer { padding:14px 18px; border-top:1px solid var(--border-subtle); color:var(--muted); font-size:11px; }
+.review-list-footer .button { min-height:32px; padding:5px 10px; font-size:11px; }
+.review-attempt-control { display:flex; flex:none; align-items:center; gap:16px; }
+.review-attempt-control > label { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:11px; }
+.review-attempt-control select { width:auto; max-width:230px; min-height:34px; padding:6px 8px; font-size:11px; }
+.review-workspace-grid { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:20px; align-items:start; }
+.review-answer-panel { min-width:0; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); }
+.review-section-tabs { display:flex; align-items:center; gap:8px; padding:0 18px; border-bottom:1px solid var(--border); }
+.review-section-tabs > button { display:flex; align-items:center; gap:8px; padding:14px 8px; border:0; border-bottom:2px solid transparent; color:var(--muted); font-size:12px; }
+.review-section-tabs > button[aria-pressed="true"] { border-bottom-color:var(--accent); color:var(--accent); }
+.review-section-tabs > button > span { font-size:10px; font-variant-numeric:tabular-nums; }
+.review-result-dot { display:block; flex:none; width:6px; height:6px; border-radius:50%; background:var(--border); }
+.review-result-dot.is-correct { background:var(--success); }
+.review-result-dot.is-different { background:var(--warning); }
+.review-answer-layout { display:grid; grid-template-columns:200px minmax(0,1fr); align-items:start; }
+.review-question-list { display:grid; grid-template-columns:minmax(0,1fr); gap:4px; padding:12px 8px; min-width:0; overflow:hidden; }
+.review-question-list > button { display:flex; align-items:flex-start; gap:8px; width:100%; min-width:0; padding:11px 8px; border:1px solid transparent; border-radius:6px; text-align:left; white-space:normal; color:var(--muted); }
+.review-question-list > button:hover { background:var(--subtle); }
+.review-question-list > button[aria-current="true"] { color:var(--text); background:var(--subtle); border-color:var(--border); }
+.review-question-number { font-size:10px; line-height:18px; font-variant-numeric:tabular-nums; }
+.review-question-list > button[aria-current="true"] .review-question-number { color:var(--accent); font-weight:600; }
+.review-question-list > button > span:nth-child(2) { min-width:0; flex:1; }
+.review-question-list strong { display:block; font-size:10px; line-height:18px; font-weight:500; overflow-wrap:anywhere; }
+.review-question-list small { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; margin-top:3px; font-size:10px; line-height:1.65; color:var(--muted); }
+.review-question-list small .i18n-motion-text,.review-question-list small .i18n-motion-content { display:inline; width:auto !important; white-space:normal; overflow-wrap:anywhere; }
+.review-question-list .review-result-dot { margin-top:6px; }
+.review-question-detail { min-width:0; min-height:560px; padding:20px; border-left:1px solid var(--border-subtle); }
+.review-question-title { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; font-size:11px; color:var(--muted); }
+.review-question-prompt { margin-bottom:20px; line-height:1.8; }
+.review-question-prompt .problem-markdown > :first-child { margin-top:0; }
+.review-question-prompt .problem-markdown > :last-child { margin-bottom:0; }
+.review-setup { margin:0 0 18px; font-size:11px; color:var(--muted); }
+.review-setup summary { cursor:pointer; }
+.review-setup pre { white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--subtle); }
+.review-sql-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.review-sql-pair > section { min-width:0; }
+.review-sql-pair h2,.review-results-section h2,.review-grading-panel h2 { margin:0 0 10px; font-size:12px; font-weight:600; letter-spacing:0; }
+.review-sql-pair .cm-editor { overflow:hidden; border:1px solid var(--border); border-radius:7px; font-size:12px; }
+.review-sql-pair .cm-scroller { overscroll-behavior:contain; }
+.review-sql-pair .cm-content { padding:12px 0; }
+.review-no-answer { min-height:160px; margin:0; padding:16px; color:var(--muted); background:var(--subtle); border:1px dashed var(--border); border-radius:7px; font-size:11px; }
+.review-results-section { margin-top:24px; padding-top:18px; border-top:1px solid var(--border-subtle); }
+.review-results-section > header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.review-results-section > header h2 { margin:0; }
+.review-results-section .button { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:5px 9px; font-size:10px; }
+.review-empty-output { padding:14px 0; color:var(--muted); font-size:11px; line-height:1.8; }
+.review-output { display:grid; gap:10px; min-width:0; }
+.review-inspection-note { margin:0 0 4px; color:var(--muted); font-size:10px; line-height:1.8; }
+.review-dataset { min-width:0; border:1px solid var(--border); border-radius:7px; padding:0 12px 12px; }
+.review-dataset:not([open]) { padding-bottom:0; }
+.review-dataset > summary,.review-dataset-summary { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 0; font-size:11px; }
+.review-dataset > summary { list-style:none; cursor:pointer; }
+.review-dataset > summary::-webkit-details-marker { display:none; }
+.review-dataset > summary > svg { margin-left:auto; }
+.review-dataset[open] > summary > svg { transform:rotate(90deg); }
+.review-dataset-summary { border-bottom:1px solid var(--border-subtle); }
+.review-dataset-summary small,.review-dataset > summary small { flex-basis:100%; color:var(--muted); font-size:10px; }
+.review-dataset .teacher-schema-comparison-pair { gap:12px; }
+.review-dataset .teacher-data-snapshot-scroll { max-height:320px; }
+.review-dataset .teacher-data-comparison-after .is-changed > td { background:color-mix(in srgb,var(--danger) 8%,var(--surface)); }
+.review-schema-constraints { grid-column:1 / -1; margin:0; color:var(--muted); font-size:10px; line-height:1.6; overflow-wrap:anywhere; }
+.review-grading-panel { position:sticky; top:calc(var(--header-height) + 16px); min-width:0; padding:20px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+.review-grading-panel > h2 { font-size:14px; }
+.review-grading-panel > dl { margin:18px 0; display:grid; gap:10px; font-size:11px; }
+.review-grading-panel > dl > div { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.review-grading-panel dt { color:var(--muted); }
+.review-grading-panel dd { margin:0; text-align:right; }
+.review-grading-panel dd small { color:var(--muted); font-size:10px; }
+.review-grading-panel .teacher-field { margin:16px 0 0; }
+.review-grading-panel .teacher-field > span { font-size:10px; }
+.review-grading-panel textarea { background:var(--surface); min-height:140px; padding:10px; font-size:12px; resize:vertical; }
+.review-score-input { display:flex; align-items:center; gap:10px; }
+.review-score-input input { flex:1; width:0; background:var(--surface); font-size:20px; font-variant-numeric:tabular-nums; }
+.review-score-input > span { color:var(--muted); font-size:12px; }
+.review-use-auto-score { margin-top:8px; padding:0; border:0; font-size:10px; color:var(--accent); text-align:left; }
+.review-save-button { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-top:18px; }
+.review-save-state { display:flex; align-items:center; gap:6px; min-height:18px; margin:10px 0 0; color:var(--muted); font-size:10px; }
+.review-save-state.is-saved { color:var(--success); }
+@media(max-width:1250px) { .review-answer-layout { grid-template-columns:160px minmax(0,1fr); } .review-question-detail { padding:16px; } .review-sql-pair { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:1050px) { .review-workspace-grid { grid-template-columns:minmax(0,1fr) 230px; gap:14px; } .review-grading-panel { padding:16px; } .review-answer-layout { grid-template-columns:minmax(0,1fr); } .review-question-list { display:flex; overflow-x:auto; border-bottom:1px solid var(--border-subtle); } .review-question-list > button { flex:0 0 170px; } .review-question-detail { border-left:0; } .review-list-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:720px) { .review-page-heading { flex-direction:column; gap:14px; } .review-page-heading h1 { font-size:17px; } .review-workspace-grid { grid-template-columns:minmax(0,1fr); } .review-grading-panel { position:static; } .review-attempt-control { flex-wrap:wrap; } .review-list-filters { grid-template-columns:minmax(0,1fr); } .review-list-footer { align-items:flex-start; flex-direction:column; } .review-dataset .teacher-schema-comparison-pair { grid-template-columns:minmax(0,1fr); } }
+
+.review-exam-log {border-top:1px solid var(--border);padding-top:16px;font:13px/1.6 system-ui,sans-serif;}
+.review-exam-log summary {cursor:pointer;color:var(--muted);}
+.review-exam-log ol {padding-left:18px;max-height:260px;overflow:auto;}
+.review-exam-log time {color:var(--muted);font-size:11px;}
+.review-exam-log p {margin:2px 0 12px;}

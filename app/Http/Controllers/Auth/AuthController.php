@@ -52,8 +52,12 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
+        $accountInput = trim((string) ($request->email ?? $request->input('email', '')));
+        $password = (string) $request->input('password', '');
+
+        // 1. First try standard user authentication
         try {
-            $user = $this->userService->authenticate($request->email, $request->password);
+            $user = $this->userService->authenticate($accountInput, $password);
             $token = $user->createToken('auth-token')->plainTextToken;
 
             return response()->json([
@@ -62,15 +66,73 @@ class AuthController extends Controller
                 'user'         => $this->formatAuthUser($user),
             ], 200);
         } catch (Exception $e) {
-            \Log::error('Login Exception: ' . $e->getMessage(), ['exception' => $e]);
-            $code = (is_int($e->getCode()) && $e->getCode() >= 400 && $e->getCode() <= 599) ? $e->getCode() : 401;
-            return response()->json(['detail' => $e->getMessage()], $code);
+            // If user account is specifically pending or disabled, return 403 immediately
+            if ($e->getCode() === 403 || str_contains($e->getMessage(), 'chờ phê duyệt') || str_contains($e->getMessage(), 'bị vô hiệu hóa')) {
+                return response()->json(['detail' => $e->getMessage()], 403);
+            }
+            // Otherwise, fall through to check temporary exam admission
         }
+
+        // 2. Check if this is a temporary exam credential (ExamAdmission)
+        /** @var \App\Http\Controllers\ExamLoginProctorController $proctorController */
+        $proctorController = app(\App\Http\Controllers\ExamLoginProctorController::class);
+
+        // Case A: Temporary exam username (exact, case-insensitive, or visually normalized)
+        $admission = $proctorController->findAdmission($accountInput);
+        if ($admission) {
+            try {
+                return $proctorController->loginWithAdmission($request, $admission, $password);
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
+            } catch (\Throwable $e) {
+                \Log::error('Exam Admission Login Exception: ' . $e->getMessage(), ['exception' => $e]);
+                return response()->json(['detail' => $e->getMessage() ?: 'Đăng nhập ca thi thất bại.'], 400);
+            }
+        }
+
+        // Case B: Student entered their school email / MSSV + exam temporary password
+        $studentUser = \App\Models\User::where('email', $accountInput)
+            ->orWhereHas('studentIdentity', fn($q) => $q->where('student_code', $accountInput))
+            ->first();
+
+        if ($studentUser) {
+            $candidateAdmissions = \App\Models\ExamAdmission::where('student_id', $studentUser->id)
+                ->where('status', '!=', 'revoked')
+                ->orderByDesc('id')
+                ->get();
+
+            foreach ($candidateAdmissions as $candAdm) {
+                $passwordOk = \Illuminate\Support\Facades\Hash::check($password, $candAdm->hashed_password)
+                    || ($candAdm->initial_password !== null && hash_equals((string) $candAdm->initial_password, $password));
+                if ($passwordOk) {
+                    try {
+                        return $proctorController->loginWithAdmission($request, $candAdm, $password);
+                    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                        return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
+                    } catch (\Throwable $e) {
+                        \Log::error('Exam Admission Login Exception: ' . $e->getMessage(), ['exception' => $e]);
+                        return response()->json(['detail' => $e->getMessage() ?: 'Đăng nhập ca thi thất bại.'], 400);
+                    }
+                }
+            }
+        }
+
+        return response()->json(['detail' => 'Email hoặc mật khẩu không chính xác.'], 401);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json($this->formatAuthUser($request->user()));
+        $user = $request->user();
+        $payload = $this->formatAuthUser($user);
+        $token = $user?->currentAccessToken();
+        if ($token && is_string($token->name) && str_starts_with($token->name, 'exam:')) {
+            $parts = explode(':', $token->name);
+            if (!empty($parts[1])) {
+                $payload['examSessionId'] = $parts[1];
+                $payload['exam_session_id'] = $parts[1];
+            }
+        }
+        return response()->json($payload);
     }
 
     public function updateMe(Request $request): JsonResponse

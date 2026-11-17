@@ -56,16 +56,20 @@ class TestProblemAndAssignmentSeeder extends Seeder
             $studentIds[] = $user->id;
         }
 
-        // 3. Tạo lớp học IS004.R12 (Cơ sở dữ liệu) và gán sinh viên
+        // 3. Sử dụng lớp học IT004.R11.1 (Cơ sở dữ liệu) và gán sinh viên
         $class = ClassModel::firstOrCreate(
-            ['id' => 'IS004.R12'],
+            ['id' => 'IT004.R11.1'],
             [
-                'course'        => 'IS004.R12',
-                'term'          => 'HK1 2026-2027',
-                'status'        => 'Active',
-                'instructor_id' => $teacher->id,
-                'start_date'    => '2026-09-01',
-                'end_date'      => '2026-12-31',
+                'course'                 => 'Cơ sở dữ liệu - IT004.R11',
+                'course_code'            => 'IT004',
+                'theory_class'           => 'IT004.R11',
+                'practice_class'         => 'IT004.R11.1',
+                'term'                   => 'HK1 2026-2027',
+                'status'                 => 'Active',
+                'instructor_id'          => $teacher->id,
+                'practice_instructor_id' => $teacher->id,
+                'start_date'             => '2026-09-01',
+                'end_date'               => '2026-12-31',
             ]
         );
 

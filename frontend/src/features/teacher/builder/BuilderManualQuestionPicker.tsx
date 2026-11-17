@@ -1,0 +1,168 @@
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import type { WorkspacePart } from "@/data/models";
+import { useLanguage } from "@/shared/context/LanguageContext";
+import { TranslatedText } from "@/shared/ui/TranslatedText";
+import { Select } from "@/shared/ui/Select";
+import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
+import { WORKSPACE_PARTS, WORKSPACE_PART_LABELS } from "@/shared/lib/workspace/workspaceParts";
+import { catalogOf, type BuilderProblemDetail, type QuestionOption, type QuestionSelection } from "@/features/teacher/builder/BuilderProblemSettings";
+import "@/features/teacher/builder/BuilderManualQuestionPicker.css";
+
+const DIFFICULTY_ALIASES: Record<string, string> = { easy: "dễ", medium: "trung bình", hard: "khó" };
+const difficultyKey = (value?: string) => {
+  const key = (value || "").trim().toLowerCase();
+  return DIFFICULTY_ALIASES[key] || key;
+};
+
+/** A selection of explicit question ids only: no auto rules, no variants (which would deal questions out at random). */
+function plainSelection(selection: QuestionSelection | undefined): QuestionSelection {
+  return Object.fromEntries(Object.entries(selection || {}).filter(([key]) => !key.startsWith("_"))) as QuestionSelection;
+}
+
+export function BuilderManualQuestionPicker({ detail, parts, questionSelection, onChange, lockedQuestionSelection, lockedParts }: {
+  detail: BuilderProblemDetail;
+  parts: WorkspacePart[];
+  questionSelection?: QuestionSelection;
+  onChange: (patch: { questionSelection: QuestionSelection; workspaceParts: WorkspacePart[] }) => void;
+  lockedQuestionSelection?: QuestionSelection;
+  lockedParts?: WorkspacePart[];
+}) {
+  const { t: tr } = useLanguage("teacher");
+  const catalog = useMemo(() => catalogOf(detail), [detail]);
+  const [activeTab, setActiveTab] = useState<WorkspacePart>(() => WORKSPACE_PARTS.find(part => catalog[part].length > 0) || "DDL");
+  const [category, setCategory] = useState("ALL");
+  const [difficulty, setDifficulty] = useState("ALL");
+
+  const selectedIds = (part: WorkspacePart): string[] => {
+    if (!parts.includes(part)) return [];
+    const stored = questionSelection?.[part];
+    if (stored) return stored;
+    const custom = catalog[part].filter(question => !question.kind);
+    return (custom.length ? custom : catalog[part]).map(question => question.id);
+  };
+
+  const lockedIdsFor = (part: WorkspacePart): Set<string> => {
+    if (!lockedParts || !lockedParts.includes(part)) return new Set();
+    const stored = lockedQuestionSelection?.[part];
+    if (Array.isArray(stored)) return new Set(stored);
+    if (stored && typeof stored === "object" && Array.isArray((stored as any).questionIds)) {
+      return new Set((stored as any).questionIds);
+    }
+    const custom = catalog[part].filter(question => !question.kind);
+    return new Set((custom.length ? custom : catalog[part]).map(question => question.id));
+  };
+
+  const choices = catalog[activeTab];
+  const selected = new Set(selectedIds(activeTab));
+  const lockedSet = lockedIdsFor(activeTab);
+  const categories = useMemo(() => Array.from(new Set(choices.map(question => question.category || "").filter(Boolean))), [choices]);
+  const difficulties = useMemo(() => {
+    const seen = new Map<string, string>();
+    choices.forEach(question => { if (question.difficulty && !seen.has(difficultyKey(question.difficulty))) seen.set(difficultyKey(question.difficulty), question.difficulty); });
+    return Array.from(seen.values());
+  }, [choices]);
+
+  const visible = choices.filter(question =>
+    (category === "ALL" || question.category === category) && (difficulty === "ALL" || difficultyKey(question.difficulty) === difficultyKey(difficulty)));
+  const groups = useMemo(() => {
+    const map = new Map<string, QuestionOption[]>();
+    visible.forEach(question => map.set(question.category || "", [...(map.get(question.category || "") || []), question]));
+    return Array.from(map.entries());
+  }, [visible]);
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const groupKeys = groups.map(([name]) => `${activeTab}|${name}`);
+  const allCollapsed = groupKeys.length > 0 && groupKeys.every(key => collapsed.has(key));
+
+  function commit(part: WorkspacePart, ids: Set<string>) {
+    const merged = new Set([...ids, ...lockedIdsFor(part)]);
+    const ordered = catalog[part].filter(question => merged.has(question.id)).map(question => question.id);
+    onChange({
+      questionSelection: { ...plainSelection(questionSelection), [part]: ordered },
+      workspaceParts: WORKSPACE_PARTS.filter(value => value === part ? ordered.length > 0 : parts.includes(value)),
+    });
+  }
+  const setMany = (questions: QuestionOption[], checked: boolean) => {
+    const next = new Set(selected);
+    questions.forEach(question => {
+      if (checked) {
+        next.add(question.id);
+      } else if (!lockedSet.has(question.id)) {
+        next.delete(question.id);
+      }
+    });
+    commit(activeTab, next);
+  };
+
+  const totalSelected = WORKSPACE_PARTS.reduce((sum, part) => sum + catalog[part].filter(question => selectedIds(part).includes(question.id)).length, 0);
+
+  return <div className="builder-manual-picker">
+    <div className="builder-selected-tabs builder-settings-inline-tabs" role="tablist" aria-label={tr("Problem settings tabs")}>
+      {WORKSPACE_PARTS.map(part => {
+        const count = catalog[part].filter(question => selectedIds(part).includes(question.id)).length;
+        return <button type="button" role="tab" key={part} aria-selected={activeTab === part} onClick={() => { setActiveTab(part); setCategory("ALL"); setDifficulty("ALL"); }}>
+          <TranslatedText>{WORKSPACE_PART_LABELS[part]}</TranslatedText><span>{count}/{catalog[part].length}</span>
+        </button>;
+      })}
+    </div>
+    <p className="muted builder-manual-picker-hint"><TranslatedText>{tr("Choose the exact questions every student will solve. Nothing is picked at random.")}</TranslatedText></p>
+    {totalSelected === 0 && <p className="teacher-state-failed" role="alert"><TranslatedText>{tr("Select at least one section.")}</TranslatedText></p>}
+    {choices.length === 0 ? <p className="muted"><TranslatedText>{tr("No questions are available in this section.")}</TranslatedText></p> : <>
+      <div className="builder-manual-picker-toolbar">
+        <Select value={category} aria-label={tr("Category")} onChange={event => setCategory(event.target.value)}>
+          <option value="ALL">{tr("All categories")}</option>
+          {categories.map(name => <option key={name} value={name}>{name}</option>)}
+        </Select>
+        <Select value={difficulty} aria-label={tr("Difficulty")} onChange={event => setDifficulty(event.target.value)}>
+          <option value="ALL">{tr("All difficulties")}</option>
+          {difficulties.map(name => <option key={name} value={name}>{name}</option>)}
+        </Select>
+        <button type="button" className="button subtle teacher-small-button" disabled={visible.every(question => selected.has(question.id))} onClick={() => setMany(visible, true)}>
+          <TranslatedText>{tr("Select all shown")}</TranslatedText>
+        </button>
+        <button type="button" className="button subtle teacher-small-button" disabled={visible.every(question => !selected.has(question.id) || lockedSet.has(question.id))} onClick={() => setMany(visible, false)}>
+          <TranslatedText>{tr("Clear shown")}</TranslatedText>
+        </button>
+      </div>
+      <p className="builder-manual-picker-count"><TranslatedText>{tr("{value0}/{value1} questions", { value0: choices.filter(question => selected.has(question.id)).length, value1: choices.length })}</TranslatedText></p>
+      {groups.length === 0 && <p className="muted"><TranslatedText>{tr("No questions match the filters.")}</TranslatedText></p>}
+      {groups.length > 1 && <button type="button" className="button subtle teacher-small-button builder-manual-picker-fold-all" onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groupKeys))}>
+        <TranslatedText>{tr(allCollapsed ? "Expand all groups" : "Collapse all groups")}</TranslatedText>
+      </button>}
+      {groups.map(([name, questions]) => {
+        const picked = questions.filter(question => selected.has(question.id)).length;
+        const key = `${activeTab}|${name}`;
+        const folded = collapsed.has(key);
+        const listId = `builder-manual-group-${activeTab}-${groups.findIndex(([groupName]) => groupName === name)}`;
+        return <section className="builder-manual-picker-group" key={name || "none"}>
+          <div className="builder-manual-picker-group-heading">
+            <input type="checkbox" checked={picked === questions.length} disabled={questions.every(q => lockedSet.has(q.id))} ref={node => { if (node) node.indeterminate = picked > 0 && picked < questions.length; }}
+              aria-label={tr("Select all questions")} onChange={event => setMany(questions, event.target.checked)} />
+            <button type="button" className="builder-manual-picker-group-toggle" aria-expanded={!folded} aria-controls={listId}
+              onClick={() => setCollapsed(previous => { const next = new Set(previous); if (folded) next.delete(key); else next.add(key); return next; })}>
+              <strong><TranslatedText>{name || tr("Other")}</TranslatedText></strong>
+              <span>{picked}/{questions.length}</span>
+              <ChevronDown size={16} className={folded ? "" : "is-expanded"} aria-hidden="true" />
+            </button>
+          </div>
+          {!folded && <ul id={listId}>
+            {questions.map(question => <li key={question.id}>
+              <label className="builder-manual-picker-question">
+                <input type="checkbox" checked={selected.has(question.id)} disabled={lockedSet.has(question.id)} title={lockedSet.has(question.id) ? tr("Published assignment questions cannot be removed") : undefined} aria-label={tr("Select question {value0}", { value0: question.name })} onChange={event => setMany([question], event.target.checked)} />
+                <span>
+                  <span className="builder-manual-picker-question-title">
+                    <TranslatedText>{question.kind === "schema" ? tr("Create tables and keys") : question.kind === "seed" ? tr("Import original data") : question.name}</TranslatedText>
+                    {question.difficulty && <span className="builder-q-tag difficulty">{question.difficulty}</span>}
+                    {question.kind && <small><TranslatedText>{tr("From original database")}</TranslatedText></small>}
+                  </span>
+                  {question.description && <ProblemMarkdown>{tr(question.description)}</ProblemMarkdown>}
+                </span>
+              </label>
+            </li>)}
+          </ul>}
+        </section>;
+      })}
+    </>}
+  </div>;
+}

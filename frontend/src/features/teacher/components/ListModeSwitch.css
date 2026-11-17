@@ -1,0 +1,7 @@
+.class-room-switch { position:relative; display:inline-flex; align-items:stretch; isolation:isolate; min-width:0; height:36px; box-sizing:border-box; padding:3px; gap:3px; border:1px solid var(--border); border-radius:10px; background:var(--subtle); font:inherit; cursor:pointer; }
+.class-room-switch-indicator { position:absolute; z-index:-1; left:3px; top:3px; bottom:3px; width:calc((100% - 9px) / 2); border:1px solid var(--border); border-radius:7px; background:var(--surface); box-shadow:0 1px 3px #15234b1a; pointer-events:none; }
+.class-room-switch.is-rooms .class-room-switch-indicator { transform:translateX(calc(100% + 3px)); }
+.class-room-switch > .class-room-option { flex:1 1 0; min-width:0; display:flex; align-items:center; justify-content:center; padding:0 10px; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--muted); font:inherit; font-size:12px; line-height:20px; white-space:nowrap; cursor:pointer; transition:color .18s; }
+.class-room-switch > .class-room-option.is-active,.class-room-switch > .class-room-option:hover { color:var(--accent); }
+.class-room-switch:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+@media (prefers-reduced-motion:reduce) { .class-room-switch > .class-room-option { transition:none; } }

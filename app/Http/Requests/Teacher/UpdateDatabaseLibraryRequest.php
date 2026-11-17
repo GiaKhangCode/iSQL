@@ -26,6 +26,9 @@ class UpdateDatabaseLibraryRequest extends FormRequest
             'insertIntoSql'          => ['nullable', 'string'],
             'insert_into_sql'        => ['nullable', 'string'],
             'datasets'               => ['nullable', 'array'],
+            'datasets.*.fileName'    => ['nullable', 'string', 'max:255'],
+            'datasets.*.sql'         => ['nullable', 'string'],
+            'datasets.*.isHidden'    => ['nullable', 'boolean'],
         ];
     }
 
@@ -37,6 +40,7 @@ class UpdateDatabaseLibraryRequest extends FormRequest
         $validator->after(function ($v) {
             $createSql = $this->input('createTableSql') ?? $this->input('create_table_sql');
             $insertSql = $this->input('insertIntoSql') ?? $this->input('insert_into_sql');
+            $datasets = $this->input('datasets', []);
 
             $dangerousPatterns = [
                 '/\bxp_cmdshell\b/i'         => 'xp_cmdshell command is not permitted.',
@@ -49,7 +53,16 @@ class UpdateDatabaseLibraryRequest extends FormRequest
                 '/\bDROP\s+LOGIN\b/i'        => 'DROP LOGIN command is not permitted.',
             ];
 
-            foreach (['createTableSql' => $createSql, 'insertIntoSql' => $insertSql] as $field => $sql) {
+            $fieldsToScan = ['createTableSql' => $createSql, 'insertIntoSql' => $insertSql];
+            if (is_array($datasets)) {
+                foreach ($datasets as $idx => $dataset) {
+                    if (is_array($dataset) && !empty($dataset['sql'])) {
+                        $fieldsToScan["datasets.{$idx}.sql"] = (string) $dataset['sql'];
+                    }
+                }
+            }
+
+            foreach ($fieldsToScan as $field => $sql) {
                 if (!empty($sql)) {
                     foreach ($dangerousPatterns as $pattern => $message) {
                         if (preg_match($pattern, $sql)) {

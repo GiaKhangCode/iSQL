@@ -16,9 +16,13 @@ class ClassModel extends Model
         'id',
         'course',
         'course_id',
+        'course_code',
+        'theory_class',
+        'practice_class',
         'term',
         'term_id',
         'instructor_id',
+        'practice_instructor_id',
         'start_date',
         'end_date',
         'status',
@@ -32,6 +36,11 @@ class ClassModel extends Model
     public function instructor()
     {
         return $this->belongsTo(User::class, 'instructor_id');
+    }
+
+    public function practiceInstructor()
+    {
+        return $this->belongsTo(User::class, 'practice_instructor_id');
     }
 
     public function instructors()

@@ -107,6 +107,8 @@ class DatabaseLibraryController extends Controller
             'create_table_sql'       => $request->input('createTableSql') ?? $request->input('create_table_sql') ?? '',
             'insert_into_sql'        => $insertIntoSql,
             'datasets_json'          => $datasets,
+            'bundle_json'            => $request->input('bundle') ?? $request->input('bundle_json'),
+            'revision'               => 1,
         ]);
 
         return response()->json($entry->toResponseArray(), 201);
@@ -118,8 +120,16 @@ class DatabaseLibraryController extends Controller
         $this->assertCanAccess($user);
 
         $entry = DatabaseLibraryEntry::findOrFail($id);
-        if ($entry->instructor_id && $entry->instructor_id !== $user->id && ! $user->isAdmin()) {
+        if ((!$entry->instructor_id || $entry->instructor_id !== $user->id) && ! $user->isAdmin()) {
             abort(403, 'You do not have permission to edit this database library entry.');
+        }
+
+        $expectedRevision = $request->input('expectedRevision') ?? $request->input('expected_revision');
+        if ($expectedRevision !== null && (int) $expectedRevision !== (int) ($entry->revision ?? 1)) {
+            return response()->json([
+                'detail'  => 'Bộ đề thư viện đã được sửa ở một cửa sổ khác. Tải lại bản mới trước khi lưu.',
+                'message' => 'Bộ đề thư viện đã được sửa ở một cửa sổ khác. Tải lại bản mới trước khi lưu.',
+            ], 409);
         }
 
         $data = $request->validated();
@@ -127,7 +137,7 @@ class DatabaseLibraryController extends Controller
         $datasets = $request->has('datasets') ? $request->input('datasets', []) : $entry->datasets_json;
         $firstDataset = is_array($datasets) && count($datasets) > 0 ? $datasets[0] : [];
 
-        $entry->update([
+        $updateData = [
             'title'                  => $request->has('title') ? trim($data['title']) : $entry->title,
             'database_file_name'     => $request->input('databaseFileName') ?? $request->input('database_file_name') ?? $entry->database_file_name,
             'create_table_file_name' => $request->input('createTableFileName') ?? $request->input('create_table_file_name') ?? $entry->create_table_file_name,
@@ -135,7 +145,14 @@ class DatabaseLibraryController extends Controller
             'create_table_sql'       => $request->input('createTableSql') ?? $request->input('create_table_sql') ?? $entry->create_table_sql,
             'insert_into_sql'        => $firstDataset['sql'] ?? $request->input('insertIntoSql') ?? $request->input('insert_into_sql') ?? $entry->insert_into_sql,
             'datasets_json'          => $datasets,
-        ]);
+            'revision'               => ((int) ($entry->revision ?? 1)) + 1,
+        ];
+
+        if ($request->has('bundle') || $request->has('bundle_json')) {
+            $updateData['bundle_json'] = $request->input('bundle') ?? $request->input('bundle_json');
+        }
+
+        $entry->update($updateData);
 
         return response()->json($entry->toResponseArray());
     }
@@ -146,7 +163,7 @@ class DatabaseLibraryController extends Controller
         $this->assertCanAccess($user);
 
         $entry = DatabaseLibraryEntry::findOrFail($id);
-        if ($entry->instructor_id && $entry->instructor_id !== $user->id && ! $user->isAdmin()) {
+        if ((!$entry->instructor_id || $entry->instructor_id !== $user->id) && ! $user->isAdmin()) {
             abort(403, 'You do not have permission to delete this database library entry.');
         }
 
@@ -186,6 +203,16 @@ class DatabaseLibraryController extends Controller
             'seedData'           => $insertSql,
             'reference_solution' => 'SELECT 1 AS test_connection;',
         ], $user);
+
+        if (strtolower((string) ($validation['status'] ?? '')) === 'error') {
+            $errMessage = (string) ($validation['message'] ?? 'SQL execution failed.');
+            return response()->json([
+                'status'          => 'Error',
+                'detail'          => $errMessage,
+                'message'         => $errMessage,
+                'executionTimeMs' => $validation['executionTimeMs'] ?? 0,
+            ], 422);
+        }
 
         return response()->json([
             'status'          => $validation['status'] ?? 'Success',

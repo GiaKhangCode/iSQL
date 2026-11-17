@@ -20,6 +20,7 @@ class ClassController extends Controller
     {
         $user = $request->user();
         $canManageAll = $user->isAdmin()
+            || $user->isFacultyOffice()
             || $user->role === User::ROLE_DEPARTMENT_HEAD
             || $user->role === 'admin';
 
@@ -36,6 +37,7 @@ class ClassController extends Controller
     {
         $user = $request->user();
         $canManageAll = $user->isAdmin()
+            || $user->isFacultyOffice()
             || $user->role === User::ROLE_DEPARTMENT_HEAD
             || $user->role === 'admin';
 

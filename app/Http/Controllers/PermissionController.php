@@ -32,6 +32,84 @@ class PermissionController extends Controller
         ]);
     }
 
+    /**
+     * Lấy danh sách capabilities quyền cho React Frontend (dạng mảng string[])
+     */
+    public function getEffectivePermissions(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['permissions' => []]);
+        }
+
+        $allPermissions = [
+            'practice.solve',
+            'problem.create',
+            'problem.share',
+            'library.manage',
+            'library.share',
+            'assignment.create',
+            'contest.create',
+            'examination.manage',
+            'exam.credentials',
+            'exam.proctor',
+            'results.grade',
+            'statistics.all',
+            'access.manage',
+        ];
+
+        if ($user->role === User::ROLE_ADMIN || $user->role === 'admin') {
+            return response()->json([
+                'permissions' => $allPermissions,
+            ]);
+        }
+
+        if ($user->isFacultyOffice() || $user->role === User::ROLE_FACULTY_OFFICE || $user->role === 'faculty_office' || strtolower((string)$user->role) === 'faculty office') {
+            return response()->json([
+                'permissions' => [
+                    'contest.create',
+                    'examination.manage',
+                    'exam.credentials',
+                    'results.grade',
+                ],
+            ]);
+        }
+
+        $instructorRoles = [
+            User::ROLE_INSTRUCTOR_PRACTICAL,
+            User::ROLE_INSTRUCTOR_THEORY,
+            User::ROLE_DEPARTMENT_HEAD,
+            User::LEGACY_INSTRUCTOR_ROLE,
+            'instructor',
+        ];
+
+        if (in_array($user->role, $instructorRoles, true)) {
+            $grants = [
+                'practice.solve',
+                'problem.create',
+                'problem.share',
+                'library.manage',
+                'library.share',
+                'assignment.create',
+                'contest.create',
+                'examination.manage',
+                'exam.credentials',
+                'exam.proctor',
+                'results.grade',
+                'statistics.all',
+            ];
+            return response()->json([
+                'permissions' => $grants,
+            ]);
+        }
+
+        return response()->json([
+            'permissions' => [
+                'practice.solve',
+            ],
+        ]);
+    }
+
     // ──────────────── TAB 1: FUNCTIONS ────────────────
     public function getFunctions()
     {

@@ -13,6 +13,7 @@ class Assignment extends Model
         'id',
         'title',
         'is_contest',
+        'scoring_mode',
         'instructions',
         'audience_type',
         'short_description',
@@ -25,11 +26,18 @@ class Assignment extends Model
         'closes',
         'published',
         'instructor_id',
+        'examination_id',
+        'session_index',
+        'proctors',
+        'room',
+        'capacity',
+        'admission_required',
         'hints_enabled',
         'comments_enabled',
         'leaderboard_enabled',
         'ai_allowed',
         'exam_mode',
+        'exam_violation_limit',
         'show_scores_after_submit',
         'max_submissions',
         'exam_type',
@@ -41,20 +49,25 @@ class Assignment extends Model
     ];
 
     protected $casts = [
-        'is_contest' => 'boolean',
-        'published' => 'boolean',
-        'hints_enabled' => 'boolean',
-        'comments_enabled' => 'boolean',
-        'leaderboard_enabled' => 'boolean',
-        'ai_allowed' => 'boolean',
-        'exam_mode' => 'boolean',
+        'is_contest'               => 'boolean',
+        'published'                => 'boolean',
+        'hints_enabled'            => 'boolean',
+        'comments_enabled'         => 'boolean',
+        'leaderboard_enabled'      => 'boolean',
+        'ai_allowed'               => 'boolean',
+        'exam_mode'                => 'boolean',
+        'exam_violation_limit'     => 'integer',
         'show_scores_after_submit' => 'boolean',
-        'max_submissions' => 'integer',
-        'opens' => 'datetime',
-        'closes' => 'datetime',
-        'ddl_points' => 'integer',
-        'dml_points' => 'integer',
-        'sql_points' => 'integer',
+        'max_submissions'          => 'integer',
+        'session_index'            => 'integer',
+        'proctors'                 => 'array',
+        'capacity'                 => 'integer',
+        'admission_required'       => 'boolean',
+        'opens'                    => 'datetime',
+        'closes'                   => 'datetime',
+        'ddl_points'               => 'integer',
+        'dml_points'               => 'integer',
+        'sql_points'               => 'integer',
     ];
 
     public function instructor()
@@ -62,10 +75,21 @@ class Assignment extends Model
         return $this->belongsTo(User::class, 'instructor_id');
     }
 
+    public function examination()
+    {
+        return $this->belongsTo(Examination::class, 'examination_id');
+    }
+
     public function classes()
     {
         return $this->belongsToMany(ClassModel::class, 'assignment_classes', 'assignment_id', 'class_id')
                     ->using(AssignmentClass::class);
+    }
+
+    public function selectedStudents()
+    {
+        return $this->belongsToMany(User::class, 'assignment_students', 'assignment_id', 'student_id')
+                    ->using(AssignmentStudent::class);
     }
 
     public function assignmentProblems()
@@ -77,6 +101,11 @@ class Assignment extends Model
     {
         return $this->belongsToMany(Problem::class, 'assignment_problems', 'assignment_id', 'problem_id')
                     ->using(AssignmentProblem::class)
-                    ->withPivot('id', 'points', 'order_index', 'workspace_parts', 'dataset_visibility', 'database_structure_visible', 'database_description_visible');
+                    ->withPivot('id', 'points', 'order_index', 'workspace_parts', 'dataset_visibility', 'question_selection', 'database_structure_visible', 'database_description_visible');
+    }
+
+    public function classProctors()
+    {
+        return $this->hasMany(ExamClassProctor::class, 'session_id');
     }
 }

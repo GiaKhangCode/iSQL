@@ -1,0 +1,7 @@
+.unsaved-changes-badge {
+  display:inline-flex; align-items:center; gap:5px; justify-self:start; align-self:start;
+  max-width:100%; margin:0; padding:0;
+  color:var(--muted); font-size:10px; font-weight:400; line-height:16px;
+}
+.unsaved-changes-badge svg { flex:none; color:var(--warning); }
+.unsaved-changes-badge i18n-text,.unsaved-changes-badge i18n-content { color:inherit; }

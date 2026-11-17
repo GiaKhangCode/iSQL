@@ -48,5 +48,18 @@ class UserSeeder extends Seeder
                 'department'      => 'Information Systems',
             ]
         );
+
+        // Faculty Office Demo (Giáo vụ khoa)
+        User::firstOrCreate(
+            ['email' => 'gvk@uit.edu.vn'],
+            [
+                'name'            => 'Giáo Vụ Khoa',
+                'initials'        => 'GV',
+                'hashed_password' => Hash::make('12345678'),
+                'role'            => 'faculty_office',
+                'status'          => 'Active',
+                'department'      => 'Văn phòng Khoa / Phòng Giáo vụ',
+            ]
+        );
     }
 }

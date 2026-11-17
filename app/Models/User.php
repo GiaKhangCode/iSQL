@@ -16,6 +16,7 @@ class User extends Authenticatable
     public const ROLE_INSTRUCTOR_PRACTICAL = 'instructor_practical';
     public const ROLE_INSTRUCTOR_THEORY = 'instructor_theory';
     public const ROLE_DEPARTMENT_HEAD = 'department_head';
+    public const ROLE_FACULTY_OFFICE = 'faculty_office';
     public const ROLE_ADMIN = 'admin';
 
     /** Accepted role values for account creation and role changes. */
@@ -24,6 +25,7 @@ class User extends Authenticatable
         self::ROLE_INSTRUCTOR_PRACTICAL,
         self::ROLE_INSTRUCTOR_THEORY,
         self::ROLE_DEPARTMENT_HEAD,
+        self::ROLE_FACULTY_OFFICE,
         self::ROLE_ADMIN,
         self::LEGACY_INSTRUCTOR_ROLE,
     ];
@@ -87,6 +89,15 @@ class User extends Authenticatable
             || str_contains(strtolower((string) $this->role), 'lecturer');
     }
 
+    public function isFacultyOffice(): bool
+    {
+        $r = strtolower((string) $this->role);
+        return $this->role === self::ROLE_FACULTY_OFFICE
+            || $r === 'faculty_office'
+            || $r === 'faculty office'
+            || $r === 'giáo vụ khoa';
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === self::ROLE_ADMIN || $this->role === 'admin';
@@ -96,6 +107,9 @@ class User extends Authenticatable
     {
         if ($this->isAdmin()) {
             return 'admin';
+        }
+        if ($this->isFacultyOffice()) {
+            return 'faculty_office';
         }
         if ($this->isInstructor()) {
             return 'instructor';
@@ -135,6 +149,25 @@ class User extends Authenticatable
             }
         }
 
+        // Faculty office default permissions
+        if ($this->isFacultyOffice()) {
+            if ($functionCode === 'ASSIGNMENT_MGMT') {
+                return true;
+            }
+            if ($functionCode === 'CLASS_MGMT' && in_array($action, ['view', 'download'])) {
+                return true;
+            }
+            if ($functionCode === 'PROBLEM_MGMT' && in_array($action, ['view', 'download'])) {
+                return true;
+            }
+            if ($functionCode === 'PRACTICE_MGMT' && $action === 'view') {
+                return true;
+            }
+            if ($functionCode === 'SUBMISSION_MGMT') {
+                return true;
+            }
+        }
+
         // Instructor default permissions
         if ($this->isInstructor()) {
             if ($functionCode === 'CLASS_MGMT' && $action === 'view') {
@@ -160,6 +193,11 @@ class User extends Authenticatable
     public function submissions()
     {
         return $this->hasMany(Submission::class);
+    }
+
+    public function studentIdentity(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StudentIdentity::class, 'user_id', 'id');
     }
 
     public function enrollments()

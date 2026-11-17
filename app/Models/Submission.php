@@ -22,13 +22,14 @@ class Submission extends Model
         'submitted_at',
         'query_text',
         'database_type',
+        'schema_name',
         'evaluated_score',
         'feedback',
     ];
 
     protected $casts = [
-        'score' => 'integer',
-        'evaluated_score' => 'integer',
+        'score' => 'float',
+        'evaluated_score' => 'float',
         'submitted_at' => 'datetime',
     ];
 
@@ -40,5 +41,10 @@ class Submission extends Model
     public function problem()
     {
         return $this->belongsTo(Problem::class);
+    }
+
+    public function workspaceResult()
+    {
+        return $this->hasOne(WorkspaceSubmissionResult::class, 'submission_id');
     }
 }

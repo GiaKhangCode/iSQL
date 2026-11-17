@@ -24,6 +24,8 @@ class UpdateUserRequest extends FormRequest
                 $role = User::ROLE_STUDENT;
             } elseif ($role === 'admin') {
                 $role = User::ROLE_ADMIN;
+            } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
+                $role = User::ROLE_FACULTY_OFFICE;
             }
             $this->merge(['role' => $role]);
         }
@@ -38,7 +40,7 @@ class UpdateUserRequest extends FormRequest
             'password'   => 'sometimes|nullable|string|min:8',
             'name'       => 'sometimes|required|string|max:255',
             'initials'   => 'sometimes|nullable|string|max:10',
-            'role'       => ['sometimes', 'required', Rule::in(array_merge(User::ROLES, ['lecturer', 'instructor', 'student', 'admin']))],
+            'role'       => ['sometimes', 'required', Rule::in(array_merge(User::ROLES, ['lecturer', 'instructor', 'student', 'admin', 'faculty office', 'faculty_office', 'giáo vụ khoa']))],
             'status'     => 'sometimes|required|in:Active,Inactive,Pending',
             'department' => 'sometimes|nullable|string|max:255',
         ];

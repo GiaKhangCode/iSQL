@@ -64,6 +64,11 @@ class Problem extends Model
         return $this->hasMany(ProblemSqlSolution::class, 'problem_id')->orderBy('order_index');
     }
 
+    public function stageExercises()
+    {
+        return $this->hasMany(ProblemStageExercise::class, 'problem_id');
+    }
+
     public function submissions()
     {
         return $this->hasMany(Submission::class, 'problem_id');

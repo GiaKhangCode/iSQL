@@ -1,0 +1,37 @@
+/* Regrade assignment (faculty office) and "my regrades" (lecturer). */
+.regrade-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; margin:0 0 16px; }
+.regrade-filters label { display:grid; gap:4px; min-width:180px; font-size:11px; color:var(--muted); }
+.regrade-filters input:not([type="checkbox"]) { min-height:38px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius-sm,5px); background:var(--surface); color:var(--text); font:inherit; font-size:12px; }
+.regrade-filters .regrade-search { flex:1 1 260px; }
+.regrade-filters .regrade-check { display:inline-flex; align-items:center; gap:8px; min-width:0; min-height:38px; padding:0 12px; border:1px solid var(--border); border-radius:var(--radius-sm,5px); background:var(--surface); color:var(--text); font-size:12px; white-space:nowrap; cursor:pointer; transition:border-color .15s; }
+.regrade-filters .regrade-check:hover { border-color:var(--accent,currentColor); }
+.regrade-filters .regrade-check:has(input:focus-visible) { outline:2px solid var(--accent,currentColor); outline-offset:2px; }
+.regrade-filters .regrade-check input[type="checkbox"] { flex:none; width:16px; height:16px; min-width:0; min-height:0; margin:0; padding:0; accent-color:var(--accent,#5b4bdb); cursor:pointer; }
+.regrade-table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-lg,10px); background:var(--surface); }
+.regrade-table { width:100%; border-collapse:collapse; font-size:12px; }
+.regrade-table th, .regrade-table td { padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+.regrade-table th { color:var(--muted); font-size:11px; font-weight:600; white-space:nowrap; }
+.regrade-table tbody tr:last-child td { border-bottom:0; }
+.regrade-table td small { display:block; margin-top:2px; font-size:10px; }
+.regrade-assign { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:280px; }
+.regrade-assign > :first-child { flex:1 1 170px; min-width:150px; }
+.regrade-assign .button { white-space:nowrap; }
+.regrade-note-input { width:100%; min-height:32px; margin-top:6px; padding:5px 8px; border:1px solid var(--border); border-radius:var(--radius-sm,5px); background:var(--surface); color:var(--text); font:inherit; font-size:11px; }
+.regrade-reason-text { max-width:260px; white-space:normal; word-break:break-word; }
+.regrade-review-link { font-size:11px; font-weight:600; color:var(--accent,#5b4bdb); text-decoration:none; }
+.regrade-review-link:hover { text-decoration:underline; }
+.regrade-filter-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+.regrade-badge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--accent-subtle,#efedff); color:var(--muted); font-size:10px; white-space:nowrap; }
+.regrade-badge.is-pending { background:#fff4d6; color:#8a5a00; }
+.regrade-badge.is-done { background:#e3f6ea; color:#1d6b3a; }
+:root[data-theme="dark"] .regrade-badge.is-pending { background:#4a3a12; color:#ffd479; }
+:root[data-theme="dark"] .regrade-badge.is-done { background:#183a27; color:#86e0a6; }
+.regrade-note { margin:10px 2px 0; font-size:11px; }
+@media (max-width: 760px) {
+  .regrade-table thead { display:none; }
+  .regrade-table, .regrade-table tbody, .regrade-table tr, .regrade-table td { display:block; }
+  .regrade-table tr { padding:8px 0; border-bottom:1px solid var(--border); }
+  .regrade-table td { border:0; padding:4px 12px; }
+  .regrade-table td::before { content:attr(data-label); display:block; color:var(--muted); font-size:10px; }
+  .regrade-assign { min-width:0; }
+}

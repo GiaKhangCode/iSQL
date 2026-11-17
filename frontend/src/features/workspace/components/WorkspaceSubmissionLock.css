@@ -1,0 +1,5 @@
+.workspace-submission-lock { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border); border-radius:5px; background:var(--subtle); color:var(--text-secondary); font-size:11px; line-height:18px; white-space:nowrap; }
+.workspace-submission-lock svg { flex:none; }
+.is-submission-locked :is(.stage-code,.sql-editor,.cm-editor,.cm-gutters) { background:var(--subtle); }
+.is-submission-locked .cm-content { cursor:default; }
+.is-submission-locked .cm-activeLine { box-shadow:none; }

@@ -1,0 +1,34 @@
+import type { DataTable, WorkspacePart } from "@/shared/types/domain";
+import type { SchemaTable } from "@/shared/lib/sql/parseDatabaseSchema";
+
+export type QueryResult = {
+  triggers?: {name:string;table:string;isDisabled:boolean;insteadOf?:boolean}[];
+  id?: string;
+  alreadySubmitted?: boolean;
+  submittedScript?: string;
+  questionOnly?: boolean;
+  schemaChanges?: { name: string; change: "created" | "modified" | "dropped"; before: SchemaTable | null; table: SchemaTable | null }[];
+  dataChanges?: { name: string; change: "created" | "modified" | "dropped"; before: DataTable | null; table: DataTable | null }[];
+  part?: WorkspacePart;
+  sections?: QueryResult[];
+  actualSchema?: SchemaTable[];
+  expectedSchema?: SchemaTable[];
+  actualTables?: DataTable[];
+  expectedTables?: DataTable[];
+  comparisons?: { dataset: number; question?: number; actualTable?: DataTable; expectedTable?: DataTable; matched?: boolean }[];
+  questionId?: string;
+  questions?: { id: string; name: string; description?: string; message?: string; comparisons?: QueryResult["comparisons"]; ratio: number; status: string; datasets: { dataset: number; correct: boolean; runtimeError?: boolean; message: string }[] }[];
+  passed?: number;
+  total?: number;
+  score?: number | null;
+  scoreVisible?: boolean;
+  maxScore?: number;
+  submissionsUsed?: number | null;
+  maxSubmissions?: number | null;
+  executionTimeMs?: number;
+  schemaTables?: SchemaTable[];
+  tables?: DataTable[];
+  status: string;
+  message: string;
+  table?: any;
+};

@@ -1,0 +1,26 @@
+/* Full-screen workspaces scroll inside their panes, never on the document. */
+html:has(.problem-workspace, .workspace-standalone),
+body:has(.problem-workspace, .workspace-standalone) {
+  height:100%;
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+#root:has(.problem-workspace, .workspace-standalone) {
+  height:100dvh;
+  min-height:0;
+  overflow:clip;
+}
+.problem-workspace,
+.workspace-standalone {
+  height:100dvh;
+  min-height:0;
+  max-height:100dvh;
+  overflow:hidden;
+}
+:is(.problem-workspace, .workspace-standalone) :is(.problem-scroll, .cm-scroller, .notes-pane textarea) {
+  overscroll-behavior:contain;
+}
+.workspace-header .workspace-context-title { flex:0 1 260px; min-width:0; max-width:26vw; overflow:hidden; color:var(--text); font-size:13px; font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
+.problem-workspace .workspace-header .workspace-context-title,
+.workspace-standalone .workspace-header .workspace-context-title { flex:1; max-width:none; }
+@media (max-width:760px) { .workspace-header .workspace-context-title { flex:1 1 160px; max-width:calc(100% - 52px); } }

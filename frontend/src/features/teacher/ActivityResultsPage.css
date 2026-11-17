@@ -1,0 +1,17 @@
+.grading-page .grading-actions { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:stretch; gap:8px; flex:none; }
+.grading-page .grading-actions > .button { display:inline-flex; justify-content:center; align-items:center; padding:8px 10px; min-height:36px; white-space:nowrap; font-size:11px; }
+.grading-page .grading-actions .u027-toggle { padding:8px; gap:5px; }
+.grading-page .teacher-list-detail-panel.grading-details { display:flex; flex-direction:column; padding:0; overflow:hidden; }
+.grading-detail-body { flex:1; min-height:0; overflow:auto; padding:16px; }
+.grading-detail-body > .muted { margin:0 0 12px; font-size:11px; }
+.grading-detail-body dl { margin:20px 0; display:grid; gap:6px; font-size:12px; }
+.grading-detail-body dd { margin:0 0 8px; font-weight:600; }
+.grading-detail-footer { flex:none; padding:12px 16px; border-top:1px solid var(--border); background:var(--surface); }
+.grading-detail-footer .button { display:flex; justify-content:center; width:100%; }
+.grading-summary { border-top:1px solid var(--border); padding-top:12px; line-height:1.8; }
+.grading-page .teacher-table > thead { position:sticky; top:0; z-index:2; }
+.grading-page .teacher-table > thead > tr > th { position:static; }
+.grading-page .teacher-table .teacher-small-button { padding:6px; font-size:10px; white-space:normal; }
+.grading-publication { margin:0; font-size:11px; }
+@media(min-width:801px) { .grading-page .teacher-list-detail-layout { grid-template-columns:minmax(0,1fr) minmax(330px,360px); } }
+@media(max-width:800px) { .grading-page .grading-details { max-height:none; } }

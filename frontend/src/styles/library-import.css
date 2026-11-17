@@ -1,0 +1,70 @@
+.library-import-selection {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--subtle);
+  margin-top: 8px;
+}
+.library-import-selection h3 {
+  margin: 0 0 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.library-import-selection p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0 0 6px;
+}
+.library-import-sections {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+.library-import-sections label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: border-color .12s ease;
+}
+.library-import-sections label:hover {
+  border-color: var(--accent);
+}
+.library-import-sections small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.library-import-sections .is-unavailable {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.library-import-mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  margin-top: 6px;
+  color: var(--text);
+}
+.library-import-mode select {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+@media(max-width:650px) {
+  .library-import-sections label { grid-template-columns: auto 1fr; }
+  .library-import-sections small { grid-column: 2; }
+}

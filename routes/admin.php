@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\AcademicTermController;
 use App\Http\Controllers\Admin\OverviewController;
 use App\Http\Controllers\ClassRosterController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\Admin\ExerciseTagController;
 
 Route::middleware(['auth:sanctum', 'active', 'role:admin'])->group(function () {
     // Permission & Role Management
@@ -62,4 +63,10 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->group(function () {
 
     Route::apiResource('courses', CourseController::class);
     Route::apiResource('terms', AcademicTermController::class);
+
+    // Exercise Tags Management (Admin - Gán thẻ Bài tập)
+    Route::get('/exercise-tags', [ExerciseTagController::class, 'index']);
+    Route::post('/exercise-tags', [ExerciseTagController::class, 'store']);
+    Route::put('/exercise-tags/{id}', [ExerciseTagController::class, 'update']);
+    Route::delete('/exercise-tags/{id}', [ExerciseTagController::class, 'destroy']);
 });
