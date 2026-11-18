@@ -207,24 +207,22 @@ class ActivityAttemptController extends Controller
             abort(403, 'Tài khoản ca thi đang tạm khóa. Vui lòng báo giám thị phòng thi.');
         }
 
-        if (($activity->audience_type ?: 'classes') !== 'all_students') {
-            $classIds = ClassEnrollment::where('student_id', $user->id)->pluck('class_id')->all();
-            $inClass = !empty($classIds) && DB::table('assignment_classes')
-                ->where('assignment_id', $activity->id)
-                ->whereIn('class_id', $classIds)
-                ->exists();
-            $isSelected = DB::table('assignment_students')
-                ->where('assignment_id', $activity->id)
-                ->where('student_id', $user->id)
-                ->exists();
-            $hasAdmission = ExamAdmission::where('session_id', $activity->id)
-                ->where('student_id', $user->id)
-                ->where('status', '!=', 'revoked')
-                ->exists();
+        $classIds = ClassEnrollment::where('student_id', $user->id)->pluck('class_id')->all();
+        $inClass = !empty($classIds) && DB::table('assignment_classes')
+            ->where('assignment_id', $activity->id)
+            ->whereIn('class_id', $classIds)
+            ->exists();
+        $isSelected = DB::table('assignment_students')
+            ->where('assignment_id', $activity->id)
+            ->where('student_id', $user->id)
+            ->exists();
+        $hasAdmission = ExamAdmission::where('session_id', $activity->id)
+            ->where('student_id', $user->id)
+            ->where('status', '!=', 'revoked')
+            ->exists();
 
-            if (!$inClass && !$isSelected && !$hasAdmission) {
-                abort(403, 'You are not assigned to this activity.');
-            }
+        if (!$inClass && !$isSelected && !$hasAdmission) {
+            abort(403, 'You are not assigned to this activity.');
         }
 
         return $activity;

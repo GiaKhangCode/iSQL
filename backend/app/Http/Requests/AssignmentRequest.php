@@ -25,9 +25,6 @@ class AssignmentRequest extends FormRequest
         if (isset($data['status'])) {
             $data['published'] = in_array(strtolower((string) $data['status']), ['published', 'open'], true);
         }
-        if (isset($data['isContest'])) {
-            $data['is_contest'] = filter_var($data['isContest'], FILTER_VALIDATE_BOOLEAN);
-        }
         if (isset($data['classIds'])) {
             $data['class_ids'] = (array) $data['classIds'];
         }
@@ -114,10 +111,9 @@ class AssignmentRequest extends FormRequest
     {
         return [
             'title'                     => 'required|string|max:255',
-            'is_contest'                => 'sometimes|boolean',
             'scoring_mode'              => 'sometimes|string|max:30',
             'instructions'              => 'nullable|string',
-            'audience_type'             => 'sometimes|string|in:classes,all_students',
+            'audience_type'             => 'sometimes|string|in:classes',
             'short_description'         => 'nullable|string|max:180',
             'description'               => 'nullable|string',
             'rules'                     => 'nullable|string',

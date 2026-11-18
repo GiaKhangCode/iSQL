@@ -58,8 +58,7 @@ class ProblemService
                     $q->whereNull('assignments.opens')->orWhere('assignments.opens', '<=', now());
                 })
                 ->where(function ($q) use ($user) {
-                    $q->where('assignments.audience_type', 'all_students')
-                        ->orWhereExists(function ($ex) use ($user) {
+                    $q->whereExists(function ($ex) use ($user) {
                             $ex->select(DB::raw(1))
                                 ->from('assignment_classes')
                                 ->join('class_enrollments', 'class_enrollments.class_id', '=', 'assignment_classes.class_id')
@@ -1279,8 +1278,7 @@ class ProblemService
                     $q->where('assignments.id', $context);
                 }
                 $q->where(function ($sub) use ($user) {
-                    $sub->where('assignments.audience_type', 'all_students')
-                        ->orWhereExists(function ($ex) use ($user) {
+                    $sub->whereExists(function ($ex) use ($user) {
                             $ex->select(DB::raw(1))
                                 ->from('assignment_classes')
                                 ->join('class_enrollments', 'class_enrollments.class_id', '=', 'assignment_classes.class_id')

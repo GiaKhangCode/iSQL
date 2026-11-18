@@ -25,18 +25,18 @@ class PermissionControllerTest extends TestCase
     /** Danh sách capability cố định mà /api/auth/permissions trả cho admin. */
     private const ALL_CAPABILITIES = [
         'practice.solve', 'problem.create', 'problem.share', 'library.manage', 'library.share',
-        'assignment.create', 'contest.create', 'examination.manage', 'exam.credentials',
+        'assignment.create', 'examination.manage', 'exam.credentials',
         'exam.proctor', 'results.grade', 'statistics.all', 'access.manage',
     ];
 
     private const INSTRUCTOR_CAPABILITIES = [
         'practice.solve', 'problem.create', 'problem.share', 'library.manage', 'library.share',
-        'assignment.create', 'contest.create', 'examination.manage', 'exam.credentials',
+        'assignment.create', 'examination.manage', 'exam.credentials',
         'exam.proctor', 'results.grade', 'statistics.all',
     ];
 
     private const FACULTY_CAPABILITIES = [
-        'contest.create', 'examination.manage', 'exam.credentials', 'results.grade',
+        'examination.manage', 'exam.credentials', 'results.grade',
     ];
 
     private User $admin;

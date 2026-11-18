@@ -49,7 +49,6 @@ class PermissionController extends Controller
             'library.manage',
             'library.share',
             'assignment.create',
-            'contest.create',
             'examination.manage',
             'exam.credentials',
             'exam.proctor',
@@ -67,7 +66,6 @@ class PermissionController extends Controller
         if ($user->isFacultyOffice() || $user->role === User::ROLE_FACULTY_OFFICE || $user->role === 'faculty_office' || strtolower((string)$user->role) === 'faculty office') {
             return response()->json([
                 'permissions' => [
-                    'contest.create',
                     'examination.manage',
                     'exam.credentials',
                     'results.grade',
@@ -91,7 +89,6 @@ class PermissionController extends Controller
                 'library.manage',
                 'library.share',
                 'assignment.create',
-                'contest.create',
                 'examination.manage',
                 'exam.credentials',
                 'exam.proctor',

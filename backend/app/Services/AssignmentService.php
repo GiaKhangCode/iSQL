@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AssignmentService
 {
@@ -65,8 +66,6 @@ class AssignmentService
                               $cq->whereIn('classes.id', $classIds);
                           })->orWhereHas('selectedStudents', function ($sq) use ($user) {
                               $sq->where('users.id', $user->id);
-                          })->orWhere(function ($oq) {
-                              $oq->where('is_contest', true)->where('audience_type', 'all_students');
                           });
                       });
             }
@@ -88,7 +87,7 @@ class AssignmentService
         $isDeptHead = $user->role === User::ROLE_DEPARTMENT_HEAD;
         $isInstructor = $user->isInstructor() || $user->canDo('ASSIGNMENT_MGMT', 'view');
 
-        $isExamActivity = (bool) ($assignment->examination_id || $assignment->is_contest || $assignment->exam_mode);
+        $isExamActivity = (bool) ($assignment->examination_id || $assignment->exam_mode);
 
         if (!$isAdmin && !$isDeptHead) {
             if ($isInstructor) {
@@ -112,18 +111,16 @@ class AssignmentService
                 if (!$assignment->published) {
                     abort(403, 'Bài tập này chưa được công bố.');
                 }
-                if ($assignment->audience_type !== 'all_students') {
-                    $enrolledClassIds = $user->enrolledClasses()->pluck('classes.id')->all();
-                    $assignmentClassIds = $assignment->classes->pluck('id')->all();
-                    $isSpecificallySelected = $assignment->selectedStudents()->where('users.id', $user->id)->exists();
-                    $hasAdmission = \App\Models\ExamAdmission::where('session_id', $assignment->id)
-                        ->where('student_id', $user->id)
-                        ->where('status', '!=', 'revoked')
-                        ->exists();
+                $enrolledClassIds = $user->enrolledClasses()->pluck('classes.id')->all();
+                $assignmentClassIds = $assignment->classes->pluck('id')->all();
+                $isSpecificallySelected = $assignment->selectedStudents()->where('users.id', $user->id)->exists();
+                $hasAdmission = \App\Models\ExamAdmission::where('session_id', $assignment->id)
+                    ->where('student_id', $user->id)
+                    ->where('status', '!=', 'revoked')
+                    ->exists();
 
-                    if (empty(array_intersect($enrolledClassIds, $assignmentClassIds)) && !$isSpecificallySelected && !$hasAdmission) {
-                        abort(403, 'Bạn không thuộc danh sách tham gia bài tập này.');
-                    }
+                if (empty(array_intersect($enrolledClassIds, $assignmentClassIds)) && !$isSpecificallySelected && !$hasAdmission) {
+                    abort(403, 'Bạn không thuộc danh sách tham gia bài tập này.');
                 }
             }
         }
@@ -206,15 +203,10 @@ class AssignmentService
      */
     public function getAudienceCount(string $audienceType, array $classIds, array $studentEmails = [], ?User $user = null): array
     {
-        if ($audienceType === 'all_students') {
-            $total = User::where('role', User::ROLE_STUDENT)->where('status', 'Active')->count();
-            return [
-                'eligibleStudents'      => $total,
-                'individualStudents'    => 0,
-                'overlappingStudents'   => 0,
-                'coveredIndividuals'    => [],
-                'resolvedStudentEmails' => [],
-            ];
+        if ($audienceType !== 'classes') {
+            throw ValidationException::withMessages([
+                'audience_type' => ['Chỉ hỗ trợ đối tượng là các lớp học (classes).'],
+            ]);
         }
 
         $classIds = array_values(array_filter($classIds));
@@ -325,7 +317,6 @@ class AssignmentService
             $assignment = new Assignment();
             $assignment->id = $assignmentId;
             $assignment->title = $data['title'];
-            $assignment->is_contest = (bool) ($data['is_contest'] ?? false);
             $assignment->scoring_mode = $data['scoring_mode'] ?? 'equal_questions';
             $assignment->audience_type = $data['audience_type'] ?? 'classes';
             $assignment->short_description = $data['short_description'] ?? null;
@@ -420,7 +411,6 @@ class AssignmentService
             }
 
             $assignment->title = $data['title'] ?? $assignment->title;
-            if (array_key_exists('is_contest', $data)) $assignment->is_contest = (bool) $data['is_contest'];
             if (array_key_exists('scoring_mode', $data)) $assignment->scoring_mode = $data['scoring_mode'];
             if (array_key_exists('audience_type', $data)) $assignment->audience_type = $data['audience_type'];
             if (array_key_exists('short_description', $data)) $assignment->short_description = $data['short_description'];
@@ -434,7 +424,7 @@ class AssignmentService
             if (array_key_exists('closes', $data)) $assignment->closes = !empty($data['closes']) ? $data['closes'] : null;
 
             $wasPublished = (bool) $assignment->published;
-            $isPublishedAssignment = $wasPublished && !$assignment->is_contest && empty($assignment->examination_id);
+            $isPublishedAssignment = $wasPublished && empty($assignment->examination_id);
             if ($wasPublished && array_key_exists('published', $data) && !$data['published']) {
                 abort(422, 'Không thể hủy công bố bài tập đã được phát hành.');
             }
@@ -520,7 +510,7 @@ class AssignmentService
             || $user->role === 'admin'
             || $user->role === User::ROLE_DEPARTMENT_HEAD;
 
-        $isExamActivity = (bool) ($assignment->examination_id || $assignment->is_contest || $assignment->exam_mode);
+        $isExamActivity = (bool) ($assignment->examination_id || $assignment->exam_mode);
         $allowedPracticalStudentIds = null;
 
         if (!$isPrivileged) {
@@ -675,13 +665,9 @@ class AssignmentService
         // Add eligible students who have not submitted yet
         $eligibleIds = [];
 
-        if (($assignment->audience_type ?: 'classes') === 'all_students') {
-            $eligibleIds = User::where('role', User::ROLE_STUDENT)->where('status', 'Active')->pluck('id')->all();
-        } else {
-            $enrolled = DB::table('class_enrollments')->whereIn('class_id', $classIds)->pluck('student_id')->all();
-            $selected = $assignment->selectedStudents->pluck('id')->all();
-            $eligibleIds = array_values(array_unique(array_merge($enrolled, $selected)));
-        }
+        $enrolled = DB::table('class_enrollments')->whereIn('class_id', $classIds)->pluck('student_id')->all();
+        $selected = $assignment->selectedStudents->pluck('id')->all();
+        $eligibleIds = array_values(array_unique(array_merge($enrolled, $selected)));
 
         if ($allowedPracticalStudentIds !== null) {
             $eligibleIds = array_values(array_intersect($eligibleIds, $allowedPracticalStudentIds));
@@ -971,13 +957,6 @@ class AssignmentService
 
     protected function resolveEligibleStudentIds(Assignment $assignment): array
     {
-        if ($assignment->is_contest && $assignment->audience_type === 'all_students') {
-            return User::where('role', User::ROLE_STUDENT)
-                ->where('status', 'Active')
-                ->pluck('id')
-                ->all();
-        }
-
         $classIds = $assignment->classes()->pluck('classes.id')->all();
         $studentIds = [];
         if (!empty($classIds)) {
@@ -1003,8 +982,8 @@ class AssignmentService
             ? array_values(array_unique($onlyStudentIds))
             : $this->resolveEligibleStudentIds($assignment);
 
-        $title = ($assignment->is_contest ? 'Kỳ thi mới: ' : 'Bài tập mới: ') . $assignment->title;
-        $link = $assignment->is_contest ? '/contests' : '/assignments';
+        $title = 'Bài tập mới: ' . $assignment->title;
+        $link = '/assignments';
 
         $this->notificationService->createMany(
             $allIds,
@@ -1050,12 +1029,10 @@ class AssignmentService
         }
 
         $due = $a->closes ? $a->closes->format('M d') : '';
-        $audienceType = $a->audience_type ?: 'classes';
+        $audienceType = 'classes';
 
         $classNames = $a->classes->map(fn($c) => $c->course ?? $c->name ?? $c->id)->filter()->all();
-        if ($a->is_contest && $audienceType === 'all_students') {
-            $classStr = 'All students';
-        } elseif (!empty($classNames)) {
+        if (!empty($classNames)) {
             $classStr = implode(', ', $classNames);
         } elseif (!empty($studentEmails)) {
             $classStr = 'Selected students';
@@ -1080,14 +1057,11 @@ class AssignmentService
                 $problemPoints[(string) $p['id']] = $pts > 0 ? $pts : 10.0;
             }
 
-            $eligibleUserMap = null;
-            if ($audienceType !== 'all_students') {
-                $enrolledIds = !empty($classIds)
-                    ? ClassEnrollment::whereIn('class_id', $classIds)->pluck('student_id')->all()
-                    : [];
-                $selectedIds = $a->selectedStudents->pluck('id')->all();
-                $eligibleUserMap = array_flip(array_values(array_unique(array_merge($enrolledIds, $selectedIds))));
-            }
+            $enrolledIds = !empty($classIds)
+                ? ClassEnrollment::whereIn('class_id', $classIds)->pluck('student_id')->all()
+                : [];
+            $selectedIds = $a->selectedStudents->pluck('id')->all();
+            $eligibleUserMap = array_flip(array_values(array_unique(array_merge($enrolledIds, $selectedIds))));
 
             $latestSubsQuery = Submission::where('context', $a->id)
                 ->whereIn('problem_id', $problemIds)
@@ -1233,7 +1207,7 @@ class AssignmentService
             ];
         }
 
-        // 3. Get assignments assigned to student's classes or student individually or all_students or ExamAdmission
+        // 3. Get assignments assigned to student's classes or student individually or via ExamAdmission
         $studentAssignmentClasses = DB::table('assignment_classes')
             ->whereIn('class_id', $classIds)
             ->get();
@@ -1251,16 +1225,9 @@ class AssignmentService
 
         $allTargetIds = array_values(array_unique(array_merge($assignmentIds, $individualAssignmentIds, $admissionAssignmentIds)));
 
+        // whereIn với mảng rỗng không khớp bản ghi nào (đúng ý: chưa được giao bài nào).
         $studentAssignments = Assignment::where('published', true)
-            ->where(function ($q) use ($allTargetIds) {
-                if (!empty($allTargetIds)) {
-                    $q->whereIn('id', $allTargetIds);
-                }
-                $q->orWhere(function ($sq) {
-                    $sq->where('is_contest', true)
-                        ->where('audience_type', 'all_students');
-                });
-            })
+            ->whereIn('id', $allTargetIds)
             ->with(['assignmentProblems.problem'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -1360,12 +1327,8 @@ class AssignmentService
 
             $totalPoints = (float) $aProblems->sum('points');
 
-            if ($a->is_contest && $a->audience_type === 'all_students') {
-                $scope = 'All students';
-            } else {
-                $matchedNames = collect($classesRes)->whereIn('id', $assignedClassIds)->pluck('name')->all();
-                $scope = !empty($matchedNames) ? implode(', ', $matchedNames) : 'Selected students';
-            }
+            $matchedNames = collect($classesRes)->whereIn('id', $assignedClassIds)->pluck('name')->all();
+            $scope = !empty($matchedNames) ? implode(', ', $matchedNames) : 'Selected students';
 
             $problemDetails = [];
             if ($isOpen && $a->is_contest) {
@@ -1396,7 +1359,7 @@ class AssignmentService
                 'problemCount'          => count($pIds),
                 'problemProgress'       => $isOpen ? (object) $problemProgress : (object) [],
                 'isContest'             => (bool) $a->is_contest,
-                'audienceType'          => (string) ($a->audience_type ?: 'classes'),
+                'audienceType'          => 'classes',
                 'scope'                 => $scope,
                 'shortDescription'      => (string) ($a->short_description ?? ''),
                 'description'           => (string) ($a->description ?? ''),
@@ -1435,9 +1398,9 @@ class AssignmentService
                     'createdAt' => $a->created_at ? $a->created_at->toISOString() : null,
                     'date'      => $a->closes->copy()->utc()->format('Y-m-d'),
                     'time'      => $a->closes->copy()->utc()->format('H:i'),
-                    'kind'      => $a->is_contest ? 'Contest' : 'Assignment',
+                    'kind'      => $a->examination_id ? 'Examination' : 'Assignment',
                     'context'   => $scope,
-                    'to'        => $a->is_contest ? ('/contests/' . $a->id) : ('/assignments?work=' . $a->id),
+                    'to'        => $a->examination_id ? ('/examinations/' . $a->examination_id) : ('/assignments?work=' . $a->id),
                 ];
             }
         }
