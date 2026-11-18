@@ -443,9 +443,9 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     }
     let active = true;
     setEligibleStudents(null);
-    const emails=audienceType==="all_students"?[]:selectedEmails?selectedEmails.split("|"):[];
+    const emails=selectedEmails?selectedEmails.split("|"):[];
     if(emails.some(email=>!validStudentIdentifier(email))) return;
-    const timer=window.setTimeout(()=>teacherService.getAudienceCount(audienceType, audienceType==="all_students"?[]:selectedIds ? selectedIds.split("|") : [], emails)
+    const timer=window.setTimeout(()=>teacherService.getAudienceCount(audienceType, selectedIds ? selectedIds.split("|") : [], emails)
       .then((result) => { if (active) { setEligibleStudents(result.eligibleStudents); setIndividualStudents(result.individualStudents ?? emails.length); setOverlappingStudents(result.overlappingStudents ?? 0);
         if(!examination && result.coveredIndividuals?.length){
           const covered=result.coveredIndividuals;
@@ -577,16 +577,6 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     setShowPublishIssues(false);
   }
 
-  function selectAudience(value: BuilderDraft["audienceType"]) {
-    if(value === "classes"){setAudiencePanel("classes");setAudiencePanelClosing(false);}
-    if (value === "all_students") {nextAudiencePanel.current=null;setAudiencePanel(null);setAudiencePanelClosing(false);}
-    setDraft((current) => current ? { ...current, audienceType: value,
-      classIds: current.classIds,studentEmails:current.studentEmails } : null);
-    markUnsaved();
-    setSaveState("Unsaved changes");
-    setAlertText("");
-  }
-
   function toggleAudiencePanel(panel:"classes"|"students") {
     nextAudiencePanel.current=audiencePanel===panel && !audiencePanelClosing?null:panel;
     if(!audiencePanel){setAudiencePanel(panel);setAudiencePanelClosing(false);}
@@ -652,11 +642,11 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       : draft.classIds;
 
     if (!draft.title.trim()) issues.push("Enter a title.");
-    if(draft.audienceType!=="all_students" && selectedEmails.split("|").filter(Boolean).some(email=>!validStudentIdentifier(email)))issues.push("Check the student IDs or email addresses.");
+    if(selectedEmails.split("|").filter(Boolean).some(email=>!validStudentIdentifier(email)))issues.push("Check the student IDs or email addresses.");
     if(examination && examinationClassIds.some(id=>!examinationPlan.sessions.some(slot=>(slot.classIds || []).includes(id))))issues.push("Assign all selected classes to sessions.");
     if(examination && examinationPlan.sessions.some((slot,index)=>!slot.starts || !slot.ends || slot.ends<=slot.starts || index>0 && `${examinationPlan.sessions[index-1].examDate || examinationPlan.examDate}T${examinationPlan.sessions[index-1].ends}`>`${slot.examDate || examinationPlan.examDate}T${slot.starts}`))issues.push("Session times must be chronological and must not overlap.");
     if (!contest && draft.classIds.length === 0 && !draft.studentEmails.length) issues.push("Select at least one class.");
-    if (contest && !examination && draft.audienceType === "classes" && draft.classIds.length === 0 && !selectedEmails) issues.push("Select at least one class or choose All students.");
+    if (contest && !examination && draft.audienceType === "classes" && draft.classIds.length === 0 && !selectedEmails) issues.push("Select at least one class.");
     if (examination && examinationClassIds.length === 0 && !selectedEmails) issues.push("Select at least one class.");
     if (contest && !examination && !draft.shortDescription.trim()) issues.push("Add a short description.");
     if (contest && !examination && !draft.description.trim()) issues.push("Add a contest description.");
@@ -716,10 +706,10 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       const payload = {
         title: draft!.title,
         isContest: contest,
-        classIds: contest && draft!.audienceType==="all_students"?[]:(draft!.classIds || []),
+        classIds: draft!.classIds || [],
         ...(parentExaminationId?{classTransfers:Object.fromEntries(Object.entries(classTransfers).filter(([classId])=>draft!.classIds.includes(classId)))}:{}),
-        studentEmails: examination || (contest && draft!.audienceType==="all_students") ? [] : draft!.studentEmails,
-        audienceType: contest ? draft!.audienceType : "classes",
+        studentEmails: examination ? [] : draft!.studentEmails,
+        audienceType: "classes",
         shortDescription: contest ? draft!.shortDescription.trim() : "",
         description: contest ? draft!.description : "",
         rules: contest ? draft!.rules : "",
@@ -1019,7 +1009,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
                 <div className="teacher-assignment-summary">
                   <span><TranslatedText>{tr(contest ? "OPEN TO" : "ASSIGNED TO")}</TranslatedText></span>
                   <strong>
-                    <span><TranslatedText>{contest && draft.audienceType === "all_students" ? tr("All students") : tr("Classes: {value0}",{value0:draft.classIds.length})}</TranslatedText></span>
+                    <span><TranslatedText>{tr("Classes: {value0}",{value0:draft.classIds.length})}</TranslatedText></span>
                     <span className="teacher-assignment-summary-separator" aria-hidden="true">·</span>
                     <span><TranslatedText>{eligibleStudents !== null ? tr("{value0} eligible student{value1}", { value0: eligibleStudents, value1: eligibleStudents === 1 ? "" : "s" }) : tr("Student count unavailable")}</TranslatedText></span>
                   </strong>
@@ -1143,16 +1133,6 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
             id={contest ? "contest-audience" : "assignment-audience"}
           >
             {!parentExaminationId&&<TeacherSectionTitle title={tr("Builder participants")}/>}
-            {contest && !examination && !parentExaminationId && <div className="teacher-audience-control-row"><fieldset className="teacher-field teacher-audience-field">
-              <legend><TranslatedText>{tr("AUDIENCE")}</TranslatedText></legend>
-              <div className="teacher-audience-options">
-                <label><input type="radio" name="contest-audience" checked={draft.audienceType === "classes"} onChange={() => selectAudience("classes")} /> <TranslatedText>{tr("Selected classes")}</TranslatedText></label>
-                <label><input type="radio" name="contest-audience" checked={draft.audienceType === "all_students"} onChange={() => selectAudience("all_students")} /> <TranslatedText>{tr("All students")}</TranslatedText></label>
-                <div className="teacher-audience-disclosure-slot" data-visible={draft.audienceType==="classes"} aria-hidden={draft.audienceType!=="classes"} ref={node=>{if(node)node.inert=draft.audienceType!=="classes";}}>
-                <button type="button" className="teacher-audience-collapse teacher-audience-disclosure-button" disabled={draft.audienceType!=="classes"} tabIndex={draft.audienceType==="classes"?0:-1} aria-controls="builder-class-picker" aria-expanded={audiencePanel==="classes" && !audiencePanelClosing} onClick={()=>toggleAudiencePanel("classes")}><ChevronDown size={14} aria-hidden="true"/><TranslatedText>{tr(audiencePanel==="classes" && !audiencePanelClosing?"Hide participant list":"Show participant list")}</TranslatedText></button>
-                </div>
-              </div>
-            </fieldset>{audienceSummary}</div>}
             <div className="teacher-builder-class-assignment">
               {(!contest || examination) && <div className="teacher-class-assignment-heading">
                 {!contest && <span className="teacher-current-term">{formatAcademicTerm(currentAcademicTerm())}</span>}

@@ -32,7 +32,7 @@ export function WorkspaceExamProvider({ children }: { children: ReactNode }) {
   const activity = params.get("context") || "";
   const eligible = session?.role === "student" && ["Assignments", "Contests"].includes(source) && Boolean(activity);
   const endpoint = `/api/student/activity-attempts/${encodeURIComponent(activity)}`;
-  const out = session?.examSessionId ? "/examinations" : source === "Contests" ? `/contests/${encodeURIComponent(activity)}` : `/assignments/work/${encodeURIComponent(activity)}`;
+  const out = session?.examSessionId ? "/examinations" : source === "Contests" ? "/examinations" : `/assignments/work/${encodeURIComponent(activity)}`;
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [loading, setLoading] = useState(eligible);
   const [error, setError] = useState("");

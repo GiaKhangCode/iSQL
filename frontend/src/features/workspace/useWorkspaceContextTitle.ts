@@ -6,7 +6,7 @@ export function useWorkspaceContextTitle(source: string, context: string, suppli
   useEffect(() => {
     if (!enabled || suppliedTitle || source === "Practice") return;
     let active = true;
-    const request = source === "Contests" ? studentApi.getContests?.() : studentApi.getAssignments?.().then(value => value.assignments);
+    const request = source === "Contests" ? studentApi.getExaminations?.() : studentApi.getAssignments?.().then(value => value.assignments);
     request?.then(items => {
       const item = items.find(item => item.id === context);
       if (active && item) setResolved({ context, title: item.title });

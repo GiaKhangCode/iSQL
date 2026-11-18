@@ -39,9 +39,7 @@ export function ContestDetailView({ contest, phase, now, preview = false, isExam
   const { t: tr, locale: uiLocale } = useLanguage("student");
   const isExamination = propIsExamination ?? Boolean(contest.examinationId);
   const isComprehensive = contest.examType === "comprehensive";
-  const examUrl = isExamination
-    ? `/examinations/${encodeURIComponent(contest.id)}/exam`
-    : `/contests/${encodeURIComponent(contest.id)}/exam`;
+  const examUrl = `/examinations/${encodeURIComponent(contest.id)}/exam`;
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
   const { data: attempts, loading: attemptsLoading, error: attemptsError } = useLoad<Submission[]>(
     () => preview || phase === "Upcoming" || (contest.admissionRequired && !contest.admissionUnlocked) || !getSubmissions ? Promise.resolve([]) : getSubmissions({ source: "Contests" }).then((items: Submission[]) => items.filter((item) => item.context === contest.id)),

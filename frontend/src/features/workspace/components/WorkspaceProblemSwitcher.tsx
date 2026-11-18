@@ -26,8 +26,7 @@ export function WorkspaceProblemSwitcher({ source, context, problemId, problemTi
       const assignment = assignments.assignments.find((item) => item.id === context);
       return { items: (assignment?.problemIds || []).map((id) => ({ id, title: (assignments.problems || []).find((problem) => problem.id === id)?.title || "" })) };
     }
-    const contests: Contest[] = await studentApi.getContests();
-    const contest = contests.find((item) => item.id === context);
+    const contest: Contest | undefined = await studentApi.getContestOrExam(context);
     return { items: (contest?.problemIds || []).map((id) => ({ id, title: (contest?.problemDetails || []).find((problem) => problem.id === id)?.title || "" })) };
   }, [source, context]);
 

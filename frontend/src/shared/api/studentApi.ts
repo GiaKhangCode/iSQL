@@ -146,11 +146,6 @@ export const studentApi = {
     };
   },
 
-  getContests: async (): Promise<Contest[]> => {
-    const enrolled = (await apiFetch("/api/student/assignments")) as StudentAssignments;
-    return enrolled.assignments.filter((item: any) => item.isContest && !item.examinationId).map(mapContest);
-  },
-
   getExaminations: async (): Promise<Contest[]> => {
     const enrolled = (await apiFetch("/api/student/assignments")) as StudentAssignments;
     return enrolled.assignments.filter((item: any) => Boolean(item.examinationId)).map(mapContest);

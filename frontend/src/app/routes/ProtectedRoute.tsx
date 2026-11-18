@@ -94,5 +94,5 @@ export function OfficeRoute() {
   if(!session) return <Navigate to="/login" replace state={{from:location.pathname+location.search}}/>;
   if(permissions===null)return <p role="status"><TranslatedText>{t("Checking access…")}</TranslatedText></p>;
   if(permissionsError)return <p role="alert">{permissionsError}</p>;
-  return session.role==="admin" || permissions.some(p=>['examination.manage','exam.credentials','contest.create','results.grade'].includes(p)) ? <Outlet/> : <p role="alert"><TranslatedText>{t("You do not have examination management permission.")}</TranslatedText></p>;
+  return session.role==="admin" || permissions.some(p=>['examination.manage','exam.credentials','results.grade'].includes(p)) ? <Outlet/> : <p role="alert"><TranslatedText>{t("You do not have examination management permission.")}</TranslatedText></p>;
 }

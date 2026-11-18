@@ -136,7 +136,7 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   const isReadOnly = reviewMode || submitting || activityClosed || (!historyLoaded && !exam?.enabled);
   const exitSaved = reviewMode || (!editedSinceSubmission && submissionAttempts.some(attempt => attempt.kind === "submit"));
   const exitBlockedReason = activityClosed ? "Assignment deadline has passed" : submissionLimitReached ? "Submission limit reached" : source === "Contests" && params.get("closed") === "1" ? "Contest submissions are closed" : undefined;
-  const exitDestination = source === "Contests" ? `/contests/${encodeURIComponent(context)}` : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
+  const exitDestination = source === "Contests" ? "/examinations" : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
   useEffect(() => {
     if (exam?.enabled || sqlOnly) return;
     let activeRequest = true;

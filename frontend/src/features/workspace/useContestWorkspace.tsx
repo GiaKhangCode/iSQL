@@ -72,7 +72,7 @@ export function useContestWorkspace() {
       try {
         setLoading(true);
         const contestOrExam = await studentApi.getContestOrExam?.(contestId);
-        const found = contestOrExam || (await studentApi.getContests()).find((c) => c.id === contestId);
+        const found = contestOrExam;
         if (!found) {
           throw new Error("The contest was not found or is unavailable.");
         }

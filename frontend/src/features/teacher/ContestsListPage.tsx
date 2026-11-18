@@ -47,7 +47,7 @@ const duration = (start?: string, end?: string) => {
   return Number.isFinite(minutes) && minutes > 0 ? `${minutes} min` : "—";
 };
 
-export function ContestsListPage({sessionsOnly=false,onBackToExaminations}:{sessionsOnly?:boolean;onBackToExaminations?:()=>void} = {}) {
+export function ContestsListPage({onBackToExaminations}:{onBackToExaminations?:()=>void} = {}) {
   const order=useListOrder();
   const dates = useListDateFilters();
   const navigate=useNavigate();
@@ -66,7 +66,7 @@ export function ContestsListPage({sessionsOnly=false,onBackToExaminations}:{sess
   const [page, setPage] = useState(1);
   useEffect(()=>setPage(1),[dates.key,order.value]);
   const tableScrollRef = useRef<HTMLDivElement>(null);
-  const contests = useMemo(() => ((data || []) as (Contest & {examinationId?:string})[]).filter(item => item.isContest && (examinationId ? item.examinationId===examinationId : sessionsOnly ? Boolean(item.examinationId) : !item.examinationId)), [data,examinationId,root,sessionsOnly]);
+  const contests = useMemo(() => ((data || []) as (Contest & {examinationId?:string})[]).filter(item => item.isContest && (examinationId ? item.examinationId===examinationId : Boolean(item.examinationId))), [data,examinationId]);
   const filteredRows = contests.filter(item => dates.matches(item) && matchesListSearch(search,item.id,item.title,item.classes,item.shortDescription) && (!classFilter || assignmentClassNames(item.classes).includes(classFilter)) && (status === "All statuses" || contestStatus(item.status) === status));
   const filtered=order.apply(filteredRows,item=>item.opens||item.id);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 15));
@@ -83,19 +83,18 @@ export function ContestsListPage({sessionsOnly=false,onBackToExaminations}:{sess
   }, [currentPage, search, status, classFilter]);
   const [plan,setPlan]=useState<SessionPlan|null>(null);
   const [confirmBusy,setConfirmBusy]=useState(false);const [planError,setPlanError]=useState("");
-  useEffect(()=>{let active=true;setPlan(null);setPlanError("");if(sessionsOnly&&selected?.id)examSessions.plan(selected.id).then(value=>{if(active)setPlan(value);}).catch(error=>{if(active)setPlanError(error.message);});return()=>{active=false;};},[sessionsOnly,selected?.id]);
+  useEffect(()=>{let active=true;setPlan(null);setPlanError("");if(selected?.id)examSessions.plan(selected.id).then(value=>{if(active)setPlan(value);}).catch(error=>{if(active)setPlanError(error.message);});return()=>{active=false;};},[selected?.id]);
   const confirmSelected=async()=>{if(!selected||!plan||!window.confirm(`Xác nhận ${selected.title}: ${plan.students.length} sinh viên, ${plan.classes.length} lớp? Đề, lịch và phân công giám thị sẽ bị khóa.`))return;setConfirmBusy(true);setPlanError("");try{setPlan(await examSessions.confirm(selected.id));}catch(error){setPlanError(error instanceof Error?error.message:"Không thể xác nhận.");}finally{setConfirmBusy(false);}};
   const reopenSelected=async()=>{if(!selected)return;const reason=window.prompt("Lý do mở lại ca thi (ít nhất 5 ký tự):")?.trim();if(!reason)return;setConfirmBusy(true);setPlanError("");try{setPlan(await examSessions.reopen(selected.id,reason));}catch(error){setPlanError(error instanceof Error?error.message:"Không thể mở lại ca thi.");}finally{setConfirmBusy(false);}};
-  const editPath=(item:Contest)=>`${root}/${sessionsOnly?"sessions":"contests"}/${item.id}/edit`;
+  const editPath=(item:Contest)=>`${root}/sessions/${item.id}/edit`;
   const chooseContest=(item:Contest)=>{if(selected?.id===item.id)navigate(editPath(item));else setSelectedId(item.id);};
   return <section className="teacher-page teacher-list-page teacher-contest-page compact-teacher-contests">
-    <h1 className="sr-only"><TranslatedText>{tr(sessionsOnly?"Exam sessions":"Contests")}</TranslatedText></h1>
-    {!loading && error && !sessionsOnly && <div className="teacher-filter-empty-actions"><Link className="button primary" to={`${root}/contests/new`}><TranslatedText>{tr("New contest")}</TranslatedText></Link></div>}
-    {loading ? <TeacherListLoading label={tr(sessionsOnly?"Loading…":"Loading contests…")} createLabel={sessionsOnly?undefined:tr("New contest")} createTo={sessionsOnly?undefined:`${root}/contests/new`} /> : error ? <ErrorState title={tr("Could not load contests")} message={tr(error)} onRetry={() => window.location.reload()} /> : <div className="teacher-list-detail-layout teacher-filter-layout">
+    <h1 className="sr-only"><TranslatedText>{tr("Exam sessions")}</TranslatedText></h1>
+    {loading ? <TeacherListLoading label={tr("Loading…")} /> : error ? <ErrorState title={tr("Could not load contests")} message={tr(error)} onRetry={() => window.location.reload()} /> : <div className="teacher-list-detail-layout teacher-filter-layout">
         <div className="teacher-list-detail-main">
-          <TeacherListFilters key={examinationId} defaultOpen={!sessionsOnly && Boolean(examinationId || requestedSearch)} order={order} suggestions={filtered.map(item=>({id:item.id,title:item.title,description:`${item.classes} · ${tr(contestStatus(item.status))}`}))} dates={dates} search={search} onSearchChange={setSearch} searchLabel={tr("Search contests…")}
+          <TeacherListFilters key={examinationId} defaultOpen={false} order={order} suggestions={filtered.map(item=>({id:item.id,title:item.title,description:`${item.classes} · ${tr(contestStatus(item.status))}`}))} dates={dates} search={search} onSearchChange={setSearch} searchLabel={tr("Search contests…")}
             onReset={()=>setParams(previous=>{const next=new URLSearchParams(previous);next.delete("examinationId");next.delete("search");return next;},{replace:true})}
-            actionsTarget={actionsTarget} createLabel={sessionsOnly?undefined:tr("New contest")} createTo={`${root}/contests/new`}
+            actionsTarget={actionsTarget}
             primaryAction={onBackToExaminations?<ListModeSwitch rooms collapseSecondary labels={["Examinations","Exam sessions"]} onChange={next=>{if(!next)onBackToExaminations();}}/>:undefined}
             filters={[{ key: "status", label: tr("STATUS"), value: status, defaultValue: "All statuses", onChange: setStatus,
               icon: <ListFilter size={17} aria-hidden="true" />, options: ["All statuses", "Live", "Upcoming", "Closed", "Draft"].map(value => ({ value, label: tr(value) })) },{key:"class",label:tr("CLASS"),value:classFilter,defaultValue:"",onChange:setClassFilter,icon:<ListFilter size={17}/>,options:[{value:"",label:tr("All classes")},...Array.from(new Set(contests.flatMap(item=>assignmentClassNames(item.classes)))).sort().map(value=>({value,label:value}))]}]} />
@@ -124,10 +123,10 @@ export function ContestsListPage({sessionsOnly=false,onBackToExaminations}:{sess
         <div className="teacher-filter-side"><div ref={setActionsTarget} className="teacher-filter-actions" />
         <aside className="teacher-list-detail-panel">{selected ? <><span className="teacher-detail-eyebrow"><TranslatedText>{tr("CONTEST DETAILS")}</TranslatedText></span><h2>{selected.title}</h2><p className="muted">{selected.shortDescription}</p><p className="muted">{selected.classes}</p>
           <dl className="teacher-list-detail-facts"><div><dt><TranslatedText>{tr("Starts")}</TranslatedText></dt><dd>{date(selected.opens, uiLocale)}</dd></div><div><dt><TranslatedText>{tr("Ends")}</TranslatedText></dt><dd>{date(selected.closes, uiLocale)}</dd></div><div><dt><TranslatedText>{tr("Duration")}</TranslatedText></dt><dd><TranslatedText>{tr(duration(selected.opens, selected.closes))}</TranslatedText></dd></div><div><dt><TranslatedText>{tr("Problems")}</TranslatedText></dt><dd>{selected.problems}</dd></div><div><dt><TranslatedText>{tr("Eligible students")}</TranslatedText></dt><dd>{selected.eligibleStudents}</dd></div><div><dt><TranslatedText>{tr("Problem submitters / eligible")}</TranslatedText></dt><dd>{selected.submitted}</dd></div></dl>
-          {sessionsOnly&&plan&&!plan.confirmedAt&&<button type="button" className="button" disabled={confirmBusy} onClick={()=>void confirmSelected()}><TranslatedText>{tr("Confirm exam session")}</TranslatedText></button>}
-          {sessionsOnly&&plan?.confirmedAt&&<button type="button" className="button" disabled={confirmBusy} onClick={()=>void reopenSelected()}><TranslatedText>{tr("Reopen exam session")}</TranslatedText></button>}
+          {plan&&!plan.confirmedAt&&<button type="button" className="button" disabled={confirmBusy} onClick={()=>void confirmSelected()}><TranslatedText>{tr("Confirm exam session")}</TranslatedText></button>}
+          {plan?.confirmedAt&&<button type="button" className="button" disabled={confirmBusy} onClick={()=>void reopenSelected()}><TranslatedText>{tr("Reopen exam session")}</TranslatedText></button>}
           {planError&&<p role="alert">{planError}</p>}
-          <div className="teacher-list-detail-actions">{sessionsOnly&&plan?.confirmedAt?<Link className="button primary" to={`${root}/examinations/${plan.examinationId}/admissions?sessionId=${selected.id}`}><TranslatedText>{tr("Issue / manage credentials")}</TranslatedText></Link>:<Link className="button primary" to={editPath(selected)}><TranslatedText>{tr("Edit")}</TranslatedText></Link>}<Link className="button" to={`${root}/results/activity/${encodeURIComponent(selected.id)}`}><TranslatedText>{tr("View submissions")}</TranslatedText></Link></div>
+          <div className="teacher-list-detail-actions">{plan?.confirmedAt?<Link className="button primary" to={`${root}/examinations/${plan.examinationId}/admissions?sessionId=${selected.id}`}><TranslatedText>{tr("Issue / manage credentials")}</TranslatedText></Link>:<Link className="button primary" to={editPath(selected)}><TranslatedText>{tr("Edit")}</TranslatedText></Link>}<Link className="button" to={`${root}/results/activity/${encodeURIComponent(selected.id)}`}><TranslatedText>{tr("View submissions")}</TranslatedText></Link></div>
         </> : <p className="muted"><TranslatedText>{tr("Select a contest to view details.")}</TranslatedText></p>}</aside>
         </div>
       </div>}

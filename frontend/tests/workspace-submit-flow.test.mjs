@@ -16,7 +16,7 @@ const exam={enabled:false,maxSubmissions:3,submissionCounts:{},draft(){},update(
 globalThis.__submitExam=exam;
 const calls=[];
 let failNext=false, pendingResolve;
-globalThis.__submitApi={getDraft:()=>'',saveDraft(){},getPreferences:async()=>({favorites:[]}),getSubmissions:async()=>[],getContests:async()=>[{id:'C',title:'Final SQL Contest',examType:'classic'}],
+globalThis.__submitApi={getDraft:()=>'',saveDraft(){},getPreferences:async()=>({favorites:[]}),getSubmissions:async()=>[],getContestOrExam:async()=>({id:'C',title:'Final SQL Contest',examType:'classic'}),getExaminations:async()=>[{id:'C',title:'Final SQL Contest',examType:'classic'}],
   submitWorkspace:async(id,input)=>{calls.push({type:'mixed',id,input});if(failNext){failNext=false;throw Error('Network unavailable');}if(pendingResolve===null)return new Promise(resolve=>pendingResolve=resolve);return {status:'Accepted',message:'Saved',scoreVisible:true,score:10,maxScore:10,submissionsUsed:1,maxSubmissions:3};},
   submitSolution:async(...args)=>{calls.push({type:'sql',args});return {status:'Accepted',message:'Saved',scoreVisible:true,score:10,maxScore:10,submissionsUsed:1,maxSubmissions:3};}};
 const output=await build({stdin:{contents:`
@@ -71,7 +71,7 @@ try{
  assert.equal(document.querySelector('#location').textContent,'/workspace/P');
  await act(async()=>pendingResolve({status:'Accepted',message:'Saved',submissionsUsed:1,maxSubmissions:3}));
  pendingResolve=undefined;
- assert.equal(document.querySelector('#location').textContent,'/contests/C','Exit happens only after the server confirms submission');
+ assert.equal(document.querySelector('#location').textContent,'/examinations','Exit happens only after the server confirms submission');
  await mount();
  await click(button('Submit',document.querySelector('header')));
  await click(button('Submit',document.querySelector('dialog')));
@@ -89,7 +89,7 @@ try{
  await click(button('Submit & Exit',document.querySelector('dialog')));
  assert.equal(calls.at(-1).type,'sql');
  assert.equal(calls.at(-1).args[1],'SELECT 7');
- assert.equal(document.querySelector('#location').textContent,'/contests/C');
+ assert.equal(document.querySelector('#location').textContent,'/examinations');
  globalThis.__submitApi.submitWorkspace=async()=>({id:'official-snapshot',status:'Accepted',message:'Saved',submissionsUsed:1,maxSubmissions:3});
  await mount();
  await click(button('Submit',document.querySelector('header')));

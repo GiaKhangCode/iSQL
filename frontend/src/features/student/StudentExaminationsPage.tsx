@@ -19,7 +19,7 @@ import {
   selectHallOfFame,
   completionMonth,
   ordinal,
-} from "@/features/student/ContestsPage";
+} from "@/features/student/ExaminationHighlights";
 import { DoorOpen } from "lucide-react";
 
 const EXAM_PAGE_SIZE = 10;
@@ -32,7 +32,6 @@ export function StudentExaminationsPage() {
   const { t: tr, locale: uiLocale } = useLanguage("student");
   const navigate = useNavigate();
   const { data = [], loading, error, mutate } = useLoad<Contest[]>(studentApi.getExaminations);
-  const { data: contestsData = [] } = useLoad<Contest[]>(studentApi.getContests);
 
   const [tab, setTab] = useState("All");
   const [page, setPage] = useState(1);
@@ -71,7 +70,7 @@ export function StudentExaminationsPage() {
   };
 
   const featured = selectFeaturedContests(data);
-  const hallOfFame = selectHallOfFame([...data, ...contestsData]);
+  const hallOfFame = selectHallOfFame(data);
 
   function openExam(exam: Contest) {
     navigate(`/examinations/${exam.id}`);

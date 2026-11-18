@@ -15,7 +15,7 @@ type Role = "student" | "teacher" | "office" | "admin";
 const links: Record<Role, [string, string][]> = {
   student: [["Dashboard", "/dashboard"], ["Assignments", "/assignments"], ["Submissions", "/submissions"]],
   teacher: [["Problems", "/teacher/problems"], ["Database library", "/teacher/database-library"], ["Assignments", "/teacher/assignments"], ["Classes", "/teacher/classes"], ["Examinations", "/teacher/exams"], ["Results", "/teacher/results"], ["Statistics", "/teacher/statistics"], ["Regrade", "/teacher/regrade"]],
-  office: [["Examinations", "/office/examinations"], ["Contests", "/office/contests"], ["Results", "/office/results"], ["Statistics", "/office/statistics"], ["Regrade assignment", "/office/regrade"]],
+  office: [["Examinations", "/office/examinations"], ["Results", "/office/results"], ["Statistics", "/office/statistics"], ["Regrade assignment", "/office/regrade"]],
   admin: [["Overview", "/admin/overview"], ["Users", "/admin/users"], ["Courses", "/admin/courses"], ["Assignments", "/admin/assignments"], ["Examinations", "/admin/examinations"], ["Regrade assignment", "/admin/regrade"], ["Roles", "/admin/roles"]],
 };
 
@@ -36,7 +36,7 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
     };
     void refresh();const timer=setInterval(()=>void refresh(),30000);return()=>{active=false;clearInterval(timer);};
   },[session?.id,permissions?.join("|")]);
-  const required:Record<string,string>={"/teacher/problems":"problem.create","/teacher/database-library":"library.manage","/teacher/assignments":"assignment.create","/teacher/contests":"contest.create","/teacher/results":"results.grade","/teacher/statistics":"results.grade","/office/examinations":"examination.manage","/office/sessions":"examination.manage","/office/contests":"contest.create","/office/results":"results.grade","/office/statistics":"results.grade","/office/regrade":"examination.manage","/teacher/regrade":"results.grade","/teacher/regrade-assignments":"examination.manage","/admin/regrade":"examination.manage"};
+  const required:Record<string,string>={"/teacher/problems":"problem.create","/teacher/database-library":"library.manage","/teacher/assignments":"assignment.create","/teacher/results":"results.grade","/teacher/statistics":"results.grade","/office/examinations":"examination.manage","/office/sessions":"examination.manage","/office/results":"results.grade","/office/statistics":"results.grade","/office/regrade":"examination.manage","/teacher/regrade":"results.grade","/teacher/regrade-assignments":"examination.manage","/admin/regrade":"examination.manage"};
   const baseLinks=links[role].filter(([,path])=>!required[path]||permissions?.includes(required[path]));
   const extraLinks:[string,string][]=[];
   if(role==="teacher" && session?.technical_role==="department_head" && permissions?.includes("examination.manage")){

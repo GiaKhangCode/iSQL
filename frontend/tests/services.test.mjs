@@ -18,8 +18,8 @@ const enrolled = {
   classes: [{ id: "C1", code: "SQL", name: "SQL", lecturer: "Teacher" }],
   assignments: [
     { id: "A1", title: "Exercise", instructions: "Solve the query.", isContest: false, classIds: ["C1"], problemIds: ["P1"], problemProgress: { P1: "Not started" } },
-    { id: "T1", title: "Sprint", isContest: true, classIds: ["C1"], audienceType: "classes", scope: "SQL", contestStatus: "Upcoming", shortDescription: "Quick SQL sprint", description: "## About", rules: "Solve both problems", opens: "2026-09-25T10:00:00Z", closes: "2026-09-25T11:30:00Z", problemIds: [], problemCount: 1, problemDetails: [], submitters: 0, score: 0, totalPoints: 20, rank: null, leaderboardEnabled: true, aiAllowed: false, leaderboard: [], problemProgress: { P1: "Not started" } },
-    { id: "T2", title: "Campus sprint", isContest: true, classIds: [], audienceType: "all_students", scope: "All students", contestStatus: "Live", shortDescription: "Open to campus", description: "## Campus", rules: "Submit before closing", bannerUrl: "/api/assignments/banners/campus.webp", opens: "2026-09-25T10:00:00Z", closes: "2026-09-25T11:30:00Z", problemIds: ["P1"], problemCount: 1, problemDetails: [{ id: "P1", title: "First query", difficulty: "Easy", topic: "SELECT" }], submitters: 2, score: 10, totalPoints: 20, rank: 2, leaderboardEnabled: true, aiAllowed: false, leaderboard: [], problemProgress: { P1: "In progress" } },
+    { id: "T1", title: "Sprint", isContest: true, examinationId: "E1", classIds: ["C1"], audienceType: "classes", scope: "SQL", contestStatus: "Upcoming", shortDescription: "Quick SQL sprint", description: "## About", rules: "Solve both problems", opens: "2026-09-25T10:00:00Z", closes: "2026-09-25T11:30:00Z", problemIds: [], problemCount: 1, problemDetails: [], submitters: 0, score: 0, totalPoints: 20, rank: null, leaderboardEnabled: true, aiAllowed: false, leaderboard: [], problemProgress: { P1: "Not started" } },
+    { id: "T2", title: "Campus sprint", isContest: true, examinationId: "E2", classIds: ["C2"], audienceType: "classes", scope: "C2", contestStatus: "Live", shortDescription: "Open to campus", description: "## Campus", rules: "Submit before closing", bannerUrl: "/api/assignments/banners/campus.webp", opens: "2026-09-25T10:00:00Z", closes: "2026-09-25T11:30:00Z", problemIds: ["P1"], problemCount: 1, problemDetails: [{ id: "P1", title: "First query", difficulty: "Easy", topic: "SELECT" }], submitters: 2, score: 10, totalPoints: 20, rank: 2, leaderboardEnabled: true, aiAllowed: false, leaderboard: [], problemProgress: { P1: "In progress" } },
   ],
   deadlines: [
     { id: "A1", title: "Exercise", date: futureUtc[0], time: futureUtc[1], kind: "Assignment", to: "/assignments?work=A1" },
@@ -94,12 +94,12 @@ const workspaceInput = { part: "DML", ddl: "CREATE TABLE T(id INT)", dml: "INSER
 assert.equal((await studentApi.runWorkspace("P1", workspaceInput)).status, "Success");
 const workspaceCall = calls.find(call => call.url === "/api/problems/P1/workspace/run");
 assert.deepEqual(JSON.parse(workspaceCall.options.body), workspaceInput);
-const contests = await studentApi.getContests();
+const contests = await studentApi.getExaminations();
 assert.deepEqual(contests.map(item => item.id), ["T1", "T2"]);
 assert.deepEqual(contests[0].problemIds, []);
 assert.equal(contests[0].problemCount, 1);
 assert.equal(contests[1].submitters, 2);
-assert.equal(contests[1].scope, "All students");
+assert.equal(contests[1].scope, "C2");
 assert.equal(contests[1].shortDescription, "Open to campus");
 assert.equal(contests[1].bannerUrl, "/api/assignments/banners/campus.webp");
 assert.equal(contests[0].status, "Upcoming");

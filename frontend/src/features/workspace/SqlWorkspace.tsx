@@ -107,9 +107,9 @@ export function SqlWorkspace({ problem, selectedSolutionId, onSolutionChange, on
   useEffect(() => {
     if (!contestMode || !contestId) return;
     let cancelled = false;
-    studentApi.getContests().then((contests) => {
-      if (!cancelled && contests.find((item) => item.id === contestId)?.examType === "comprehensive") {
-        navigate(`/contests/${encodeURIComponent(contestId)}/exam`, { replace: true });
+    studentApi.getContestOrExam(contestId).then((exam) => {
+      if (!cancelled && exam?.examType === "comprehensive") {
+        navigate(`/examinations/${encodeURIComponent(contestId)}/exam`, { replace: true });
       }
     }).catch(() => {});
     return () => { cancelled = true; };
@@ -175,7 +175,7 @@ export function SqlWorkspace({ problem, selectedSolutionId, onSolutionChange, on
   const isReadOnly = parentReadOnly || reviewMode || activityClosed || (busy && resultTab === "Submissions") || (!embedded && !historyLoaded && !exam?.enabled);
   const exitSaved = reviewMode || (hasSubmitted && !editedSinceSubmission);
   const exitBlockedReason = activityClosed ? "Assignment deadline has passed" : submissionLimitReached ? "Submission limit reached" : contestClosed ? "Contest submissions are closed" : undefined;
-  const exitDestination = source === "Contests" ? `/contests/${encodeURIComponent(context)}` : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
+  const exitDestination = source === "Contests" ? "/examinations" : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
   const [confirmResetQuery, setConfirmResetQuery] = useState(false);
   const [notice, setNotice] = useState("");
   const previousQuestionId = useRef(question?.id);

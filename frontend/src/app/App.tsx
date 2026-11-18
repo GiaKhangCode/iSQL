@@ -50,8 +50,6 @@ const ContestWorkspacePage = lazy(() =>
 );
 import { AssignmentsPage } from "@/features/student/AssignmentsPage";
 import { AssignmentDetailPage } from "@/features/student/AssignmentDetailPage";
-import { ContestDetailPage } from "@/features/student/ContestDetailPage";
-import { ContestsPage } from "@/features/student/ContestsPage";
 import { SubmissionsPage } from "@/features/student/SubmissionsPage";
 import { ProblemEditorPage } from "@/features/teacher/ProblemEditorPage";
 import { DatabaseLibraryPage } from "@/features/teacher/DatabaseLibraryPage";
@@ -146,11 +144,6 @@ export function App() {
               path="/assignments/classes/:scopeId"
               element={<AssignmentDetailPage />}
             />
-            <Route path="/contests" element={<ContestsPage />} />
-            <Route
-              path="/contests/:contestId"
-              element={<ContestDetailPage />}
-            />
             <Route path="/examinations" element={<StudentExaminationsPage />} />
             <Route
               path="/examinations/:examinationId"
@@ -163,14 +156,6 @@ export function App() {
             element={
               <Suspense fallback={<Loading variant="workspace" />}>
                 <WorkspacePage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/contests/:contestId/exam"
-            element={
-              <Suspense fallback={<Loading variant="workspace" />}>
-                <ContestWorkspacePage />
               </Suspense>
             }
           />
@@ -194,9 +179,6 @@ export function App() {
             <Route path="assignments" element={<CapabilityGuard permission="assignment.create"><AssignmentsListPage /></CapabilityGuard>} />
             <Route path="assignments/new" element={<CapabilityGuard permission="assignment.create"><AssignmentBuilderPage /></CapabilityGuard>} />
             <Route path="assignments/:id/edit" element={<CapabilityGuard permission="assignment.create"><AssignmentBuilderPage /></CapabilityGuard>} />
-            <Route path="contests" element={<CapabilityGuard permission="contest.create"><ContestsListPage/></CapabilityGuard>} />
-            <Route path="contests/new" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage /></CapabilityGuard>} />
-            <Route path="contests/:id/edit" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage /></CapabilityGuard>} />
             <Route path="shared" element={<SharedContentPage/>}/>
             <Route path="problems/:id/preview" element={<SharedPreviewPage kind="problem"/>}/>
             <Route path="database-library/:id/preview" element={<SharedPreviewPage kind="library"/>}/>
@@ -222,11 +204,8 @@ export function App() {
             <Route path="examinations/:examId/admissions" element={<CapabilityGuard permission="exam.credentials"><ExamAdmissionsPage/></CapabilityGuard>}/>
             <Route path="examinations/new" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
             <Route path="examinations/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
-            <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ContestsListPage sessionsOnly/></CapabilityGuard>}/>
-            <Route path="sessions/:id/edit" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage/></CapabilityGuard>}/>
-            <Route path="contests" element={<CapabilityGuard permission="contest.create"><ContestsListPage/></CapabilityGuard>}/>
-            <Route path="contests/new" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage/></CapabilityGuard>}/>
-            <Route path="contests/:id/edit" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage/></CapabilityGuard>}/>
+            <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ContestsListPage/></CapabilityGuard>}/>
+            <Route path="sessions/:id/edit" element={<CapabilityGuard permission="examination.manage"><ContestBuilderPage/></CapabilityGuard>}/>
             <Route path="regrade" element={<CapabilityGuard permission="examination.manage"><RegradeAssignmentsPage/></CapabilityGuard>}/>
             <Route path="results" element={<CapabilityGuard permission="results.grade"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
             <Route path="statistics" element={<CapabilityGuard permission="results.grade"><OfficeStatisticsPage/></CapabilityGuard>}/>
@@ -242,7 +221,7 @@ export function App() {
             <Route path="examinations/new" element={<ExaminationBuilderPage/>}/>
             <Route path="examinations/:id/edit" element={<ExaminationBuilderPage/>}/>
             <Route path="examinations/:examId/admissions" element={<ExamAdmissionsPage/>}/>
-            <Route path="sessions" element={<ContestsListPage sessionsOnly/>}/>
+            <Route path="sessions" element={<ContestsListPage/>}/>
             <Route path="sessions/:id/edit" element={<ContestBuilderPage/>}/>
             <Route path="regrade" element={<RegradeAssignmentsPage/>}/>
             <Route path="results" element={<ResultsDashboardPage defaultKind="exams" onlyExams/>}/>

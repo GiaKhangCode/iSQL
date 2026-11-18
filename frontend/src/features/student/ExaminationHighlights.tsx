@@ -1,24 +1,13 @@
-import { useListOrder, ListSortSelect } from "@/shared/components/ListSortSelect";
-import { ListSearchInput } from "@/shared/components/ListSearchInput";
-import { useListDateFilters, ListDateFilters } from "@/shared/components/ListDateFilters";
-import { matchesListSearch } from "@/shared/lib/listSearch";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import type { Translator } from "@/i18n/index";
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useLayoutEffect, useRef, useState, type TransitionEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { studentApi } from "@/features/student/studentApi";
 import { type Contest } from "@/data/models";
-import { useLoad } from "@/shared/hooks/useLoad";
-import { Empty, ErrorState, Loading, Status } from "@/shared/ui/ui";
-import { ContestSwipeTabs } from "@/shared/components/ContestSwipeTabs";
 import { LayeredContestBanner } from "@/shared/components/LayeredContestBanner";
-import { selectFeaturedContests } from "@/shared/lib/contest/featuredContests";
 import { ContestCountdown } from "@/shared/components/ContestCountdown";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 
-const CONTEST_PAGE_SIZE = 10;
 
 
 
@@ -245,100 +234,5 @@ export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; on
         />)}
       </div>
     </div>
-  </section>;
-}
-
-export function ContestsPage() {
-  const order=useListOrder();
-  useEffect(()=>setPage(1),[order.value]);
-  const dates=useListDateFilters();
-  const { t: tr, locale: uiLocale } = useLanguage("student");
-  const navigate = useNavigate();
-  const { data, loading, error } = useLoad(studentApi.getContests);
-  const [tab, setTab] = useState("All");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const feedRef = useRef<HTMLDivElement>(null);
-  const [params] = useSearchParams();
-  if (loading) return <section className="page contests-page u048-page"><Loading variant="cards" columns={3} rows={6} label={tr("Loading contests…")} /></section>;
-  if (error || !data) return <section className="page contests-page u048-page"><ErrorState title={tr("Contests unavailable")} message={tr(error) || tr("Could not load contests.")} onRetry={() => window.location.reload()} /></section>;
-  const selected = data.find((contest) => contest.id === params.get("contest"));
-  function changePage(nextPage: number) {
-    setPage(nextPage);
-    requestAnimationFrame(() => feedRef.current?.scrollTo({ top: 0 }));
-  }
-  const contestCounts = {
-    All: data.length,
-    Upcoming: data.filter((contest) => contest.status === "Upcoming").length,
-    Live: data.filter((contest) => contest.status === "Live").length,
-    Past: data.filter((contest) => contest.status === "Closed").length,
-  };
-  const featured = selectFeaturedContests(data);
-  const hallOfFame = selectHallOfFame(data);
-  function details(contest: Contest) {
-    navigate(`/contests/${contest.id}`);
-  }
-  if (selected) return <Navigate replace to={`/contests/${selected.id}`} />;
-  return <section className="page contests-page u048-page">
-    <h1 className="sr-only"><TranslatedText>{tr("Contests")}</TranslatedText></h1>
-    <FeaturedContests contests={featured} onOpen={details} />
-    <ContestSwipeTabs
-      tabs={["All", "Upcoming", "Live", "Past"].map((id) => ({ id, label: <TranslatedText>{tr(id)}</TranslatedText>, count: contestCounts[id as keyof typeof contestCounts] }))}
-      value={tab} onChange={(next) => { setTab(next); setPage(1); requestAnimationFrame(() => feedRef.current?.scrollTo({ top: 0 })); }} label={tr("Contest status")}
-      toolbar={<>
-        <label className="sr-only" htmlFor="contest-search"><TranslatedText>{tr("Search contests")}</TranslatedText></label>
-        <ListSearchInput value={search} onChange={value=>{setSearch(value);setPage(1);}} label={tr("Search contests")} items={data.filter(c=>dates.matches(c)).map(c=>({id:c.id,title:c.title,description:c.scope}))}/><ListSortSelect order={order}/><ListDateFilters dates={dates}/>
-      </>}
-      aside={<aside className="hall-of-fame" aria-label={tr("Hall of Fame")}>
-        <h2><TranslatedText>{tr("Hall of Fame")}</TranslatedText></h2>
-        <p className="fame-description"><TranslatedText>{tr("Recent public achievements")}</TranslatedText></p>
-        {hallOfFame.length > 0 ? <ol className="fame-list">
-          {hallOfFame.map((entry, index) => <li className="fame-row" key={`${entry.contest.id}-${entry.rank}-${entry.student}`}>
-            <b>{String(index + 1).padStart(2, "0")}</b>
-            <div>
-              <strong>{entry.student}</strong>
-              <small className="fame-place"><TranslatedText>{uiLocale === "vi-VN" ? tr("Rank {rank}", { rank: entry.rank }) : `${ordinal(entry.rank)} place`}</TranslatedText></small>
-              <small className="fame-contest">{entry.contest.title}</small>
-              <time className="fame-date">{completionMonth(entry.contest, uiLocale)}</time>
-            </div>
-          </li>)}
-        </ol> : <p className="fame-empty"><TranslatedText>{tr("Published results will appear here after a leaderboard contest closes.")}</TranslatedText></p>}
-      </aside>}
-    >{(panelTab, active) => {
-        const filteredRows = data.filter(
-          (contest) =>
-            (panelTab === "All" || contest.status === (panelTab === "Live" ? "Live" : panelTab === "Past" ? "Closed" : "Upcoming")) &&
-            dates.matches(contest) && matchesListSearch(search,contest.title,contest.shortDescription,contest.scope),
-        );
-        const filtered=order.apply(filteredRows,item=>item.id);
-        const pageCount = Math.max(1, Math.ceil(filtered.length / CONTEST_PAGE_SIZE));
-        const currentPage = Math.min(active ? page : 1, pageCount);
-        const firstIndex = (currentPage - 1) * CONTEST_PAGE_SIZE;
-        const pageContests = filtered.slice(firstIndex, firstIndex + CONTEST_PAGE_SIZE);
-      return (
-      <div id={active ? "contest-feed" : undefined} className="contest-feed-panel">
-        <div className="section-heading"><h2><TranslatedText>{panelTab === "All" ? tr("All contests") : tr("{value0} contests", { value0: panelTab })}</TranslatedText></h2><div className="contest-list-controls">
-          <span className="tiny muted" aria-live="polite"><TranslatedText>{tr("Showing")}</TranslatedText> {filtered.length ? firstIndex + 1 : 0}–{Math.min(firstIndex + CONTEST_PAGE_SIZE, filtered.length)} <TranslatedText>{tr("of")}</TranslatedText> {filtered.length}</span>
-          <nav className="contest-list-pagination" aria-label={tr("Contest pages")}>
-            <button type="button" className="button" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}><TranslatedText>{tr("← Previous")}</TranslatedText></button>
-            <span><TranslatedText>{tr("Page")}</TranslatedText> {currentPage} <TranslatedText>{tr("of")}</TranslatedText> {pageCount}</span>
-            <button type="button" className="button" disabled={currentPage === pageCount} onClick={() => changePage(currentPage + 1)}><TranslatedText>{tr("Next →")}</TranslatedText></button>
-          </nav>
-        </div></div>
-        <div className="contest-feed-scroll" ref={active ? feedRef : undefined} tabIndex={0} aria-label={tr("Contest list")}>
-        {pageContests.map((contest) => <article className="contest-item" key={contest.id} id={active ? `student-contest-${contest.id}` : undefined}>
-          <div>
-            <div className="contest-title"><h3>{contest.title}</h3><Status value={contest.status} /><ContestCountdown contest={contest} /></div>
-            <small>{contest.scope}</small>
-            <p>{contest.shortDescription}</p>
-            <span className="tiny">{contest.date} {contest.time} → {contest.endDate || contest.date} {contest.endTime} · {contest.problemCount} <TranslatedText>{tr("problem")}</TranslatedText><TranslatedText>{contest.problemCount === 1 ? "" : tr("s")}</TranslatedText> · {contest.submitters ?? 0} <TranslatedText>{tr("student")}</TranslatedText><TranslatedText>{contest.submitters === 1 ? "" : tr("s")}</TranslatedText> <TranslatedText>{tr("participated")}</TranslatedText></span>
-          </div>
-          <button className="text-button" onClick={() => details(contest)}><TranslatedText>{tr("View details →")}</TranslatedText></button>
-        </article>)}
-        {!filtered.length && <Empty title={tr("No matching contests")} />}
-        </div>
-      </div>
-      );
-    }}</ContestSwipeTabs>
   </section>;
 }

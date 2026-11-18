@@ -50,15 +50,14 @@ export function ContestWorkspacePage() {
         <AlertCircle size={48} color="#ef4444" style={{ marginBottom: 16 }} />
         <h2><TranslatedText>{tr("Exam workspace unavailable")}</TranslatedText></h2>
         <p className="muted" style={{ margin: "8px 0 20px" }}><TranslatedText>{tr(error) || tr("The contest does not exist or has ended.")}</TranslatedText></p>
-        <Link to={typeof window !== "undefined" && window.location.pathname.startsWith("/examinations") ? "/examinations" : "/contests"} className="contest-btn-primary">
-          <ArrowLeft size={16} /> <TranslatedText>{typeof window !== "undefined" && window.location.pathname.startsWith("/examinations") ? tr("Back to examinations") : tr("Back to contests")}</TranslatedText>
+        <Link to="/examinations" className="contest-btn-primary">
+          <ArrowLeft size={16} /> <TranslatedText>{tr("Back to examinations")}</TranslatedText>
         </Link>
       </div>
     );
   }
 
-  const isExam = Boolean(contest?.examinationId || (typeof window !== "undefined" && window.location.pathname.startsWith("/examinations")));
-  const returnUrl = contest ? (isExam ? `/examinations/${contest.id}` : `/contests/${contest.id}`) : (isExam ? "/examinations" : "/contests");
+  const returnUrl = contest ? `/examinations/${contest.id}` : "/examinations";
 
   const isTimeCritical = timeRemaining < 300000 && timeRemaining > 0; // Less than five minutes remaining
   const activeQuestion = contest.problemDetails[activeQuestionIndex];

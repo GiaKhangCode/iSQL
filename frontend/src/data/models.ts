@@ -89,7 +89,7 @@ export type Contest = {
   endTime: string;
   endDate?: string;
   scope: string;
-  audienceType: "classes" | "all_students";
+  audienceType: "classes";
   shortDescription: string;
   description: string;
   rules: string;

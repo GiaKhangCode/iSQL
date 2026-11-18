@@ -10,7 +10,7 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
 for (const name of ["window", "document", "navigator", "HTMLElement", "Element", "MutationObserver", "localStorage"]) Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
-globalThis.__workspaceApi = { getDraft: () => "", saveDraft() {}, getPreferences: async () => ({ favorites: [] }), getContests: async () => [] };
+globalThis.__workspaceApi = { getDraft: () => "", saveDraft() {}, getPreferences: async () => ({ favorites: [] }), getContestOrExam: async () => undefined };
 
 const output = await build({
   stdin: { contents: `

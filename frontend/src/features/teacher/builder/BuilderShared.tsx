@@ -15,7 +15,7 @@ export type BuilderDraft = {
   title: string;
   classIds: string[];
   studentEmails: string[];
-  audienceType: "classes" | "all_students";
+  audienceType: "classes";
   shortDescription: string;
   description: string;
   rules: string;
@@ -243,7 +243,7 @@ export function ActivityPreview({ draft, contest, classes, problems, bannerActio
   const [selectedClassId, setSelectedClassId] = useState(draft.classIds[0] || "");
   const classId = draft.classIds.includes(selectedClassId) ? selectedClassId : draft.classIds[0];
   const classLabel = classes.find((item) => item.id === classId)?.course || classId || "No class selected";
-  const audience = contest && draft.audienceType === "all_students" ? "All students" : classLabel;
+  const audience = classLabel;
   const totalPoints = Math.round(draft.problems.reduce((sum, item) => sum + (Number(item.points) || 0), 0) * 100) / 100;
   const title = draft.title.trim() || (contest ? "Untitled contest" : "Untitled assignment");
 
