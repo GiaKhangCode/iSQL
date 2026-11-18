@@ -7,13 +7,13 @@ use App\Models\AssignmentProblem;
 use App\Models\ClassEnrollment;
 use App\Models\ClassModel;
 use App\Models\ExamClassProctor;
-use App\Models\Notification;
 use App\Models\Problem;
 use App\Models\Submission;
 use App\Models\SubmissionAppeal;
 use App\Models\SubmissionRegradeAssignment;
 use App\Models\User;
 use App\Services\ExaminationService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -24,6 +24,7 @@ class RegradeAssignmentController extends Controller
 {
     public function __construct(
         protected ExaminationService $examinationService,
+        protected NotificationService $notificationService,
     ) {
     }
 
@@ -429,28 +430,22 @@ class RegradeAssignmentController extends Controller
         $problem = Problem::find($sub->problem_id);
         $problemTitle = $problem ? $problem->title : 'Bài nộp SQL';
         if ($previousReviewerId) {
-            Notification::create([
-                'id'         => (string) Str::uuid(),
-                'user_id'    => $previousReviewerId,
-                'title'      => 'Thay đổi phân công chấm phúc khảo: ' . $problemTitle,
-                'message'    => 'Bài nộp này đã được chuyển phân công phúc khảo cho giảng viên khác.',
-                'type'       => 'Info',
-                'link'       => '/teacher/regrade',
-                'is_read'    => false,
-                'created_at' => now(),
-            ]);
+            $this->notificationService->create(
+                $previousReviewerId,
+                'Thay đổi phân công chấm phúc khảo: ' . $problemTitle,
+                'Bài nộp này đã được chuyển phân công phúc khảo cho giảng viên khác.',
+                'Info',
+                '/teacher/regrade',
+            );
         }
 
-        Notification::create([
-            'id'         => (string) Str::uuid(),
-            'user_id'    => $reviewer->id,
-            'title'      => 'Phân công chấm phúc khảo: ' . $problemTitle,
-            'message'    => $note ?: 'Giáo vụ khoa đã phân công một bài nộp cần chấm phúc khảo cho bạn.',
-            'type'       => 'Review',
-            'link'       => "/teacher/results/review/{$sub->id}",
-            'is_read'    => false,
-            'created_at' => now(),
-        ]);
+        $this->notificationService->create(
+            $reviewer->id,
+            'Phân công chấm phúc khảo: ' . $problemTitle,
+            $note ?: 'Giáo vụ khoa đã phân công một bài nộp cần chấm phúc khảo cho bạn.',
+            'Review',
+            "/teacher/results/review/{$sub->id}",
+        );
 
         return response()->json(array_merge($this->serializeRow($sub), ['ok' => true]));
     }
@@ -474,16 +469,13 @@ class RegradeAssignmentController extends Controller
 
         if ($previousReviewerId) {
             $problem = Problem::find($sub->problem_id);
-            Notification::create([
-                'id'         => (string) Str::uuid(),
-                'user_id'    => $previousReviewerId,
-                'title'      => 'Hủy phân công chấm phúc khảo: ' . ($problem ? $problem->title : 'Bài nộp SQL'),
-                'message'    => 'Giáo vụ khoa đã hủy phân công chấm phúc khảo cho bài nộp này.',
-                'type'       => 'Info',
-                'link'       => '/teacher/regrade',
-                'is_read'    => false,
-                'created_at' => now(),
-            ]);
+            $this->notificationService->create(
+                $previousReviewerId,
+                'Hủy phân công chấm phúc khảo: ' . ($problem ? $problem->title : 'Bài nộp SQL'),
+                'Giáo vụ khoa đã hủy phân công chấm phúc khảo cho bài nộp này.',
+                'Info',
+                '/teacher/regrade',
+            );
         }
 
         return response()->json(array_merge($this->serializeRow($sub), ['ok' => true]));

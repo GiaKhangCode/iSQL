@@ -7,7 +7,6 @@ use App\Models\AssignmentProblem;
 use App\Models\AssignmentStudent;
 use App\Models\ClassEnrollment;
 use App\Models\ClassModel;
-use App\Models\Notification;
 use App\Models\Problem;
 use App\Models\Submission;
 use App\Models\User;
@@ -17,6 +16,11 @@ use Illuminate\Support\Str;
 
 class AssignmentService
 {
+    public function __construct(
+        protected NotificationService $notificationService,
+    ) {
+    }
+
     /**
      * Get all assignments with role-based filtering, optional results scope, and frontend formatting
      */
@@ -1002,23 +1006,13 @@ class AssignmentService
         $title = ($assignment->is_contest ? 'Kỳ thi mới: ' : 'Bài tập mới: ') . $assignment->title;
         $link = $assignment->is_contest ? '/contests' : '/assignments';
 
-        $notifications = [];
-        foreach ($allIds as $sId) {
-            $notifications[] = [
-                'id'         => (string) Str::uuid(),
-                'user_id'    => $sId,
-                'title'      => $title,
-                'message'    => 'Giảng viên đã giao một bài mới. Hãy kiểm tra ngay!',
-                'type'       => 'Assignment',
-                'link'       => $link,
-                'is_read'    => false,
-                'created_at' => now(),
-            ];
-        }
-
-        if (!empty($notifications)) {
-            Notification::insert($notifications);
-        }
+        $this->notificationService->createMany(
+            $allIds,
+            $title,
+            'Giảng viên đã giao một bài mới. Hãy kiểm tra ngay!',
+            'Assignment',
+            $link,
+        );
     }
 
     /**

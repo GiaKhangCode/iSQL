@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Assignment;
 use App\Models\ClassModel;
+use App\Models\Notification;
 use App\Models\Problem;
 use App\Models\Topic;
 use App\Models\User;
@@ -108,9 +109,40 @@ class AssignmentCrudTest extends TestCase
         $response = $this->getJson('/api/assignments/audience-count?audience_type=classes&class_ids[]=' . $this->class->id);
         $response->assertStatus(200);
         $response->assertJson([
-            'eligible_students' => 1,
-            'class_count'       => 1,
+            'eligibleStudents'    => 1,
+            'individualStudents'  => 0,
+            'overlappingStudents' => 0,
         ]);
+    }
+
+    public function test_publishing_assignment_notifies_students_of_the_class(): void
+    {
+        Sanctum::actingAs($this->instructor);
+
+        $response = $this->postJson('/api/assignments', [
+            'title'        => 'Bài thực hành thông báo',
+            'instructions' => '<p>Thử thông báo</p>',
+            'classIds'     => [$this->class->id],
+            'audienceType' => 'classes',
+            'opens'        => now()->toIso8601String(),
+            'closes'       => now()->addDays(7)->toIso8601String(),
+            'status'       => 'published',
+            'problems'     => [
+                ['id' => $this->problem1->id, 'points' => 10, 'order' => 1],
+            ],
+        ]);
+        $response->assertStatus(201);
+
+        $notifications = Notification::where('user_id', $this->student->id)->get();
+
+        $this->assertCount(1, $notifications);
+        $this->assertSame('Bài tập mới: Bài thực hành thông báo', $notifications[0]->title);
+        $this->assertSame('Assignment', $notifications[0]->type);
+        $this->assertSame('/assignments', $notifications[0]->link);
+        $this->assertFalse((bool) $notifications[0]->is_read);
+
+        // Giảng viên tạo bài không phải người nhận.
+        $this->assertSame(0, Notification::where('user_id', $this->instructor->id)->count());
     }
 
     public function test_instructor_can_create_assignment_with_frontend_payload(): void

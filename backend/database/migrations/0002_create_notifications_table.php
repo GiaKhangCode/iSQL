@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('user_id', 50);
             $table->string('title', 255);
             $table->text('message');
-            $table->string('type', 50);                          // info | success | warning | error
+            $table->string('type', 50);                          // Nhãn nghiệp vụ, không phải mức độ: Assignment | Review | Info | content_share (frontend hiển thị chung một kiểu)
             $table->boolean('is_read')->default(false);
             $table->string('link', 255)->nullable();
             $table->timestamp('created_at')->useCurrent();

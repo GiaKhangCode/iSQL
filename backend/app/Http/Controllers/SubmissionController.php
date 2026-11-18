@@ -8,7 +8,6 @@ use App\Models\Assignment;
 use App\Models\AssignmentProblem;
 use App\Models\ClassEnrollment;
 use App\Models\ClassModel;
-use App\Models\Notification;
 use App\Models\Problem;
 use App\Models\StudentIdentity;
 use App\Models\Submission;
@@ -18,6 +17,7 @@ use App\Models\TestCase;
 use App\Models\User;
 use App\Models\WorkspaceSubmissionResult;
 use App\Services\ExaminationService;
+use App\Services\NotificationService;
 use App\Services\ProblemWorkspaceService;
 use App\Services\SubmissionReviewService;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +30,8 @@ class SubmissionController extends Controller
     public function __construct(
         protected readonly ExaminationService $examinationService,
         protected readonly ProblemWorkspaceService $workspaceService,
-        protected readonly SubmissionReviewService $reviewService
+        protected readonly SubmissionReviewService $reviewService,
+        protected readonly NotificationService $notificationService
     ) {
     }
 
@@ -352,18 +353,15 @@ class SubmissionController extends Controller
             }
 
             $notifTitle = ($isRegradeAction ? 'Kết quả phúc khảo: ' : 'Bài nộp đã được chấm: ') . ($prob ? $prob->title : 'SQL Problem');
-            Notification::create([
-                'id'         => (string) Str::uuid(),
-                'user_id'    => $sub->user_id,
-                'title'      => $notifTitle,
-                'message'    => $scoresVisible
+            $this->notificationService->create(
+                $sub->user_id,
+                $notifTitle,
+                $scoresVisible
                     ? ('Điểm số: ' . ($sub->evaluated_score ?? $sub->score) . " / {$maxScore}." . ($feedback ? " Phản hồi: {$feedback}" : ''))
                     : 'Bài nộp đã được chấm. Giáo viên đang ẩn điểm của hoạt động này.',
-                'type'       => 'Review',
-                'link'       => "/submissions?submission={$sub->id}",
-                'is_read'    => false,
-                'created_at' => now(),
-            ]);
+                'Review',
+                "/submissions?submission={$sub->id}",
+            );
 
             if ($regrade && $regrade->assigned_by_id && $regrade->assigned_by_id !== $user->id) {
                 $assigner = User::find($regrade->assigned_by_id);
@@ -372,16 +370,13 @@ class SubmissionController extends Controller
                         ? "/admin/results/review/{$sub->id}"
                         : ($assigner->isFacultyOffice() ? "/office/results/review/{$sub->id}" : "/teacher/results/review/{$sub->id}");
                     $student = User::find($sub->user_id);
-                    Notification::create([
-                        'id'         => (string) Str::uuid(),
-                        'user_id'    => $assigner->id,
-                        'title'      => 'Đã hoàn tất chấm phúc khảo: ' . ($prob ? $prob->title : 'Bài nộp SQL'),
-                        'message'    => ($student ? $student->name : 'Sinh viên') . ': ' . ($sub->evaluated_score ?? $sub->score) . " / {$maxScore} (GV: {$user->name}).",
-                        'type'       => 'Review',
-                        'link'       => $assignerLink,
-                        'is_read'    => false,
-                        'created_at' => now(),
-                    ]);
+                    $this->notificationService->create(
+                        $assigner->id,
+                        'Đã hoàn tất chấm phúc khảo: ' . ($prob ? $prob->title : 'Bài nộp SQL'),
+                        ($student ? $student->name : 'Sinh viên') . ': ' . ($sub->evaluated_score ?? $sub->score) . " / {$maxScore} (GV: {$user->name}).",
+                        'Review',
+                        $assignerLink,
+                    );
                 }
             }
         });

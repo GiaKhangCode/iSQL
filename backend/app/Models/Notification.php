@@ -31,4 +31,25 @@ class Notification extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Định dạng JSON trả về cho frontend (camelCase).
+     *
+     * Mặc định Eloquent trả đúng tên cột trong DB (is_read, created_at), nhưng
+     * frontend đọc isRead / createdAt. Ghi đè toArray() để mọi nơi trả về
+     * Notification (response()->json($notification), collection, ...) đều dùng
+     * chung một định dạng. user_id không cần cho client nên không xuất ra.
+     */
+    public function toArray(): array
+    {
+        return [
+            'id'        => $this->id,
+            'title'     => $this->title,
+            'message'   => $this->message,
+            'type'      => $this->type,
+            'isRead'    => (bool) $this->is_read,
+            'link'      => $this->link,
+            'createdAt' => $this->created_at?->toIso8601String(),
+        ];
+    }
 }

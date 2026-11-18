@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\ContentShare;
 use App\Models\DatabaseLibraryEntry;
-use App\Models\Notification;
 use App\Models\Problem;
 use App\Models\ProblemSqlSolution;
 use App\Models\ProblemStageExercise;
 use App\Models\TestCase;
 use App\Models\TestCaseScript;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Services\ProblemService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +21,8 @@ use Illuminate\Support\Str;
 class ContentSharingController extends Controller
 {
     public function __construct(
-        protected ProblemService $problemService
+        protected ProblemService $problemService,
+        protected NotificationService $notificationService,
     ) {}
 
     /**
@@ -202,16 +203,13 @@ class ContentSharingController extends Controller
             ? "/teacher/problems/{$row->id}/preview"
             : "/teacher/database-library/{$row->id}/preview";
 
-        Notification::create([
-            'id'         => (string) Str::uuid(),
-            'user_id'    => $target->id,
-            'title'      => 'Nội dung được chia sẻ',
-            'message'    => "{$user->name} đã chia sẻ {$row->title} với bạn.",
-            'type'       => 'content_share',
-            'is_read'    => false,
-            'link'       => $link,
-            'created_at' => now(),
-        ]);
+        $this->notificationService->create(
+            $target->id,
+            'Nội dung được chia sẻ',
+            "{$user->name} đã chia sẻ {$row->title} với bạn.",
+            'content_share',
+            $link,
+        );
 
         ActivityLog::create([
             'id'         => (string) Str::uuid(),
