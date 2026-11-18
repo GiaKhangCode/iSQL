@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Teacher\ClassController;
 use App\Http\Controllers\Teacher\AssignmentController;
-use App\Http\Controllers\Teacher\ReviewController;
 use App\Http\Controllers\Teacher\CatalogController;
 use App\Http\Controllers\ClassRosterController;
 

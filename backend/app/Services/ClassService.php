@@ -38,6 +38,24 @@ class ClassService
     }
 
     /**
+     * Get one class that the user teaches in ANY capacity (theory or practical, or the legacy
+     * `instructor_id`). Used for read-only views such as the roster; writes use getClass()
+     * with an instructor id, which is limited to practical instructors.
+     */
+    public function getClassTaughtBy(string $classId, string $instructorId): ClassModel
+    {
+        return ClassModel::whereKey($classId)
+            ->where(function (Builder $q) use ($instructorId): void {
+                $q->where('instructor_id', $instructorId)
+                    ->orWhere('practice_instructor_id', $instructorId)
+                    ->orWhereHas('instructors', function (Builder $instructors) use ($instructorId): void {
+                        $instructors->where('users.id', $instructorId);
+                    });
+            })
+            ->firstOrFail();
+    }
+
+    /**
      * Get classes taught by a specific practical instructor
      */
     public function getInstructorClasses(string $instructorId): Collection
@@ -79,6 +97,13 @@ class ClassService
         }
 
         $data = $this->resolveCatalogLabels($data);
+        $this->assertDateOrder($data['start_date'] ?? null, $data['end_date'] ?? null);
+
+        $hasInstructor = $instructorId !== null && $instructorId !== 'Unassigned' && $instructorId !== '';
+        if ($hasInstructor) {
+            // Kiểm tra TRƯỚC khi tạo lớp để id lạ/không hợp lệ trả 422 thay vì lỗi khóa ngoại.
+            $this->assertActiveInstructor($instructorId);
+        }
 
         $attributes = [
             'course'        => $data['course'],
@@ -95,11 +120,16 @@ class ClassService
             $attributes['id'] = $data['id'];
         }
 
-        $class = ClassModel::create($attributes);
+        // Tạo lớp và gán giảng viên là một đơn vị: lỗi giữa chừng không được để lại lớp dở dang.
+        $class = DB::transaction(function () use ($attributes, $hasInstructor, $data, $instructorId): ClassModel {
+            $class = ClassModel::create($attributes);
 
-        if ($instructorId !== null && $instructorId !== 'Unassigned' && $instructorId !== '') {
-            $this->assignInstructor($class->id, $data['assignment_type'] ?? 'practical', $instructorId);
-        }
+            if ($hasInstructor) {
+                $this->assignInstructor($class->id, $data['assignment_type'] ?? 'practical', $instructorId);
+            }
+
+            return $class;
+        });
 
         return $class->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
     }
@@ -177,6 +207,22 @@ class ClassService
         return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
     }
 
+    /**
+     * Ngày kết thúc không được trước ngày bắt đầu (bằng nhau thì được). Thiếu một đầu thì bỏ qua.
+     */
+    private function assertDateOrder(mixed $start, mixed $end): void
+    {
+        if ($start === null || $start === '' || $end === null || $end === '') {
+            return;
+        }
+
+        if (\Carbon\Carbon::parse($end)->lt(\Carbon\Carbon::parse($start))) {
+            throw ValidationException::withMessages([
+                'end_date' => ['The end date must be a date after or equal to the start date.'],
+            ]);
+        }
+    }
+
     private function assertActiveInstructor(string $instructorId): void
     {
         $valid = User::whereKey($instructorId)
@@ -225,6 +271,12 @@ class ClassService
         }
 
         $data = $this->resolveCatalogLabels($data, creating: false);
+
+        // Chỉ gửi một đầu thì so với ngày đang lưu của lớp.
+        $this->assertDateOrder(
+            array_key_exists('start_date', $data) ? $data['start_date'] : $class->start_date,
+            array_key_exists('end_date', $data) ? $data['end_date'] : $class->end_date
+        );
 
         $hasLecturerInput = array_key_exists('lecturer_id', $data)
             || array_key_exists('lecturerId', $data)
