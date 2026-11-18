@@ -32,8 +32,6 @@ export interface DashboardStats {
   hard: number;
   continuing: any[];
   deadlines: any[];
-  currentStreak: number;
-  longestStreak: number;
   submissionsPerDay: DailySubmission[];
   deadlinesError?: string;
 }
@@ -368,10 +366,10 @@ export const studentApi = {
   },
   
   markAsRead: async (id: string) => {
-    return await apiFetch(`/api/notifications/${id}/read`, { method: "PUT" });
+    return await apiFetch(`/api/notifications/${id}/read`, { method: "PATCH" });
   },
   
   markAllAsRead: async () => {
-    return await apiFetch("/api/notifications/read-all", { method: "PUT" });
+    return await apiFetch("/api/notifications/read-all", { method: "PATCH" });
   }
 };

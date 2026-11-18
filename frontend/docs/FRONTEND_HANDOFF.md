@@ -30,7 +30,6 @@ Route map: `/` → Login/Dashboard; public-only `/login`, `/register`; protected
 | ------------------------------------------------------ | ----------------------------------------------------------------------- |
 | `mockAuthService.login(email, password)`               | Validate/reject predictably and return a Student session                |
 | `register(name, email, password)`                      | Validate and create a mock session                                      |
-| `demoLogin()`                                          | Return the named demo Student                                           |
 | `logout()` / `restoreSession()`                        | Remove/restore only the mock session key                                |
 | `studentApi.getDashboard()`                            | Solved breakdown, continuing problems and deadlines                     |
 | `getProblems(filters)` / `getProblem(id)`              | Problem list/detail with progress                                       |

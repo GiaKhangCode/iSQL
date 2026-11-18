@@ -59,7 +59,6 @@ export const student: Dictionary = {
   "Loading activity…": "Đang tải hoạt động…",
   "Could not load activity.": "Không tải được hoạt động.",
   "Choose a problem from the table to see its details here.": "Chọn bài trong danh sách để xem chi tiết tại đây.",
-  "Current streak: {count} days": "Chuỗi hiện tại: {count} ngày",
   "{count} upcoming": "{count} sắp tới",
   "Completed": "Đã hoàn thành",
   "Loading class work…": "Đang tải bài tập của lớp…",

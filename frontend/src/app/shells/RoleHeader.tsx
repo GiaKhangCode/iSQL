@@ -8,10 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/app/providers/AuthContext";
-import { useTheme } from "@/shared/context/ThemeContext";
 import { APP_NAME } from "@/data/models";
-import { studentApi } from "@/features/student/studentApi";
-import { useLoad } from "@/shared/hooks/useLoad";
 import { findMatchingTab, getTabSession, isPathMatchingTab, setTabSession } from "@/shared/lib/tabSession";
 
 type Role = "student" | "teacher" | "office" | "admin";
@@ -26,7 +23,6 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
   const { t: tr } = useLanguage("common");
   const { t } = useLanguage();
   const { session, logout, permissions } = useAuth();
-  const { dark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [hasProctorDuty,setHasProctorDuty]=useState(false);
@@ -54,11 +50,8 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
   const navigationLinks: [string,string][] = session?.examSessionId?[["Examinations","/examinations"]]:orderedLinks;
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [streakOpen, setStreakOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const accountButton = useRef<HTMLButtonElement>(null);
-  const streakRef = useRef<HTMLDivElement>(null);
-  const streakButton = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
 
@@ -73,10 +66,7 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
     }
   }, [location.pathname, location.search, location.hash, navigationLinks, currentUserId, fullPath]);
 
-  // Fetch student dashboard stats for streak
-  const { data: dashboardStats } = useLoad<any>(() => typeof studentApi.getDashboard === "function" && role === "student" && !workspace && !session?.examSessionId ? studentApi.getDashboard() : Promise.resolve(null), [role, workspace]);
-
-  useEffect(() => { setMenuOpen(false); setAccountOpen(false); setStreakOpen(false); }, [location.pathname]);
+  useEffect(() => { setMenuOpen(false); setAccountOpen(false); }, [location.pathname]);
   useEffect(() => {
     if (!accountOpen) return;
     accountRef.current?.querySelector<HTMLButtonElement>("#role-account-menu button")?.focus();
@@ -90,21 +80,6 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
     document.addEventListener("pointerdown", onPointer);
     return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onPointer); };
   }, [accountOpen]);
-  useEffect(() => {
-    if (!streakOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setStreakOpen(false);
-        streakButton.current?.focus();
-      }
-    };
-    const onPointer = (event: PointerEvent) => {
-      if (!streakRef.current?.contains(event.target as Node)) setStreakOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onPointer); };
-  }, [streakOpen]);
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -174,25 +149,9 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
       </nav>
     </>}
     <TranslatedText>{workspace && tr(workspaceActions)}</TranslatedText>
-    {role === "student" && !session?.examSessionId && <div className="student-header-status" role="group" aria-label={t("Student activity")}>
-      <div className="streak-anchor" ref={streakRef}>
-        <button ref={streakButton} type="button" className="streak-trigger" aria-label={t("{count} day learning streak", { count: dashboardStats?.currentStreak || 0 })} aria-expanded={streakOpen} aria-controls="student-streak-popover" onClick={() => { setStreakOpen(value => !value); setAccountOpen(false); }}>
-          <img src={dark ? "/assets/flame-dark.svg" : "/assets/flame.svg"} width="22" height="22" alt="" />
-          <span>{dashboardStats?.currentStreak || 0}</span>
-        </button>
-        {streakOpen && <div id="student-streak-popover" className="student-popover streak-popover" role="region" aria-label={t("streak details")}>
-          <div className="streak-heading">
-            <strong className="streak-title"><TranslatedText>{t("{count}-day streak", { count: dashboardStats?.currentStreak || 0 })}</TranslatedText></strong>
-            <button type="button" className="popover-close" onClick={() => { setStreakOpen(false); streakButton.current?.focus(); }}><TranslatedText>{t("Close")}</TranslatedText></button>
-          </div>
-          <p className="streak-today"><TranslatedText>{t(dashboardStats?.currentStreak ? "Keep it going: solve at least one SQL problem each day." : "Start your streak by solving a problem today!")}</TranslatedText></p>
-          <small><TranslatedText>{t("Personal best · {count} days", { count: dashboardStats?.longestStreak || 0 })}</TranslatedText></small>
-        </div>}
-      </div>
-    </div>}
     <div className="role-account" ref={accountRef}>
       {session?.id && !workspace && <ToastHistoryBell userId={session.id} />}
-      <button ref={accountButton} type="button" className="account-trigger" aria-label={t("Account and appearance")} aria-expanded={accountOpen} aria-controls="role-account-menu" onClick={() => { setAccountOpen(value => !value); setStreakOpen(false); }}>
+      <button ref={accountButton} type="button" className="account-trigger" aria-label={t("Account and appearance")} aria-expanded={accountOpen} aria-controls="role-account-menu" onClick={() => { setAccountOpen(value => !value); }}>
         <span className="avatar">{session?.initials || "?"}</span>{!workspace && <span className="account-identity"><b><TranslatedText>{session?.name || t("Account")}</TranslatedText></b><small><TranslatedText>{t(accountRole)}</TranslatedText></small></span>}
       </button>
       {accountOpen && <div id="role-account-menu" className="role-account-menu u219-account-menu" role="region" aria-label={t("Account settings")}>

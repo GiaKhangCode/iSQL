@@ -77,7 +77,6 @@ export function DashboardPage() {
               <b>{data.solved}</b>
               <span><TranslatedText>{t("problems solved")}</TranslatedText></span>
             </div>
-            <small><TranslatedText>{t("Current streak: {count} days", { count: data.currentStreak })}</TranslatedText></small>
           </div>
           <Activity submissions={data.submissionsPerDay} />
         </div>

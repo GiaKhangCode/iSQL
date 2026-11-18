@@ -51,23 +51,3 @@ export function toggleFavorite(id: string) {
   storage.set("sql-practice:favorites", JSON.stringify(next));
   return next.includes(id);
 }
-export function calculateStreak(days: string[], today: string) {
-  const ordered = [...new Set(days)].filter((day) => day <= today).sort();
-  const dayNumber = (day: string) => Date.parse(day + "T00:00:00Z") / 86400000;
-  let best = 0,
-    run = 0,
-    previous = -Infinity;
-  for (const day of ordered) {
-    const current = dayNumber(day);
-    run = current - previous === 1 ? run + 1 : 1;
-    best = Math.max(best, run);
-    previous = current;
-  }
-  const complete = ordered.includes(today);
-  const latest = ordered[ordered.length - 1];
-  return {
-    current: latest && dayNumber(today) - dayNumber(latest) <= 1 ? run : 0,
-    best,
-    complete,
-  };
-}

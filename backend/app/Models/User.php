@@ -50,9 +50,6 @@ class User extends Authenticatable
         'role',
         'status',
         'department',
-        'current_streak',
-        'longest_streak',
-        'last_streak_date',
         'last_active',
     ];
 
