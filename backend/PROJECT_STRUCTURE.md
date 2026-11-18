@@ -62,8 +62,7 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
     * [Teacher/ProblemController.php](./app/Http/Controllers/Teacher/ProblemController.php): Giảng viên CRUD ngân hàng câu hỏi, test truy vấn.
     * [Teacher/AssignmentController.php](./app/Http/Controllers/Teacher/AssignmentController.php): Giảng viên tạo bài tập & kỳ thi contest.
     * [Teacher/ClassController.php](./app/Http/Controllers/Teacher/ClassController.php): Giảng viên quản lý lớp học mình phụ trách.
-    * [Teacher/ReviewController.php](./app/Http/Controllers/Teacher/ReviewController.php): Chấm điểm thủ công và nhận xét bài nộp.
-    * [Student/DashboardController.php](./app/Http/Controllers/Student/DashboardController.php): Dashboard sinh viên, streak ngày làm bài, lịch sử gần đây.
+    * [Student/DashboardController.php](./app/Http/Controllers/Student/DashboardController.php): Dashboard sinh viên: số bài đã giải, bài đang làm, biểu đồ hoạt động theo ngày, lịch sử gần đây.
     * [Student/AssignmentController.php](./app/Http/Controllers/Student/AssignmentController.php): Danh sách bài tập được giao cho sinh viên.
     * [Student/PracticeController.php](./app/Http/Controllers/Student/PracticeController.php): Danh sách bài tập luyện tập công khai.
     * [Student/PreferenceController.php](./app/Http/Controllers/Student/PreferenceController.php): Quản lý bài tập yêu thích và danh sách tự tạo.
@@ -86,7 +85,7 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 * **Vai trò:** Đại diện cho các bảng dữ liệu trong MySQL thông qua Eloquent ORM.
 * **Tại sao cần có:** Giúp thao tác với database dưới dạng hướng đối tượng (OOP) thay vì phải viết các câu lệnh SQL dài dòng thủ công.
 * **Các file tiêu biểu:**
-  * [User.php](./app/Models/User.php): Tài khoản người dùng (Admin, Instructor, Student), lưu streak, hash password.
+  * [User.php](./app/Models/User.php): Tài khoản người dùng (Admin, Instructor, Student), hash password.
   * [Problem.php](./app/Models/Problem.php): Ngân hàng câu hỏi SQL.
   * [Topic.php](./app/Models/Topic.php): Chủ đề SQL (SELECT, JOIN, Subqueries...).
   * [TestCase.php](./app/Models/TestCase.php) & [TestCaseScript.php](./app/Models/TestCaseScript.php): Kịch bản test case và script tạo bảng mẫu.
