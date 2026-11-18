@@ -193,6 +193,51 @@ class ExamAdmissionService
         abort(400, 'Unsupported credential action.');
     }
 
+    /**
+     * Mật khẩu có khớp với tài khoản ca thi không: mật khẩu đã băm, hoặc mật khẩu ban đầu
+     * (initial_password) còn lưu để giám thị cấp lại cho sinh viên.
+     */
+    public function admissionPasswordMatches(ExamAdmission $row, string $password): bool
+    {
+        return Hash::check($password, $row->hashed_password)
+            || ($row->initial_password !== null && hash_equals((string) $row->initial_password, $password));
+    }
+
+    /**
+     * Tìm tài khoản ca thi cho trường hợp sinh viên đăng nhập bằng email hoặc MSSV kèm
+     * mật khẩu TẠM của ca thi. Chỉ xét các tài khoản chưa bị thu hồi, mới nhất trước, và
+     * trả về tài khoản đầu tiên có mật khẩu khớp.
+     */
+    public function findAdmissionByStudentCredentials(string $account, string $password): ?ExamAdmission
+    {
+        $student = User::where('email', $account)
+            ->orWhereHas('studentIdentity', fn ($q) => $q->where('student_code', $account))
+            ->first();
+
+        if (!$student) {
+            return null;
+        }
+
+        $candidates = ExamAdmission::where('student_id', $student->id)
+            ->where('status', '!=', 'revoked')
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            if ($this->admissionPasswordMatches($candidate, $password)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Mở khóa ca thi cho sinh viên đã đăng nhập.
+     *
+     * @return array{0: ?ExamAdmission, 1: array<string, mixed>, 2: Assignment}
+     *         [tài khoản ca thi (null nếu ca không yêu cầu), nội dung trả về, hoạt động]
+     */
     public function unlockAdmission(string $activityId, string $username, string $password, User $student): array
     {
         $activity = Assignment::findOrFail($activityId);
@@ -203,6 +248,7 @@ class ExamAdmissionService
                     'admissionUnlocked' => true,
                     'serverTime'        => now()->toISOString(),
                 ],
+                $activity,
             ];
         }
 
@@ -222,10 +268,8 @@ class ExamAdmissionService
         }
 
         $inputUsername = strtolower(trim($username));
-        $passwordOk = Hash::check($password, $row->hashed_password)
-            || ($row->initial_password !== null && hash_equals((string) $row->initial_password, $password));
 
-        if (strtolower($row->username) !== $inputUsername || !$passwordOk) {
+        if (strtolower($row->username) !== $inputUsername || !$this->admissionPasswordMatches($row, $password)) {
             abort(403, 'Sai tài khoản hoặc mật khẩu ca thi.');
         }
 
@@ -248,6 +292,7 @@ class ExamAdmissionService
                 'admissionUnlocked' => true,
                 'serverTime'        => now()->toISOString(),
             ],
+            $activity,
         ];
     }
 

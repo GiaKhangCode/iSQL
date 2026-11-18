@@ -129,12 +129,3 @@ export function AuthLayout({
     </main>
   );
 }
-
-export function RecoveryUnavailable() {
-  const { t: tr } = useLanguage("auth");
-  return (
-    <p className="form-message" role="status">
-      <TranslatedText>{tr("Password recovery is not connected yet. Ask an administrator to reset your account password.")}</TranslatedText>
-    </p>
-  );
-}

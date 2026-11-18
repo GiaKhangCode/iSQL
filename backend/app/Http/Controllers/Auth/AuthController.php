@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterLecturerRequest;
+use App\Services\ExamAdmissionService;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,9 +20,12 @@ class AuthController extends Controller
 {
     protected UserService $userService;
 
-    public function __construct(UserService $userService)
+    protected ExamAdmissionService $examAdmissionService;
+
+    public function __construct(UserService $userService, ExamAdmissionService $examAdmissionService)
     {
         $this->userService = $userService;
+        $this->examAdmissionService = $examAdmissionService;
     }
 
     public function register(RegisterRequest $request): JsonResponse
@@ -91,29 +95,15 @@ class AuthController extends Controller
         }
 
         // Case B: Student entered their school email / MSSV + exam temporary password
-        $studentUser = \App\Models\User::where('email', $accountInput)
-            ->orWhereHas('studentIdentity', fn($q) => $q->where('student_code', $accountInput))
-            ->first();
-
-        if ($studentUser) {
-            $candidateAdmissions = \App\Models\ExamAdmission::where('student_id', $studentUser->id)
-                ->where('status', '!=', 'revoked')
-                ->orderByDesc('id')
-                ->get();
-
-            foreach ($candidateAdmissions as $candAdm) {
-                $passwordOk = \Illuminate\Support\Facades\Hash::check($password, $candAdm->hashed_password)
-                    || ($candAdm->initial_password !== null && hash_equals((string) $candAdm->initial_password, $password));
-                if ($passwordOk) {
-                    try {
-                        return $proctorController->loginWithAdmission($request, $candAdm, $password);
-                    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-                        return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
-                    } catch (\Throwable $e) {
-                        \Log::error('Exam Admission Login Exception: ' . $e->getMessage(), ['exception' => $e]);
-                        return response()->json(['detail' => $e->getMessage() ?: 'Đăng nhập ca thi thất bại.'], 400);
-                    }
-                }
+        $candidateAdmission = $this->examAdmissionService->findAdmissionByStudentCredentials($accountInput, $password);
+        if ($candidateAdmission) {
+            try {
+                return $proctorController->loginWithAdmission($request, $candidateAdmission, $password);
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
+            } catch (\Throwable $e) {
+                \Log::error('Exam Admission Login Exception: ' . $e->getMessage(), ['exception' => $e]);
+                return response()->json(['detail' => $e->getMessage() ?: 'Đăng nhập ca thi thất bại.'], 400);
             }
         }
 

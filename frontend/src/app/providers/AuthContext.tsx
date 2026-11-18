@@ -11,7 +11,6 @@ type Auth = {
   login: (email: string, password: string) => Promise<StudentSession>;
   examLogin: (username:string,password:string) => Promise<StudentSession>;
   register: (name: string, email: string, password: string) => Promise<void>;
-  demoLogin: () => Promise<void>;
   logout: () => void;
 };
 const AuthContext = createContext<Auth | null>(null);
@@ -51,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     register: async (n, e, p) =>
       setSession(await authService.register(n, e, p)),
-    demoLogin: async () => setSession(await authService.demoLogin()),
     logout: () => {
       authService.logout();
       setSession(null);

@@ -67,11 +67,8 @@ class UserController extends Controller
             throw ValidationException::withMessages(['status' => ['Only pending accounts can be approved.']]);
         }
 
+        // updateStatus(..., 'Active') đã tự gán nhóm quyền Giảng viên cho tài khoản giảng viên.
         $user = $this->userService->updateStatus($id, 'Active');
-        $lecturerGroup = \App\Models\RoleGroup::where('name', 'like', '%Giảng viên%')->first();
-        if ($lecturerGroup) {
-            $user->roleGroups()->syncWithoutDetaching([$lecturerGroup->id]);
-        }
 
         return response()->json($user);
     }
