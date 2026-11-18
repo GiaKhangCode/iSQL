@@ -774,7 +774,7 @@ body:has(.assignments-page) {
 .hall-of-fame,
 .practice-sidebar,
 .detail-side-panel,
-.contest-participation {
+.exam-session-participation {
   min-width: 0;
   width: 100%;
   background: var(--surface);
@@ -787,13 +787,13 @@ body:has(.assignments-page) {
   border-top: 1px solid var(--border);
   padding-top: 12px;
 }
-.contests-page {
+.exam-sessions-page {
   background: var(--surface);
 }
-.featured-contest-section {
+.featured-exam-session-section {
   margin-bottom: 24px;
 }
-.featured-contest-heading-row {
+.featured-exam-session-heading-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -833,7 +833,7 @@ body:has(.assignments-page) {
   gap: var(--featured-carousel-gap);
   will-change: transform;
 }
-.featured-contest {
+.featured-exam-session {
   flex: 0 0 calc((100% - var(--featured-carousel-gap)) / 2);
   aspect-ratio: 3 / 1;
   height: auto;
@@ -853,58 +853,58 @@ body:has(.assignments-page) {
   background-position: center;
   background-size: cover;
 }
-.featured-carousel[data-visible="1"] .featured-contest {
+.featured-carousel[data-visible="1"] .featured-exam-session {
   flex-basis: 100%;
 }
-.featured-contest:focus-visible {
+.featured-exam-session:focus-visible {
   outline: 2px solid var(--feature-mark);
   outline-offset: 3px;
 }
-.featured-contest.contest-banner-visual-0,
-.contest-detail-banner.contest-banner-visual-0 {
+.featured-exam-session.exam-session-banner-visual-0,
+.exam-session-detail-banner.exam-session-banner-visual-0 {
   background: linear-gradient(
     100deg,
     var(--feature-0-start),
     var(--feature-0-end)
   );
 }
-.featured-contest.contest-banner-visual-1,
-.contest-detail-banner.contest-banner-visual-1 {
+.featured-exam-session.exam-session-banner-visual-1,
+.exam-session-detail-banner.exam-session-banner-visual-1 {
   background: linear-gradient(
     100deg,
     var(--feature-1-start),
     var(--feature-1-end)
   );
 }
-.featured-contest.contest-banner-visual-2,
-.contest-detail-banner.contest-banner-visual-2 {
+.featured-exam-session.exam-session-banner-visual-2,
+.exam-session-detail-banner.exam-session-banner-visual-2 {
   background: linear-gradient(
     100deg,
     var(--feature-2-start),
     var(--feature-2-end)
   );
 }
-.featured-contest.has-image {
-  /* Contest visual variants use a background shorthand; restore sizing for both layers. */
+.featured-exam-session.has-image {
+  /* Exam session visual variants use a background shorthand; restore sizing for both layers. */
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover, cover;
 }
-.featured-contest > span {
+.featured-exam-session > span {
   color: var(--feature-mark);
   font-weight: 700;
 }
-.featured-contest :is(h2, h3) {
+.featured-exam-session :is(h2, h3) {
   margin: 0;
   font-size: 18px;
   line-height: 24px;
 }
-.featured-contest p {
+.featured-exam-session p {
   margin: 0;
   font-size: 12px;
   line-height: 18px;
 }
-.featured-contest small {
+.featured-exam-session small {
   margin-top: auto;
   font-size: 10px;
   line-height: 16px;
@@ -914,13 +914,13 @@ body:has(.assignments-page) {
     transition: none !important;
   }
 }
-.contest-toolbar {
+.exam-session-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--student-sidebar-width);
   align-items: start;
   gap: 24px;
 }
-.contest-toolbar .underline-tabs {
+.exam-session-toolbar .underline-tabs {
   position: sticky;
   top: var(--header-height);
   z-index: 10;
@@ -930,33 +930,33 @@ body:has(.assignments-page) {
   border-bottom: 1px solid var(--border);
   gap: 12px;
 }
-.contest-toolbar input {
+.exam-session-toolbar input {
   width: 100%;
   font-size: 12px;
 }
-.contest-columns {
+.exam-session-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--student-sidebar-width);
   gap: 24px;
   align-items: start;
   padding-top: 24px;
 }
-.contest-feed-panel {
+.exam-session-feed-panel {
   min-width: 0;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
 }
-.contest-feed-panel > .section-heading {
+.exam-session-feed-panel > .section-heading {
   margin-bottom: 0;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
-.contest-columns h2 {
+.exam-session-columns h2 {
   font-size: 16px;
 }
-.contest-item {
+.exam-session-item {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -964,25 +964,25 @@ body:has(.assignments-page) {
   border-bottom: 1px solid var(--border);
   padding: 24px 0;
 }
-.contest-item > div {
+.exam-session-item > div {
   min-width: 0;
 }
-.contest-title {
+.exam-session-title {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 6px;
 }
-.contest-title h3 {
+.exam-session-title h3 {
   font-size: 16px;
 }
-.contest-item small,
-.contest-item p {
+.exam-session-item small,
+.exam-session-item p {
   color: var(--muted);
   font-size: 12px;
 }
-.contest-item .text-button {
+.exam-session-item .text-button {
   white-space: nowrap;
   margin-top: 4px;
 }
@@ -1049,7 +1049,7 @@ body:has(.assignments-page) {
   line-height: 16px;
   margin-top: 3px;
 }
-.fame-row .fame-contest {
+.fame-row .fame-exam-session {
   overflow-wrap: break-word;
 }
 .fame-row .fame-date {
@@ -1064,7 +1064,7 @@ body:has(.assignments-page) {
   color: var(--muted);
 }
 @media (max-width: 960px) {
-  .contest-columns {
+  .exam-session-columns {
     grid-template-columns: minmax(0, 1fr);
   }
   .hall-of-fame {
@@ -1505,9 +1505,9 @@ body:has(.assignments-page) {
 }
 @media (min-width: 761px) {
   body:has(.dashboard-page),
-  body:has(.contests-page),
+  body:has(.exam-sessions-page),
   body:has(.submissions-page),
-  body:has(.contest-detail-page) {
+  body:has(.exam-session-detail-page) {
     background: var(--surface);
   }
 }
@@ -1529,7 +1529,7 @@ body:has(.assignments-page) {
     gap: 10px;
     padding: 16px;
   }
-  .featured-contest :is(h2, h3) {
+  .featured-exam-session :is(h2, h3) {
     font-size: 18px;
   }
   .workspace-identity b {
@@ -1594,7 +1594,7 @@ body:has(.assignments-page) {
   }
   .dashboard-layout,
   .assignments-layout,
-  .contest-columns {
+  .exam-session-columns {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
@@ -1656,32 +1656,32 @@ body:has(.assignments-page) {
   .featured-carousel {
     --featured-carousel-gap: 12px;
   }
-  .featured-contest {
+  .featured-exam-session {
     aspect-ratio: 2.2 / 1;
     height: auto;
     min-height: 0;
     padding: 14px;
     gap: 6px;
   }
-  .featured-contest.has-image {
+  .featured-exam-session.has-image {
     background-size: cover, contain;
   }
-  .featured-contest :is(h2, h3) {
+  .featured-exam-session :is(h2, h3) {
     font-size: 18px;
   }
-  .contest-toolbar {
+  .exam-session-toolbar {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
-  .contest-toolbar input {
+  .exam-session-toolbar input {
     max-width: none;
   }
-  .contest-toolbar .underline-tabs {
+  .exam-session-toolbar .underline-tabs {
     padding: 0;
     justify-content: space-between;
     gap: 0;
   }
-  .contest-item {
+  .exam-session-item {
     flex-direction: column;
     gap: 12px;
   }

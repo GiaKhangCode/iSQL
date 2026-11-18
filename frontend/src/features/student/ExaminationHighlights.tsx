@@ -3,26 +3,26 @@ import type { Translator } from "@/i18n/index";
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useLayoutEffect, useRef, useState, type TransitionEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type Contest } from "@/data/models";
-import { LayeredContestBanner } from "@/shared/components/LayeredContestBanner";
-import { ContestCountdown } from "@/shared/components/ContestCountdown";
+import { type ExamSession } from "@/data/models";
+import { LayeredExamSessionBanner } from "@/shared/components/LayeredExamSessionBanner";
+import { ExamSessionCountdown } from "@/shared/components/ExamSessionCountdown";
 import { useReducedMotion } from "@/shared/hooks/useReducedMotion";
 
 
 
 
-function contestTimestamp(contest: Contest) {
-  const timestamp = new Date(contest.opensAt).getTime();
+function examSessionTimestamp(examSession: ExamSession) {
+  const timestamp = new Date(examSession.opensAt).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-function featureMeta(contest: Contest, tr: Translator) {
-  const problemLabel = tr("{count} problems", { count: contest.problemCount });
-  const participants = contest.submitters
-    ? ` · ${tr("{count} participants", { count: contest.submitters })}`
+function featureMeta(examSession: ExamSession, tr: Translator) {
+  const problemLabel = tr("{count} problems", { count: examSession.problemCount });
+  const participants = examSession.submitters
+    ? ` · ${tr("{count} participants", { count: examSession.submitters })}`
     : "";
-  if (contest.status === "Live") return `${tr("Live now")} · ${problemLabel}${participants}`;
-  return `${contest.date} ${contest.time} · ${problemLabel}${participants}`;
+  if (examSession.status === "Live") return `${tr("Live now")} · ${problemLabel}${participants}`;
+  return `${examSession.date} ${examSession.time} · ${problemLabel}${participants}`;
 }
 
 export function ordinal(value: number) {
@@ -30,18 +30,18 @@ export function ordinal(value: number) {
   return `${value}${["th", "st", "nd", "rd"][value % 10] || "th"}`;
 }
 
-export function completionMonth(contest: Contest, locale: string) {
-  const date = new Date(contest.closesAt);
+export function completionMonth(examSession: ExamSession, locale: string) {
+  const date = new Date(examSession.closesAt);
   return Number.isFinite(date.getTime())
     ? date.toLocaleDateString(locale, { month: "short", year: "numeric" })
-    : contest.endDate || contest.date;
+    : examSession.endDate || examSession.date;
 }
 
-export function selectHallOfFame(contests: Contest[]) {
-  return contests
-    .filter((contest) => contest.status === "Closed" && contest.leaderboardEnabled)
-    .sort((left, right) => contestTimestamp(right) - contestTimestamp(left))
-    .flatMap((contest) => contest.leaderboard.map((entry) => ({ contest, ...entry })))
+export function selectHallOfFame(examSessionList: ExamSession[]) {
+  return examSessionList
+    .filter((examSession) => examSession.status === "Closed" && examSession.leaderboardEnabled)
+    .sort((left, right) => examSessionTimestamp(right) - examSessionTimestamp(left))
+    .flatMap((examSession) => examSession.leaderboard.map((entry) => ({ examSession, ...entry })))
     .slice(0, 3);
 }
 
@@ -57,33 +57,33 @@ function useFeaturedCardsInView() {
   return cardsInView;
 }
 
-function FeaturedContestCard({ contest, onOpen, sentinel = false }: {
-  contest: Contest;
-  onOpen: (contest: Contest) => void;
+function FeaturedExamSessionCard({ examSession, onOpen, sentinel = false }: {
+  examSession: ExamSession;
+  onOpen: (examSession: ExamSession) => void;
   sentinel?: boolean;
 }) {
   const { t: tr, locale: uiLocale } = useLanguage("student");
-  return <LayeredContestBanner
-    id={contest.id} bannerUrl={contest.bannerUrl} className="featured-contest"
-    onOpen={() => onOpen(contest)} sentinel={sentinel}
-    label={tr("Open {value0} contest details", { value0: contest.title })}
+  return <LayeredExamSessionBanner
+    id={examSession.id} bannerUrl={examSession.bannerUrl} className="featured-exam-session"
+    onOpen={() => onOpen(examSession)} sentinel={sentinel}
+    label={tr("Open {value0} exam session details", { value0: examSession.title })}
   >
-    <div className="u049-top"><span className="u049-tag"><TranslatedText>{tr(contest.status).toLocaleUpperCase(uiLocale)}</TranslatedText> · SQL</span></div>
+    <div className="u049-top"><span className="u049-tag"><TranslatedText>{tr(examSession.status).toLocaleUpperCase(uiLocale)}</TranslatedText> · SQL</span></div>
     <div className="u049-body">
-      <div className="u049-k">{contest.scope}</div>
-      <h3 className="u049-t">{contest.title}</h3>
+      <div className="u049-k">{examSession.scope}</div>
+      <h3 className="u049-t">{examSession.title}</h3>
       <div className="u049-reveal"><div className="u049-reveal-inner">
-        <p className="u049-sum"><TranslatedText>{contest.shortDescription || tr("SQL challenges for {value0}.", { value0: contest.scope.toLowerCase() })}</TranslatedText></p>
+        <p className="u049-sum"><TranslatedText>{examSession.shortDescription || tr("SQL challenges for {value0}.", { value0: examSession.scope.toLowerCase() })}</TranslatedText></p>
         <div className="u049-foot">
-          <small className="featured-contest-meta"><ContestCountdown contest={contest} /><span>{featureMeta(contest, tr)}</span></small>
+          <small className="featured-exam-session-meta"><ExamSessionCountdown examSession={examSession} /><span>{featureMeta(examSession, tr)}</span></small>
           <span className="u049-cta"><TranslatedText>{tr("View details →")}</TranslatedText></span>
         </div>
       </div></div>
     </div>
-  </LayeredContestBanner>;
+  </LayeredExamSessionBanner>;
 }
 
-export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; onOpen: (contest: Contest) => void }) {
+export function FeaturedExamSessions({ examSessionList, onOpen }: { examSessionList: ExamSession[]; onOpen: (examSession: ExamSession) => void }) {
   const { t: tr } = useLanguage("student");
   const viewport = useRef<HTMLDivElement>(null);
   const resumeTimer = useRef<number>();
@@ -91,20 +91,20 @@ export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; on
   const suppressCardOpen = useRef(false);
   const reducedMotion = useReducedMotion();
   const preferredCardsInView = useFeaturedCardsInView();
-  const cardsInView = Math.min(preferredCardsInView, contests.length);
-  const canNavigate = contests.length > cardsInView;
+  const cardsInView = Math.min(preferredCardsInView, examSessionList.length);
+  const canNavigate = examSessionList.length > cardsInView;
   const [displayIndex, setDisplayIndex] = useState(canNavigate ? 1 : 0);
   const [slideStep, setSlideStep] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [rotationVersion, setRotationVersion] = useState(0);
-  const contestKey = contests.map((contest) => contest.id).join("|");
-  const carouselContests = canNavigate ? [contests[contests.length - 1], ...contests, contests[0]] : contests;
+  const examSessionKey = examSessionList.map((examSession) => examSession.id).join("|");
+  const carouselExamSessions = canNavigate ? [examSessionList[examSessionList.length - 1], ...examSessionList, examSessionList[0]] : examSessionList;
 
   useLayoutEffect(() => {
     setDisplayIndex(canNavigate ? 1 : 0);
     setIsSliding(false);
-  }, [canNavigate, contestKey]);
+  }, [canNavigate, examSessionKey]);
 
   useLayoutEffect(() => {
     const element = viewport.current;
@@ -145,8 +145,8 @@ export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; on
     if (reducedMotion) {
       setDisplayIndex((current) => {
         const next = current + direction;
-        if (next === 0) return contests.length;
-        if (next === contests.length + 1) return 1;
+        if (next === 0) return examSessionList.length;
+        if (next === examSessionList.length + 1) return 1;
         return next;
       });
       return;
@@ -157,11 +157,11 @@ export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; on
   }
 
   useEffect(() => {
-    const shouldRotate = contests.length >= 3 && canNavigate && !reducedMotion && !isPaused && !isSliding;
+    const shouldRotate = examSessionList.length >= 3 && canNavigate && !reducedMotion && !isPaused && !isSliding;
     if (!shouldRotate) return;
     const timer = window.setTimeout(() => move(1), 4000);
     return () => window.clearTimeout(timer);
-  }, [canNavigate, contests.length, displayIndex, isPaused, isSliding, reducedMotion, rotationVersion]);
+  }, [canNavigate, examSessionList.length, displayIndex, isPaused, isSliding, reducedMotion, rotationVersion]);
 
   useEffect(() => () => clearResumeTimer(), []);
 
@@ -169,8 +169,8 @@ export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; on
     if (event.target !== event.currentTarget || event.propertyName !== "transform") return;
     setIsSliding(false);
     setDisplayIndex((current) => {
-      if (current === 0) return contests.length;
-      if (current === contests.length + 1) return 1;
+      if (current === 0) return examSessionList.length;
+      if (current === examSessionList.length + 1) return 1;
       return current;
     });
   }
@@ -187,13 +187,13 @@ export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; on
     resumeRotation();
   }
 
-  if (!contests.length) return null;
-  return <section className="featured-contest-section" aria-labelledby="featured-contests-heading">
-    <div className="featured-contest-heading-row">
-      <h2 id="featured-contests-heading" className="featured-heading"><TranslatedText>{tr("Featured contests")}</TranslatedText></h2>
-      {canNavigate && <div className="featured-carousel-controls" aria-label={tr("Featured contest navigation")}>
-        <button className="featured-carousel-control" type="button" onClick={() => move(-1, true)} aria-label={tr("Previous featured contests")}><ChevronLeft size={16} aria-hidden="true" /></button>
-        <button className="featured-carousel-control" type="button" onClick={() => move(1, true)} aria-label={tr("Next featured contests")}><ChevronRight size={16} aria-hidden="true" /></button>
+  if (!examSessionList.length) return null;
+  return <section className="featured-exam-session-section" aria-labelledby="featured-exam-sessions-heading">
+    <div className="featured-exam-session-heading-row">
+      <h2 id="featured-exam-sessions-heading" className="featured-heading"><TranslatedText>{tr("Featured exam sessions")}</TranslatedText></h2>
+      {canNavigate && <div className="featured-carousel-controls" aria-label={tr("Featured exam session navigation")}>
+        <button className="featured-carousel-control" type="button" onClick={() => move(-1, true)} aria-label={tr("Previous featured exam sessions")}><ChevronLeft size={16} aria-hidden="true" /></button>
+        <button className="featured-carousel-control" type="button" onClick={() => move(1, true)} aria-label={tr("Next featured exam sessions")}><ChevronRight size={16} aria-hidden="true" /></button>
       </div>}
     </div>
     <div
@@ -220,17 +220,17 @@ export function FeaturedContests({ contests, onOpen }: { contests: Contest[]; on
         style={{ transform: `translate3d(-${displayIndex * slideStep}px, 0, 0)`, transition: isSliding && !reducedMotion ? "transform 420ms cubic-bezier(.2, .7, .2, 1)" : "none" }}
         onTransitionEnd={finishSlide}
       >
-        {carouselContests.map((contest, index) => <FeaturedContestCard
-          contest={contest}
-          key={`${contest.id}-${index}`}
-          onOpen={(selectedContest) => {
+        {carouselExamSessions.map((examSession, index) => <FeaturedExamSessionCard
+          examSession={examSession}
+          key={`${examSession.id}-${index}`}
+          onOpen={(selectedExamSession) => {
             if (suppressCardOpen.current) {
               suppressCardOpen.current = false;
               return;
             }
-            onOpen(selectedContest);
+            onOpen(selectedExamSession);
           }}
-          sentinel={canNavigate && (index === 0 || index === carouselContests.length - 1)}
+          sentinel={canNavigate && (index === 0 || index === carouselExamSessions.length - 1)}
         />)}
       </div>
     </div>

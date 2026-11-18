@@ -1,9 +1,9 @@
 // Lucian UX/UI Prompt #049 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#049
 import { useId, useRef, useState, type ReactNode, type PointerEvent } from "react";
-import { contestBannerClass, resolveContestBannerUrl } from "@/shared/lib/contest/contestBanner";
-import "@/shared/components/LayeredContestBanner.css";
+import { examSessionBannerClass, resolveExamSessionBannerUrl } from "@/shared/lib/exam-session/examSessionBanner";
+import "@/shared/components/LayeredExamSessionBanner.css";
 
-export function LayeredContestBanner({ id, bannerUrl, className, label, onOpen, sentinel = false, children }: {
+export function LayeredExamSessionBanner({ id, bannerUrl, className, label, onOpen, sentinel = false, children }: {
   id: string;
   bannerUrl?: string | null;
   className: string;
@@ -12,10 +12,10 @@ export function LayeredContestBanner({ id, bannerUrl, className, label, onOpen, 
   sentinel?: boolean;
   children: ReactNode;
 }) {
-  const gradientId = `contest-sky-${useId().replace(/:/g, "")}`;
+  const gradientId = `exam-session-sky-${useId().replace(/:/g, "")}`;
   const [open, setOpen] = useState(false);
   const quietFocus = useRef(false);
-  const imageUrl = resolveContestBannerUrl(bannerUrl);
+  const imageUrl = resolveExamSessionBannerUrl(bannerUrl);
   const Tag = onOpen ? "button" : "header";
 
   function move(event: PointerEvent<HTMLElement>) {
@@ -25,7 +25,7 @@ export function LayeredContestBanner({ id, bannerUrl, className, label, onOpen, 
     event.currentTarget.style.setProperty("--py", ((event.clientY - rect.top) / rect.height * 2 - 1).toFixed(3));
   }
 
-  return <Tag className={`u049 ${className} ${contestBannerClass(id)}${open ? " is-open" : ""}${imageUrl ? " has-image" : ""}`}
+  return <Tag className={`u049 ${className} ${examSessionBannerClass(id)}${open ? " is-open" : ""}${imageUrl ? " has-image" : ""}`}
     type={onOpen ? "button" : undefined} tabIndex={sentinel ? -1 : 0} aria-hidden={sentinel || undefined} aria-label={label}
     onPointerEnter={(event) => { if (event.pointerType === "mouse") setOpen(true); }} onPointerMove={move}
     onPointerLeave={(event) => {

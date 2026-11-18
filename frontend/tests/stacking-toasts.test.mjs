@@ -58,7 +58,7 @@ try {
   let second, third;
   await act(async () => {
     second = toast.show({ title: 'Assignment saved', variant: 'success' });
-    third = toast.show({ title: 'Contest saved', variant: 'success' });
+    third = toast.show({ title: 'Exam session saved', variant: 'success' });
   });
   assert.equal(card(second).inert, true, 'Collapsed back cards do not receive focus');
   assert.equal(card(third).inert, false);

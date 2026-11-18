@@ -8,14 +8,14 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { studentApi } from "@/features/student/studentApi";
-import { type Contest } from "@/data/models";
+import { type ExamSession } from "@/data/models";
 import { useLoad } from "@/shared/hooks/useLoad";
 import { Empty, ErrorState, Loading, Status } from "@/shared/ui/ui";
-import { ContestSwipeTabs } from "@/shared/components/ContestSwipeTabs";
-import { ContestCountdown } from "@/shared/components/ContestCountdown";
-import { selectFeaturedContests } from "@/shared/lib/contest/featuredContests";
+import { ExamSessionSwipeTabs } from "@/shared/components/ExamSessionSwipeTabs";
+import { ExamSessionCountdown } from "@/shared/components/ExamSessionCountdown";
+import { selectFeaturedExamSessions } from "@/shared/lib/exam-session/featuredExamSessions";
 import {
-  FeaturedContests,
+  FeaturedExamSessions,
   selectHallOfFame,
   completionMonth,
   ordinal,
@@ -31,7 +31,7 @@ export function StudentExaminationsPage() {
   }
   const { t: tr, locale: uiLocale } = useLanguage("student");
   const navigate = useNavigate();
-  const { data = [], loading, error, mutate } = useLoad<Contest[]>(studentApi.getExaminations);
+  const { data = [], loading, error, mutate } = useLoad<ExamSession[]>(studentApi.getExaminations);
 
   const [tab, setTab] = useState("All");
   const [page, setPage] = useState(1);
@@ -44,7 +44,7 @@ export function StudentExaminationsPage() {
 
   if (loading) {
     return (
-      <section className="page contests-page u048-page">
+      <section className="page exam-sessions-page u048-page">
         <Loading variant="cards" columns={3} rows={6} label={tr("Loading examinations…")} />
       </section>
     );
@@ -52,7 +52,7 @@ export function StudentExaminationsPage() {
 
   if (error) {
     return (
-      <section className="page contests-page u048-page">
+      <section className="page exam-sessions-page u048-page">
         <ErrorState
           title={tr("Examinations unavailable")}
           message={tr(error) || tr("Could not load examinations.")}
@@ -69,10 +69,10 @@ export function StudentExaminationsPage() {
     Past: data.filter((exam) => exam.status === "Closed").length,
   };
 
-  const featured = selectFeaturedContests(data);
+  const featured = selectFeaturedExamSessions(data);
   const hallOfFame = selectHallOfFame(data);
 
-  function openExam(exam: Contest) {
+  function openExam(exam: ExamSession) {
     navigate(`/examinations/${exam.id}`);
   }
 
@@ -82,12 +82,12 @@ export function StudentExaminationsPage() {
   }
 
   return (
-    <section className="page contests-page u048-page">
+    <section className="page exam-sessions-page u048-page">
       <h1 className="sr-only"><TranslatedText>{tr("Examinations")}</TranslatedText></h1>
 
-      <FeaturedContests contests={featured} onOpen={openExam} />
+      <FeaturedExamSessions examSessionList={featured} onOpen={openExam} />
 
-      <ContestSwipeTabs
+      <ExamSessionSwipeTabs
         tabs={["All", "Upcoming", "Live", "Past"].map((id) => ({
           id,
           label: <TranslatedText>{tr(id)}</TranslatedText>,
@@ -131,7 +131,7 @@ export function StudentExaminationsPage() {
             {hallOfFame.length > 0 ? (
               <ol className="fame-list">
                 {hallOfFame.map((entry, index) => (
-                  <li className="fame-row" key={`${entry.contest.id}-${entry.rank}-${entry.student}`}>
+                  <li className="fame-row" key={`${entry.examSession.id}-${entry.rank}-${entry.student}`}>
                     <b>{String(index + 1).padStart(2, "0")}</b>
                     <div>
                       <strong>{entry.student}</strong>
@@ -140,15 +140,15 @@ export function StudentExaminationsPage() {
                           {uiLocale === "vi-VN" ? tr("Rank {rank}", { rank: entry.rank }) : `${ordinal(entry.rank)} place`}
                         </TranslatedText>
                       </small>
-                      <small className="fame-contest">{entry.contest.title}</small>
-                      <time className="fame-date">{completionMonth(entry.contest, uiLocale)}</time>
+                      <small className="fame-exam-session">{entry.examSession.title}</small>
+                      <time className="fame-date">{completionMonth(entry.examSession, uiLocale)}</time>
                     </div>
                   </li>
                 ))}
               </ol>
             ) : (
               <p className="fame-empty">
-                <TranslatedText>{tr("Published results will appear here after a leaderboard contest closes.")}</TranslatedText>
+                <TranslatedText>{tr("Published results will appear here after a leaderboard exam session closes.")}</TranslatedText>
               </p>
             )}
           </aside>
@@ -170,7 +170,7 @@ export function StudentExaminationsPage() {
           const pageExams = filtered.slice(firstIndex, firstIndex + EXAM_PAGE_SIZE);
 
           return (
-            <div id={active ? "contest-feed" : undefined} className="contest-feed-panel">
+            <div id={active ? "exam-session-feed" : undefined} className="exam-session-feed-panel">
               <div className="section-heading">
                 <h2>
                   <TranslatedText>
@@ -179,13 +179,13 @@ export function StudentExaminationsPage() {
                       : tr("{value0} examinations", { value0: panelTab })}
                   </TranslatedText>
                 </h2>
-                <div className="contest-list-controls">
+                <div className="exam-session-list-controls">
                   <span className="tiny muted" aria-live="polite">
                     <TranslatedText>{tr("Showing")}</TranslatedText>{" "}
                     {filtered.length ? firstIndex + 1 : 0}–{Math.min(firstIndex + EXAM_PAGE_SIZE, filtered.length)}{" "}
                     <TranslatedText>{tr("of")}</TranslatedText> {filtered.length}
                   </span>
-                  <nav className="contest-list-pagination" aria-label={tr("Examination pages")}>
+                  <nav className="exam-session-list-pagination" aria-label={tr("Examination pages")}>
                     <button
                       type="button"
                       className="button"
@@ -211,19 +211,19 @@ export function StudentExaminationsPage() {
               </div>
 
               <div
-                className="contest-feed-scroll"
+                className="exam-session-feed-scroll"
                 ref={active ? feedRef : undefined}
                 tabIndex={0}
                 aria-label={tr("Examination list")}
               >
                 {pageExams.map((exam) => (
                   <article
-                    className="contest-item exam-item"
+                    className="exam-session-item exam-item"
                     key={exam.id}
                     id={active ? `student-exam-${exam.id}` : undefined}
                   >
                     <div>
-                      <div className="contest-title">
+                      <div className="exam-session-title">
                         <h3>{exam.title}</h3>
                         <Status
                           value={exam.finishReason === "violations" ? "Bị cấm thi" : exam.attemptStatus === "submitted" ? "Đã nộp bài" : exam.status}
@@ -246,7 +246,7 @@ export function StudentExaminationsPage() {
                             <DoorOpen size={13} /> Phòng {exam.room}
                           </span>
                         )}
-                        <ContestCountdown contest={exam} />
+                        <ExamSessionCountdown examSession={exam} />
                       </div>
                       <small>{exam.scope}</small>
                       <p>{exam.shortDescription || exam.description || tr("Official examination session")}</p>
@@ -269,7 +269,7 @@ export function StudentExaminationsPage() {
             </div>
           );
         }}
-      </ContestSwipeTabs>
+      </ExamSessionSwipeTabs>
     </section>
   );
 }

@@ -27,8 +27,8 @@ import type { Problem, Submission, WorkspacePart } from "@/data/models";
 import { workspaceReference } from "@/shared/lib/workspace/workspaceReference";
 import { GlidingTooltipGroup } from "@/shared/ui/GlidingTooltip";
 import { AlertCircle, Play, LayoutGrid } from "lucide-react";
-import { type ContestWorkspaceController } from "@/features/workspace/useContestWorkspace";
-import type { Contest } from "@/data/models";
+import { type ExamSessionWorkspaceController } from "@/features/workspace/useExamSessionWorkspace";
+import type { ExamSession } from "@/data/models";
 import { useProblemWorkspaceLayout } from "@/features/workspace/components/ProblemWorkspaceLayoutContext";
 import { WorkspaceResizeHandle } from "@/features/workspace/components/WorkspaceResizeHandle";
 import { WorkspaceDatabasePanel, type DatabaseView, type WorkspaceDatabaseState } from "@/shared/components/WorkspaceDatabasePanel";
@@ -95,26 +95,26 @@ export function SqlWorkspace({ problem, selectedSolutionId, onSolutionChange, on
   const source: Submission["source"] =
     params.get("source") === "Assignments"
       ? "Assignments"
-      : params.get("source") === "Contests"
-        ? "Contests"
+      : params.get("source") === "ExamSession"
+        ? "ExamSession"
         : "Practice";
   const context = params.get("context") || source;
   const contextTitle = useWorkspaceContextTitle(source, context, params.get("contextTitle"), !embedded);
   const sqlDraftKey = workspaceDraftKey(session?.id || "anonymous", problem.id, context) + ":SQL";
-  const contestMode = source === "Contests";
+  const examSessionMode = source === "ExamSession";
   const navigate = useNavigate();
-  const contestId = params.get("contest") || (contestMode ? context : "");
+  const examSessionId = params.get("examSession") || (examSessionMode ? context : "");
   useEffect(() => {
-    if (!contestMode || !contestId) return;
+    if (!examSessionMode || !examSessionId) return;
     let cancelled = false;
-    studentApi.getContestOrExam(contestId).then((exam) => {
+    studentApi.getExamSessionOrExam(examSessionId).then((exam) => {
       if (!cancelled && exam?.examType === "comprehensive") {
-        navigate(`/examinations/${encodeURIComponent(contestId)}/exam`, { replace: true });
+        navigate(`/examinations/${encodeURIComponent(examSessionId)}/exam`, { replace: true });
       }
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [contestMode, contestId, navigate]);
-  const contestClosed = contestMode && params.get("closed") === "1";
+  }, [examSessionMode, examSessionId, navigate]);
+  const examSessionClosed = examSessionMode && params.get("closed") === "1";
   const [favorite, setFavorite] = useState(false);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -174,8 +174,8 @@ export function SqlWorkspace({ problem, selectedSolutionId, onSolutionChange, on
   const isSubmitted = parentSubmitted || reviewMode;
   const isReadOnly = parentReadOnly || reviewMode || activityClosed || (busy && resultTab === "Submissions") || (!embedded && !historyLoaded && !exam?.enabled);
   const exitSaved = reviewMode || (hasSubmitted && !editedSinceSubmission);
-  const exitBlockedReason = activityClosed ? "Assignment deadline has passed" : submissionLimitReached ? "Submission limit reached" : contestClosed ? "Contest submissions are closed" : undefined;
-  const exitDestination = source === "Contests" ? "/examinations" : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
+  const exitBlockedReason = activityClosed ? "Assignment deadline has passed" : submissionLimitReached ? "Submission limit reached" : examSessionClosed ? "Exam session submissions are closed" : undefined;
+  const exitDestination = source === "ExamSession" ? "/examinations" : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
   const [confirmResetQuery, setConfirmResetQuery] = useState(false);
   const [notice, setNotice] = useState("");
   const previousQuestionId = useRef(question?.id);
@@ -225,7 +225,7 @@ export function SqlWorkspace({ problem, selectedSolutionId, onSolutionChange, on
     studentApi.getSubmissions({ source, includeQuestionUpdates: true }).then((response) => {
       if (!active || !Array.isArray(response)) return;
       const matching = (response as Submission[])
-        .filter(item => item.problemId === problem.id && item.context === context && [source, source === "Assignments" ? "Assignment" : source === "Contests" ? "Contest" : "Practice"].includes(item.source))
+        .filter(item => item.problemId === problem.id && item.context === context && [source, source === "Assignments" ? "Assignment" : source === "ExamSession" ? "ExamSession" : "Practice"].includes(item.source))
         .sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt));
       setHistorySubmissionsUsed(matching.filter(item => !item.questionOnly).length);
       if (matching.length) {
@@ -453,11 +453,11 @@ export function SqlWorkspace({ problem, selectedSolutionId, onSolutionChange, on
           {!setupScripts && !exam?.enabled && (<button
                   className="button primary workspace-submit-current"
                   data-tooltip={tr(reviewMode ? "Continue editing your submitted scripts. Submit again to update your work." : "Submit all DQL answers for grading.")}
-                  disabled={busy || !historyLoaded || contestClosed || activityClosed || (!reviewMode && submissionLimitReached)}
-                  title={activityClosed ? tr("Assignment deadline has passed") : submissionLimitReached && !reviewMode ? tr("Submission limit reached") : contestClosed ? tr("Contest submissions are closed") : undefined}
+                  disabled={busy || !historyLoaded || examSessionClosed || activityClosed || (!reviewMode && submissionLimitReached)}
+                  title={activityClosed ? tr("Assignment deadline has passed") : submissionLimitReached && !reviewMode ? tr("Submission limit reached") : examSessionClosed ? tr("Exam session submissions are closed") : undefined}
                   onClick={() => reviewMode ? setReviewMode(false) : void run("submit")}
                 >
-                  <TranslatedText>{activityClosed || contestClosed ? tr("Submissions closed") : reviewMode ? tr("Edit again") : busy && resultTab === "Submissions" ? tr("Submitting…") : tr("Submit")}</TranslatedText>
+                  <TranslatedText>{activityClosed || examSessionClosed ? tr("Submissions closed") : reviewMode ? tr("Edit again") : busy && resultTab === "Submissions" ? tr("Submitting…") : tr("Submit")}</TranslatedText>
                 </button>)}
           <button data-tooltip={tr("Submit your current work before leaving the workspace.")} type="button" className="button workspace-submit-exit" disabled={busy || !historyLoaded} onClick={() => { setExitError(""); setConfirmExit(true); }}><TranslatedText>{tr("Exit")}</TranslatedText></button>
         </GlidingTooltipGroup>}</>}
@@ -656,4 +656,4 @@ export function SqlWorkspace({ problem, selectedSolutionId, onSolutionChange, on
   );
 }
 
-export { ContestSqlWorkspace } from "@/features/workspace/ContestSqlWorkspace";
+export { ExamSessionSqlWorkspace } from "@/features/workspace/ExamSessionSqlWorkspace";

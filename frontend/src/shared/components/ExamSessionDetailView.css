@@ -1,65 +1,65 @@
 /* A task-first detail page: banner, problem workbench, then supporting information. */
-.contest-detail-workflow { min-width:0; padding-bottom:24px; container:contest-workflow / inline-size; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner { min-height:168px; padding:16px 20px; margin:0 0 12px; gap:0; box-shadow:none; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .u049-top { position:static; gap:12px; align-items:center; margin-bottom:12px; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .contest-header-timing { flex:1; min-width:0; padding:0; align-self:auto; align-items:flex-end; text-align:right; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .u049-tag { flex:none; white-space:nowrap; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .contest-header-timing p { margin:0; white-space:normal; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .u049-t { margin:4px 0; font-size:24px; line-height:1.25; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .u049-body > p { margin:4px 0 0; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .u049-reveal { grid-template-rows:1fr; opacity:1; transform:none; }
-.contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .u049-sum { margin-top:8px; font-size:12px; line-height:1.5; }
-.contest-detail-workflow .contest-detail-content-grid { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; align-items:start; }
-.contest-detail-workflow .contest-problem-workbench { min-width:0; margin:0; overflow:hidden; border:1px solid var(--border); border-radius:6px; background:var(--surface); }
-.contest-detail-workflow .contest-problem-stage-header { display:flex; align-items:center; flex-wrap:wrap; gap:12px; min-height:56px; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--surface); }
-.contest-detail-workflow .contest-problem-stage-header h2 { flex:1; min-width:0; margin:0; font-size:16px; line-height:24px; overflow-wrap:anywhere; }
-.contest-detail-workflow .contest-problem-stage-header > .button { flex:none; margin-left:auto; font-size:12px; min-height:34px; }
-.contest-detail-workflow .contest-problem-notice { padding:20px 16px; margin:0; font-size:12px; }
-.contest-detail-workflow .contest-problem-slide { width:100%; min-width:0; }
-.contest-detail-workflow .contest-selected-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; padding:12px 16px 8px; margin-bottom:0; font-size:11px; }
-.contest-detail-workflow .contest-selected-body { max-height:min(56dvh,520px); overflow-y:auto; padding:0 16px 16px; }
-.contest-detail-workflow .contest-problem-slide > .contest-markdown { padding:0 16px 16px; }
+.exam-session-detail-workflow { min-width:0; padding-bottom:24px; container:exam-session-workflow / inline-size; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner { min-height:168px; padding:16px 20px; margin:0 0 12px; gap:0; box-shadow:none; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .u049-top { position:static; gap:12px; align-items:center; margin-bottom:12px; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .exam-session-header-timing { flex:1; min-width:0; padding:0; align-self:auto; align-items:flex-end; text-align:right; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .u049-tag { flex:none; white-space:nowrap; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .exam-session-header-timing p { margin:0; white-space:normal; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .u049-t { margin:4px 0; font-size:24px; line-height:1.25; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .u049-body > p { margin:4px 0 0; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .u049-reveal { grid-template-rows:1fr; opacity:1; transform:none; }
+.exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .u049-sum { margin-top:8px; font-size:12px; line-height:1.5; }
+.exam-session-detail-workflow .exam-session-detail-content-grid { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; align-items:start; }
+.exam-session-detail-workflow .exam-session-problem-workbench { min-width:0; margin:0; overflow:hidden; border:1px solid var(--border); border-radius:6px; background:var(--surface); }
+.exam-session-detail-workflow .exam-session-problem-stage-header { display:flex; align-items:center; flex-wrap:wrap; gap:12px; min-height:56px; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--surface); }
+.exam-session-detail-workflow .exam-session-problem-stage-header h2 { flex:1; min-width:0; margin:0; font-size:16px; line-height:24px; overflow-wrap:anywhere; }
+.exam-session-detail-workflow .exam-session-problem-stage-header > .button { flex:none; margin-left:auto; font-size:12px; min-height:34px; }
+.exam-session-detail-workflow .exam-session-problem-notice { padding:20px 16px; margin:0; font-size:12px; }
+.exam-session-detail-workflow .exam-session-problem-slide { width:100%; min-width:0; }
+.exam-session-detail-workflow .exam-session-selected-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; padding:12px 16px 8px; margin-bottom:0; font-size:11px; }
+.exam-session-detail-workflow .exam-session-selected-body { max-height:min(56dvh,520px); overflow-y:auto; padding:0 16px 16px; }
+.exam-session-detail-workflow .exam-session-problem-slide > .exam-session-markdown { padding:0 16px 16px; }
 /* Use the same swipe-linked underline for horizontal problem navigation. */
-.u048.contest-list-region.contest-problem-slider { position:static; top:auto; height:auto; min-height:0; padding:0; gap:0; }
-.u048.contest-list-region.contest-problem-slider .contest-toolbar { display:block; }
-.u048.contest-list-region.contest-problem-slider .u048-tw { border:0; border-bottom:1px solid var(--border); border-radius:0; }
-.u048.contest-list-region.contest-problem-slider .u048-tabs { padding:0 6px; }
-.u048.contest-list-region.contest-problem-slider .u048-tab { height:58px; max-width:280px; padding:8px 12px; text-align:left; }
-.u048.contest-list-region.contest-problem-slider .contest-columns { display:block; padding:0; }
-.u048.contest-list-region.contest-problem-slider .u048-pages { height:auto; min-height:0; border-radius:0; align-items:flex-start; }
-.u048.contest-list-region.contest-problem-slider .u048-pg { display:block; }
-.u048.contest-list-region.contest-problem-slider .contest-problem-tab-label { display:flex; flex-direction:column; align-items:flex-start; min-width:0; gap:3px; }
-.u048.contest-list-region.contest-problem-slider .contest-problem-tab-label > span:first-child { max-width:100%; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
-.u048.contest-list-region.contest-problem-slider .contest-problem-tab-label .status { font-size:9px; line-height:14px; padding:1px 5px; border-radius:3px; }
-.contest-detail-workflow .contest-selected-body .contest-selected-facts { display:flex; flex-wrap:wrap; gap:12px 28px; padding:12px 0; margin:0 0 16px; border-block:1px solid var(--border-subtle); }
-.contest-detail-workflow .contest-selected-body .contest-selected-facts > div { display:block; min-width:0; margin:0; padding:0; border:0; background:none; }
-.contest-detail-workflow .contest-selected-body .contest-selected-facts dt { font-size:10px; color:var(--muted); margin-bottom:4px; }
-.contest-detail-workflow .contest-selected-body .contest-selected-facts dd { max-width:none; margin:0; font-size:12px; font-weight:500; text-align:left; }
-.contest-detail-workflow .contest-selected-body .contest-markdown { font-size:12px; line-height:1.7; }
-.contest-detail-workflow .contest-selected-body > section { padding:0; border:0; background:none; }
-.contest-detail-workflow .contest-selected-body > section + section { padding-top:14px; margin-top:14px; border-top:1px solid var(--border-subtle); }
-.contest-detail-workflow .contest-selected-body > section h4 { margin:0 0 10px; color:var(--text); font-size:13px; line-height:20px; }
-.contest-detail-workflow .contest-selected-body .contest-markdown pre { background:var(--subtle); border-color:var(--border-subtle); border-radius:4px; }
-.contest-detail-workflow .contest-detail-sidebar { display:grid; gap:12px; min-width:0; }
-.contest-detail-workflow .contest-context-section { min-width:0; border:1px solid var(--border); border-radius:6px; background:var(--surface); overflow:hidden; }
-.contest-detail-workflow .contest-context-section > header { padding:14px 16px; border-bottom:1px solid var(--border-subtle); background:var(--surface); }
-.contest-detail-workflow .contest-context-section > header h2 { margin:0; font-size:13px; line-height:20px; }
-.contest-detail-workflow .contest-context-section > .contest-markdown { padding:16px; max-height:min(56dvh,520px); overflow-y:auto; font-size:12px; line-height:1.7; }
-.contest-detail-workflow .contest-detail-sidebar .contest-participation { position:static; grid-column:auto; grid-row:auto; height:auto; max-height:none; min-height:0; padding:16px; overflow:visible; contain:none; border:1px solid var(--border); border-radius:6px; background:var(--surface); }
-.contest-detail-workflow .contest-detail-sidebar .contest-participation h2 { font-size:13px; margin:0 0 8px; }
-.contest-detail-workflow .contest-detail-sidebar .contest-participation dl { margin:0; padding:0; border:0; }
-.contest-detail-workflow .contest-detail-sidebar .contest-participation dl div { margin:0; padding:6px 0; }
-.contest-detail-workflow .contest-detail-sidebar .contest-participation .contest-leaderboard { margin-top:14px; padding-top:14px; border-top:1px solid var(--border-subtle); }
-.contest-detail-workflow .contest-detail-sidebar .contest-leaderboard-scroll { height:auto; max-height:180px; }
+.u048.exam-session-list-region.exam-session-problem-slider { position:static; top:auto; height:auto; min-height:0; padding:0; gap:0; }
+.u048.exam-session-list-region.exam-session-problem-slider .exam-session-toolbar { display:block; }
+.u048.exam-session-list-region.exam-session-problem-slider .u048-tw { border:0; border-bottom:1px solid var(--border); border-radius:0; }
+.u048.exam-session-list-region.exam-session-problem-slider .u048-tabs { padding:0 6px; }
+.u048.exam-session-list-region.exam-session-problem-slider .u048-tab { height:58px; max-width:280px; padding:8px 12px; text-align:left; }
+.u048.exam-session-list-region.exam-session-problem-slider .exam-session-columns { display:block; padding:0; }
+.u048.exam-session-list-region.exam-session-problem-slider .u048-pages { height:auto; min-height:0; border-radius:0; align-items:flex-start; }
+.u048.exam-session-list-region.exam-session-problem-slider .u048-pg { display:block; }
+.u048.exam-session-list-region.exam-session-problem-slider .exam-session-problem-tab-label { display:flex; flex-direction:column; align-items:flex-start; min-width:0; gap:3px; }
+.u048.exam-session-list-region.exam-session-problem-slider .exam-session-problem-tab-label > span:first-child { max-width:100%; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+.u048.exam-session-list-region.exam-session-problem-slider .exam-session-problem-tab-label .status { font-size:9px; line-height:14px; padding:1px 5px; border-radius:3px; }
+.exam-session-detail-workflow .exam-session-selected-body .exam-session-selected-facts { display:flex; flex-wrap:wrap; gap:12px 28px; padding:12px 0; margin:0 0 16px; border-block:1px solid var(--border-subtle); }
+.exam-session-detail-workflow .exam-session-selected-body .exam-session-selected-facts > div { display:block; min-width:0; margin:0; padding:0; border:0; background:none; }
+.exam-session-detail-workflow .exam-session-selected-body .exam-session-selected-facts dt { font-size:10px; color:var(--muted); margin-bottom:4px; }
+.exam-session-detail-workflow .exam-session-selected-body .exam-session-selected-facts dd { max-width:none; margin:0; font-size:12px; font-weight:500; text-align:left; }
+.exam-session-detail-workflow .exam-session-selected-body .exam-session-markdown { font-size:12px; line-height:1.7; }
+.exam-session-detail-workflow .exam-session-selected-body > section { padding:0; border:0; background:none; }
+.exam-session-detail-workflow .exam-session-selected-body > section + section { padding-top:14px; margin-top:14px; border-top:1px solid var(--border-subtle); }
+.exam-session-detail-workflow .exam-session-selected-body > section h4 { margin:0 0 10px; color:var(--text); font-size:13px; line-height:20px; }
+.exam-session-detail-workflow .exam-session-selected-body .exam-session-markdown pre { background:var(--subtle); border-color:var(--border-subtle); border-radius:4px; }
+.exam-session-detail-workflow .exam-session-detail-sidebar { display:grid; gap:12px; min-width:0; }
+.exam-session-detail-workflow .exam-session-context-section { min-width:0; border:1px solid var(--border); border-radius:6px; background:var(--surface); overflow:hidden; }
+.exam-session-detail-workflow .exam-session-context-section > header { padding:14px 16px; border-bottom:1px solid var(--border-subtle); background:var(--surface); }
+.exam-session-detail-workflow .exam-session-context-section > header h2 { margin:0; font-size:13px; line-height:20px; }
+.exam-session-detail-workflow .exam-session-context-section > .exam-session-markdown { padding:16px; max-height:min(56dvh,520px); overflow-y:auto; font-size:12px; line-height:1.7; }
+.exam-session-detail-workflow .exam-session-detail-sidebar .exam-session-participation { position:static; grid-column:auto; grid-row:auto; height:auto; max-height:none; min-height:0; padding:16px; overflow:visible; contain:none; border:1px solid var(--border); border-radius:6px; background:var(--surface); }
+.exam-session-detail-workflow .exam-session-detail-sidebar .exam-session-participation h2 { font-size:13px; margin:0 0 8px; }
+.exam-session-detail-workflow .exam-session-detail-sidebar .exam-session-participation dl { margin:0; padding:0; border:0; }
+.exam-session-detail-workflow .exam-session-detail-sidebar .exam-session-participation dl div { margin:0; padding:6px 0; }
+.exam-session-detail-workflow .exam-session-detail-sidebar .exam-session-participation .exam-session-leaderboard { margin-top:14px; padding-top:14px; border-top:1px solid var(--border-subtle); }
+.exam-session-detail-workflow .exam-session-detail-sidebar .exam-session-leaderboard-scroll { height:auto; max-height:180px; }
 @media (max-width:760px) {
-  .contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner { min-height:156px; padding:16px; }
-  .contest-detail-shell.contest-detail-workflow > .u049.contest-detail-banner .u049-t { font-size:21px; }
-  .contest-detail-workflow .contest-detail-content-grid { grid-template-columns:minmax(0,1fr); gap:12px; }
-  .contest-detail-workflow .contest-problem-stage-header { padding:12px; gap:8px; }
-  .contest-detail-workflow .contest-problem-stage-header h2 { font-size:14px; }
-  .contest-detail-workflow .contest-selected-body { max-height:none; overflow:visible; padding:0 12px 14px; }
-  .contest-detail-workflow .contest-selected-heading { padding:12px; }
+  .exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner { min-height:156px; padding:16px; }
+  .exam-session-detail-shell.exam-session-detail-workflow > .u049.exam-session-detail-banner .u049-t { font-size:21px; }
+  .exam-session-detail-workflow .exam-session-detail-content-grid { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .exam-session-detail-workflow .exam-session-problem-stage-header { padding:12px; gap:8px; }
+  .exam-session-detail-workflow .exam-session-problem-stage-header h2 { font-size:14px; }
+  .exam-session-detail-workflow .exam-session-selected-body { max-height:none; overflow:visible; padding:0 12px 14px; }
+  .exam-session-detail-workflow .exam-session-selected-heading { padding:12px; }
 }
-@container contest-workflow (max-width:900px) {
-  .contest-detail-workflow .contest-detail-content-grid { grid-template-columns:minmax(0,1fr); }
+@container exam-session-workflow (max-width:900px) {
+  .exam-session-detail-workflow .exam-session-detail-content-grid { grid-template-columns:minmax(0,1fr); }
 }

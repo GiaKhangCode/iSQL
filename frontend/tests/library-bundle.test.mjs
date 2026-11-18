@@ -85,7 +85,7 @@ try{
   'library-details','library-schema','library-datasets',
  ].indexOf(id)];
  assert.equal(document.querySelectorAll('.teacher-library-section-nav button').length,3,'The library only edits database details, structure and initial data');
- assert.equal(document.querySelector('.teacher-contest-page-nav-indicator').style.width,'200px','The active indicator is measured when the new editor mounts');
+ assert.equal(document.querySelector('.teacher-exam-session-page-nav-indicator').style.width,'200px','The active indicator is measured when the new editor mounts');
  assert.equal(document.querySelector('#library-statement'),null,'The shared problem statement is no longer edited in the library');
  await click(sectionButton('library-datasets'));
  assert.ok(document.querySelector('#library-datasets'));
@@ -98,7 +98,7 @@ try{
  await click(document.querySelector('.teacher-database-tracking-table tbody button'));
 
  assert.equal(document.querySelector('[maxlength="255"]').value,'Sales','Clicking the selected row opens the database editor');
- assert.equal(document.querySelector('.teacher-contest-page-nav-indicator').style.width,'200px','The indicator is restored when reopening an existing database');
+ assert.equal(document.querySelector('.teacher-exam-session-page-nav-indicator').style.width,'200px','The indicator is restored when reopening an existing database');
  assert.equal(document.querySelectorAll('[role=tab]').length,2,'Only the structure and initial dataset tabs remain');
  assert.deepEqual([...document.querySelectorAll('[role=tab]')].map(n=>n.id),['library-setup-schema','library-setup-data']);
  assert.equal(document.querySelector('.teacher-exercise-collection'),null,'DDL, DML, DQL and trigger question editors are not part of the library');

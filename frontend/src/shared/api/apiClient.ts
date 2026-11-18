@@ -16,9 +16,9 @@ function translateRawMessage(msg: string): string {
     "Only teachers can view audience counts.": "Chỉ giảng viên hoặc giáo vụ mới có quyền xem thông tin đối tượng.",
     "Only teachers can search students.": "Chỉ giảng viên hoặc giáo vụ mới có quyền tìm kiếm sinh viên.",
     "Invalid audience type.": "Hình thức đối tượng tham gia không hợp lệ.",
-    "Published contests need a short description and description.": "Cuộc thi đã công bố cần có mô tả ngắn và mô tả chi tiết.",
+    "Published exam sessions need a short description and description.": "Ca thi đã công bố cần có mô tả ngắn và mô tả chi tiết.",
     "Published activities need valid start and end times.": "Hoạt động đã công bố cần có thời gian bắt đầu và kết thúc hợp lệ.",
-    "All-students contests cannot select classes.": "Cuộc thi mở cho tất cả sinh viên không thể chọn lớp học.",
+    "All-students exam sessions cannot select classes.": "Ca thi mở cho tất cả sinh viên không thể chọn lớp học.",
     "Select at least one section for each problem.": "Hãy chọn ít nhất một phần bài làm cho từng bài toán.",
   };
   if (errorTranslations[trimmed]) return errorTranslations[trimmed];

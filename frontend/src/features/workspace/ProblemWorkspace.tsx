@@ -70,7 +70,7 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   const [historySubmissionsUsed, setHistorySubmissionsUsed] = useState(0);
   const submissionCounter = useRef(0);
   const [params] = useSearchParams();
-  const source = params.get("source") === "Assignments" ? "Assignments" : params.get("source") === "Contests" ? "Contests" : "Practice";
+  const source = params.get("source") === "Assignments" ? "Assignments" : params.get("source") === "ExamSession" ? "ExamSession" : "Practice";
   const context = params.get("context") || source;
   const draftKey = workspaceDraftKey(session?.id || "anonymous", problem.id, context);
   const [savedSelection] = useState(() => readWorkspaceSelection(draftKey + ":selection"));
@@ -135,8 +135,8 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   const submissionLimitReached = maxSubmissions != null && submissionsUsed >= maxSubmissions;
   const isReadOnly = reviewMode || submitting || activityClosed || (!historyLoaded && !exam?.enabled);
   const exitSaved = reviewMode || (!editedSinceSubmission && submissionAttempts.some(attempt => attempt.kind === "submit"));
-  const exitBlockedReason = activityClosed ? "Assignment deadline has passed" : submissionLimitReached ? "Submission limit reached" : source === "Contests" && params.get("closed") === "1" ? "Contest submissions are closed" : undefined;
-  const exitDestination = source === "Contests" ? "/examinations" : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
+  const exitBlockedReason = activityClosed ? "Assignment deadline has passed" : submissionLimitReached ? "Submission limit reached" : source === "ExamSession" && params.get("closed") === "1" ? "Exam session submissions are closed" : undefined;
+  const exitDestination = source === "ExamSession" ? "/examinations" : source === "Assignments" ? `/assignments/work/${encodeURIComponent(context)}` : "/dashboard";
   useEffect(() => {
     if (exam?.enabled || sqlOnly) return;
     let activeRequest = true;
@@ -147,7 +147,7 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
     studentApi.getSubmissions({ source, includeQuestionUpdates: true }).then((response) => {
       if (!activeRequest || !Array.isArray(response)) return;
       const matching = (response as Submission[])
-        .filter(item => item.problemId === problem.id && item.context === context && [source, source === "Assignments" ? "Assignment" : source === "Contests" ? "Contest" : "Practice"].includes(item.source))
+        .filter(item => item.problemId === problem.id && item.context === context && [source, source === "Assignments" ? "Assignment" : source === "ExamSession" ? "ExamSession" : "Practice"].includes(item.source))
         .sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt));
       setHistorySubmissionsUsed(matching.filter(item => !item.questionOnly).length);
       if (matching.length) {

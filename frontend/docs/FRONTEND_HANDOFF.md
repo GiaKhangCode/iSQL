@@ -10,7 +10,7 @@ Continue as demo student signs in as `{ id: "student-demo", name: "Huy Lai", ini
 
 `src/context/AuthContext.tsx` restores the namespaced mock session synchronously before rendering routes. `ProtectedRoute` redirects a signed-out visitor to Login and records pathname/query/hash in router state. Login restores only a recognized local Student destination. `PublicOnlyRoute` redirects signed-in Login/Register visits to Dashboard. Logout removes only `sql-practice:mock-session:v1`, clears context, and replaces the route with Login. Back navigation still passes through the guard.
 
-Route map: `/` → Login/Dashboard; public-only `/login`, `/register`; protected `/dashboard`, `/practice`, `/workspace/:problemId`, `/assignments`, `/contests`, `/submissions`. Only one Workspace exists. Student assignments link through `/assignments/classes/:scopeId` and `/assignments/work/:assignmentId` to their problems. Contests link to protected `/contests/:contestId`. Unknown routes redirect to the entry page.
+Route map: `/` → Login/Dashboard; public-only `/login`, `/register`; protected `/dashboard`, `/practice`, `/workspace/:problemId`, `/assignments`, `/exam-sessions`, `/submissions`. Only one Workspace exists. Student assignments link through `/assignments/classes/:scopeId` and `/assignments/work/:assignmentId` to their problems. ExamSessions link to protected `/exam-sessions/:examSessionId`. Unknown routes redirect to the entry page.
 
 ## Code map
 
@@ -34,7 +34,7 @@ Route map: `/` → Login/Dashboard; public-only `/login`, `/register`; protected
 | `studentApi.getDashboard()`                            | Solved breakdown, continuing problems and deadlines                     |
 | `getProblems(filters)` / `getProblem(id)`              | Problem list/detail with progress                                       |
 | `getAssignments()`                                     | Enrolled classes, assignments, per-student progress and deduplicated deadlines |
-| `getContests()`                                        | Live, upcoming and closed contests                                      |
+| `getExamSessions()`                                        | Live, upcoming and closed examSessionList                                      |
 | `getSubmissions(filters)`                              | Search/result/source filtering plus new in-memory attempts              |
 | `runQuery(id, query, database)`                        | Fixture table or deterministic mock error                               |
 | `submitSolution(id, query, database, source, context)` | Mock verdict, history update and solved progress                        |
@@ -44,7 +44,7 @@ Route map: `/` → Login/Dashboard; public-only `/login`, `/register`; protected
 
 Use short simulated delays only for this demo. Run selected sends the editor selection; Run all sends the whole draft. `-- mock:error` and `-- mock:timeout` trigger execution errors; `-- mock:wrong` triggers a wrong submission. Missing SELECT causes Runtime Error. Submit requires ORDER BY, and ranking additionally requires DENSE_RANK. These are text checks, not correctness grading. A successful mock run returns expected fixture rows regardless of actual SQL semantics.
 
-Assignments and contest detail links pass source/context to the canonical Workspace. Upcoming contests show their description and rules while the server withholds problems until start; live contests allow submissions, and closed contests allow review with submissions disabled. The detail countdown uses the scheduled end time. Assignment records appear once in the combined calendar even when assigned to several classes.
+Assignments and examSession detail links pass source/context to the canonical Workspace. Upcoming examSessionList show their description and rules while the server withholds problems until start; live examSessionList allow submissions, and closed examSessionList allow review with submissions disabled. The detail countdown uses the scheduled end time. Assignment records appear once in the combined calendar even when assigned to several classes.
 
 ## Persistence and production limitations
 
@@ -56,11 +56,11 @@ Authentication, SQL execution, grading, AI, persistence and security are not pro
 
 File: https://www.figma.com/design/A2mwI7yuWBhYWAMswSVrjw/Untitled
 
-Retrieved reference nodes: Dashboard `25:112`; Practice `47:1290`; Workspace desktop light `65:2623`, desktop dark `78:3085`, mobile light `74:2950`, mobile dark `78:3105`; Assignments `91:112`; Contests `91:229`; Submissions `135:3190`; Login `7:3`; Register `7:4`.
+Retrieved reference nodes: Dashboard `25:112`; Practice `47:1290`; Workspace desktop light `65:2623`, desktop dark `78:3085`, mobile light `74:2950`, mobile dark `78:3105`; Assignments `91:112`; ExamSessions `91:229`; Submissions `135:3190`; Login `7:3`; Register `7:4`.
 
-Layout follows the contexts: horizontal header, one account identity, compact flat lists, activity/calendar, classes with class context, featured contest bands, and the rule-divided workspace. Contests intentionally retains the featured gradients present in its retrieved frame. The exact database SVG export was downloaded locally. JetBrains Mono is used for the Student interface and SQL; auth uses Inter. Fonts load from Google Fonts, with local fallbacks when offline.
+Layout follows the contexts: horizontal header, one account identity, compact flat lists, activity/calendar, classes with class context, featured examSession bands, and the rule-divided workspace. ExamSessions intentionally retains the featured gradients present in its retrieved frame. The exact database SVG export was downloaded locally. JetBrains Mono is used for the Student interface and SQL; auth uses Inter. Fonts load from Google Fonts, with local fallbacks when offline.
 
-Intentional differences: auth copy is English while the retrieved auth frames use Vietnamese; Full name, explicit password rules and demo entry were added as required. Earlier mock fixtures used a smaller set of classes, problems and submissions than the reference. Submissions adds score/actions required by the prompt. Real SQL, real AI and real contest registration were outside the original frontend scope. Calendar opens matching work on date selection. Other Student mobile pages use responsive stacking/menu/table scrolling.
+Intentional differences: auth copy is English while the retrieved auth frames use Vietnamese; Full name, explicit password rules and demo entry were added as required. Earlier mock fixtures used a smaller set of classes, problems and submissions than the reference. Submissions adds score/actions required by the prompt. Real SQL, real AI and real examSession registration were outside the original frontend scope. Calendar opens matching work on date selection. Other Student mobile pages use responsive stacking/menu/table scrolling.
 
 Dark-theme primary buttons use dark foreground text on the light purple accent for readability; this differs from the white button labels in the retrieved dark Workspace frame.
 
@@ -74,11 +74,11 @@ No route was visually inspected in a browser at desktop 1440×900 or mobile 390�
 
 ## September 18 Figma update
 
-See [FIGMA_UPDATE_REPORT.md](FIGMA_UPDATE_REPORT.md) for additional inspected frames and implementation details. Theme selection is inside the account menu. Notifications and streak popovers are shared by every Student header, including Workspace. Each new submission captures query and database independently of the editable draft. Auto and instructor scores remain separate. Favorites persist locally; attempts, progress and contest completion remain in memory. Streaks use an illustrative accepted-day history plus in-memory Accepted attempts, calculated by ICT calendar date; an inactive streak is muted.
+See [FIGMA_UPDATE_REPORT.md](FIGMA_UPDATE_REPORT.md) for additional inspected frames and implementation details. Theme selection is inside the account menu. Notifications and streak popovers are shared by every Student header, including Workspace. Each new submission captures query and database independently of the editable draft. Auto and instructor scores remain separate. Favorites persist locally; attempts, progress and examSession completion remain in memory. Streaks use an illustrative accepted-day history plus in-memory Accepted attempts, calculated by ICT calendar date; an inactive streak is muted.
 
 Page 2.2 revision: PracticeSidebar.tsx contains the desktop numbered activity calendar/mobile heatmap and selectable trending ranges. My Lists collapse/create and mobile filters are implemented in PracticePage.tsx. User-created private lists capture the current result IDs and persist locally. Additional trending Workspace fixtures p9/p10 are excluded from the default eight-row Practice catalogue. Replace illustrative activity/trending data and local lists with Student backend adapters when integrating.
 
-Assignment navigation now runs from class to assignment to problems. A published assignment can belong to several classes, while progress and submissions remain separate for each student. Assignment deadlines exclude contests and completed work, and detail links reuse the canonical workspace.
+Assignment navigation now runs from class to assignment to problems. A published assignment can belong to several classes, while progress and submissions remain separate for each student. Assignment deadlines exclude examSessionList and completed work, and detail links reuse the canonical workspace.
 
 ## UX quality pass
 Audited the existing Student flows against the repository architecture and referenced Figma frames. High-impact fixes in this pass: Practice and Submissions now keep the current result surface visible while filter/search data refreshes, avoiding full-list loading flicker; each Dialog gets a unique generated title ID so multiple dialog instances remain correctly labelled for assistive technology. No product redesign or new dependencies were introduced. Remaining limitations are documented above: browser visual inspection remains unavailable, mock services retain demo latency for execution/submission feedback, and real backend persistence is outside scope.

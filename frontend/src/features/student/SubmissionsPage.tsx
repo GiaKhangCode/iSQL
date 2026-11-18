@@ -78,7 +78,7 @@ export function SubmissionsPage() {
         filters={[
           { key: "source", label: tr("Source"), value: source, defaultValue: "", onChange: setSource,
             icon: <Layers size={17} aria-hidden="true" />, options: [{ value: "", label: tr("All sources") },
-              ...["Practice", "Assignments", "Contests"].map(value => ({ value, label: tr(value) }))] },
+              ...["Practice", "Assignments", "ExamSession"].map(value => ({ value, label: tr(value) }))] },
           { key: "result", label: tr("Result"), value: result, defaultValue: "", onChange: setResult,
             icon: <ListFilter size={17} aria-hidden="true" />, options: [{ value: "", label: tr("All results") },
               ...["Accepted", "Partial", "Wrong Answer", "Runtime Error", "Time Limit Exceeded", "Rejected"].map(value => ({ value, label: tr(value) }))] },

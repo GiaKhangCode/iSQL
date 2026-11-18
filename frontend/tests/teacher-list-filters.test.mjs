@@ -14,11 +14,11 @@ dom.window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
 dom.window.HTMLDialogElement.prototype.close=function(){this.open=false;};
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.__activities = [
-  { id: 'live', title: 'Live joins', classes: 'Class A', shortDescription: 'Joins practice', status: 'Open', isContest: true },
-  { id: 'next', title: 'Next challenge', classes: 'Class B', status: 'Scheduled', isContest: true },
-  { id: 'closed', title: 'Previous challenge', classes: 'Class A', status: 'Closed', isContest: true },
-  { id: 'assignment', title: 'Regular assignment', classes: 'Class A', status: 'Open', isContest: false },
-  { id: 'exam-slot', title: 'Examination session', classes: 'Class A', status: 'Open', isContest: true, examinationId: 'exam-parent' },
+  { id: 'live', title: 'Live joins', classes: 'Class A', shortDescription: 'Joins practice', status: 'Open', isExamSession: true },
+  { id: 'next', title: 'Next challenge', classes: 'Class B', status: 'Scheduled', isExamSession: true },
+  { id: 'closed', title: 'Previous challenge', classes: 'Class A', status: 'Closed', isExamSession: true },
+  { id: 'assignment', title: 'Regular assignment', classes: 'Class A', status: 'Open', isExamSession: false },
+  { id: 'exam-slot', title: 'Examination session', classes: 'Class A', status: 'Open', isExamSession: true, examinationId: 'exam-parent' },
 ];
 globalThis.__classes = [
   { id: 'A', course: 'Database systems', term: 'Semester 2, 2026', students: 20, status: 'Active' },
@@ -31,7 +31,7 @@ const result = await build({
     import { createRoot } from 'react-dom/client';
     import { Simulate } from 'react-dom/test-utils';
     import { MemoryRouter, useLocation } from 'react-router-dom';
-    import { ContestsListPage } from './src/features/teacher/ContestsListPage';
+    import { ExamSessionsListPage } from './src/features/teacher/ExamSessionsListPage';
     import { AssignmentsListPage } from './src/features/teacher/AssignmentsListPage';
     import { ClassesPage } from './src/features/teacher/ClassesPage';
     import { ProctorRoomsView } from './src/features/office/ProctorPage';
@@ -39,7 +39,7 @@ const result = await build({
     import { SubmissionsPage } from './src/features/student/SubmissionsPage';
     export { act, Simulate };
     function Location(){return <output data-location>{useLocation().pathname}</output>;}
-    export function mount(node, kind) { const root=createRoot(node); root.render(<MemoryRouter initialEntries={[kind === 'contests' ? '/office/contests' : kind === 'exams' ? '/teacher/exams' : '/']} future={{v7_startTransition:true,v7_relativeSplatPath:true}}><Location/>{kind === 'contests' ? <ContestsListPage/> : kind === 'assignments' ? <AssignmentsListPage/> : kind === 'results' ? <ResultsDashboardPage/> : kind === 'submissions' ? <SubmissionsPage/> : kind === 'exams' ? <ProctorRoomsView/> : <ClassesPage/>}</MemoryRouter>); return root; }
+    export function mount(node, kind) { const root=createRoot(node); root.render(<MemoryRouter initialEntries={[kind === 'exam-sessions' ? '/office/exam-sessions' : kind === 'exams' ? '/teacher/exams' : '/']} future={{v7_startTransition:true,v7_relativeSplatPath:true}}><Location/>{kind === 'exam-sessions' ? <ExamSessionsListPage/> : kind === 'assignments' ? <AssignmentsListPage/> : kind === 'results' ? <ResultsDashboardPage/> : kind === 'submissions' ? <SubmissionsPage/> : kind === 'exams' ? <ProctorRoomsView/> : <ClassesPage/>}</MemoryRouter>); return root; }
   `, resolveDir: process.cwd(), loader: 'tsx' },
   bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic', logLevel: 'silent', loader: { '.css': 'empty' },
   plugins: [{ name: 'teacher-filter-fixtures', setup(builder) {
@@ -72,29 +72,29 @@ try {
   }
   let resolveActivities;
   globalThis.__activitiesRequest = new Promise(resolve => { resolveActivities = resolve; });
-  await api.act(async () => { root = api.mount(document.getElementById('root'), 'contests'); });
+  await api.act(async () => { root = api.mount(document.getElementById('root'), 'exam-sessions'); });
   assert.ok(document.querySelector('.teacher-list-loading'), 'Loading reserves the same table and detail columns');
-  assert.equal(document.querySelector('[role="status"]').textContent, 'Loading contests…');
+  assert.equal(document.querySelector('[role="status"]').textContent, 'Loading exam sessions…');
   assert.equal(document.querySelector('.spinner'), null, 'Loading no longer replaces the page with an isolated spinner');
   assert.equal(toggle().disabled, true, 'Filters stay disabled until data is available');
-  assert.equal(document.querySelector('.teacher-filter-side .u027-create').getAttribute('href'), '/office/contests/new', 'The create action keeps its final position and styling during loading');
+  assert.equal(document.querySelector('.teacher-filter-side .u027-create').getAttribute('href'), '/office/exam-sessions/new', 'The create action keeps its final position and styling during loading');
   await api.act(async () => resolveActivities(globalThis.__activities));
   delete globalThis.__activitiesRequest;
   assert.equal(document.querySelector('.teacher-list-loading'), null);
   assert.equal(toggle().disabled, false);
-  assert.equal(rows().length, 3, 'The contest page excludes assignments and examination sessions');
-  assert.deepEqual([...document.querySelectorAll('.teacher-contest-list-table th')].map(node=>node.textContent),['ID','CONTEST','AUDIENCE','STARTS','ENDS','STATUS']);
-  assert.equal(document.querySelector('.teacher-contest-list-table td[data-label="STATUS"]').textContent,'Upcoming');
+  assert.equal(rows().length, 3, 'The exam session page excludes assignments and examination sessions');
+  assert.deepEqual([...document.querySelectorAll('.teacher-exam-session-list-table th')].map(node=>node.textContent),['ID','EXAM SESSION','AUDIENCE','STARTS','ENDS','STATUS']);
+  assert.equal(document.querySelector('.teacher-exam-session-list-table td[data-label="STATUS"]').textContent,'Upcoming');
   assert.equal(toggle().getAttribute('aria-expanded'), 'false');
-  assert.equal(document.querySelector('.teacher-filter-side .u027-create').getAttribute('href'), '/office/contests/new');
-  assert.ok(document.querySelector('.teacher-list-detail-actions a[href^="/office/contests/"][href$="/edit"]'),'Edit stays in the faculty office');
+  assert.equal(document.querySelector('.teacher-filter-side .u027-create').getAttribute('href'), '/office/exam-sessions/new');
+  assert.ok(document.querySelector('.teacher-list-detail-actions a[href^="/office/exam-sessions/"][href$="/edit"]'),'Edit stays in the faculty office');
   assert.ok(document.querySelector('.teacher-list-detail-actions a[href^="/office/results/activity/"]'),'Submissions open directly in the faculty office');
   await click(toggle());
   await pick(1);
   assert.equal(rows().length, 1);
   assert.match(text(), /Live joins/);
   await change('Class B');
-  assert.match(text(), /No contests match/);
+  assert.match(text(), /No exam sessions match/);
   await change('Joins practice');
   assert.match(text(), /Live joins/, 'Search still includes the summary');
   await click(toggle());
@@ -104,7 +104,7 @@ try {
   await click(document.querySelector('.u027-reset'));
   assert.equal(rows().length, 3);
   await click(rows()[0]);
-  assert.match(document.querySelector('[data-location]').textContent,/^\/office\/contests\/.+\/edit$/,'Clicking the selected row opens the exam row');
+  assert.match(document.querySelector('[data-location]').textContent,/^\/office\/exam-sessions\/.+\/edit$/,'Clicking the selected row opens the exam row');
   await api.act(async () => root.unmount()); root = null;
 
   await api.act(async () => { root = api.mount(document.getElementById('root'), 'assignments'); });
@@ -162,9 +162,9 @@ try {
 
 
   globalThis.__activities = [
-    { id: 'one', title: 'SQL joins', classes: 'Class 1, Class 2', isContest: false, awaiting: 2, average: '80', submitted: '8/10' },
-    { id: 'ten', title: 'Reviewed contest', classes: 'Class 10', isContest: true, examinationId:'exam-parent', awaiting: 0, average: '90', submitted: '10/10' },
-    { id: 'contest', title: 'Pending contest', classes: 'Class 1', isContest: true, examinationId:'exam-parent', awaiting: 1, average: '75', submitted: '9/10' },
+    { id: 'one', title: 'SQL joins', classes: 'Class 1, Class 2', isExamSession: false, awaiting: 2, average: '80', submitted: '8/10' },
+    { id: 'ten', title: 'Reviewed exam session', classes: 'Class 10', isExamSession: true, examinationId:'exam-parent', awaiting: 0, average: '90', submitted: '10/10' },
+    { id: 'examSession', title: 'Pending exam session', classes: 'Class 1', isExamSession: true, examinationId:'exam-parent', awaiting: 1, average: '75', submitted: '9/10' },
   ];
   globalThis.__activitiesRequest = new Promise(resolve => { resolveActivities = resolve; });
   await api.act(async () => { root = api.mount(document.getElementById('root'), 'results'); });
@@ -189,18 +189,18 @@ try {
   await click(scope().querySelector('.u027-toggle'));
   await pick(1);
   assert.equal(rows().length,1,'Class 1 does not include Class 10');
-  assert.match(text(),/Pending contest/);
+  assert.match(text(),/Pending exam-session/);
   await pick(2,1);
   assert.match(text(),/No results match/);
   await pick(1,1);
-  assert.match(text(),/Pending contest/);
+  assert.match(text(),/Pending exam-session/);
   await change('  pending  ');
   await click(scope().querySelector('[data-results-kind=assignments]'));
   assert.equal(input().value,'joins','Assignment filter survives switching tabs');
   assert.match(text(),/SQL joins/);
   await click(scope().querySelector('[data-results-kind=exams]'));
   assert.equal(input().value,'  pending  ','Exam filters are restored');
-  assert.match(scope().querySelector('.teacher-list-detail-panel').textContent,/Pending contest/);
+  assert.match(scope().querySelector('.teacher-list-detail-panel').textContent,/Pending exam-session/);
   await click(scope().querySelector('.u027-reset'));
   assert.equal(rows().length,2,'Reset never mixes assignment and exam results');
   assert.deepEqual([...scope().querySelectorAll('.u027-select-value')].map(node=>node.textContent),['Class','Review status','Descending']);
@@ -226,13 +226,13 @@ try {
   await api.act(async () => root.unmount()); root = null;
 
   globalThis.__activities = [];
-  await api.act(async () => { root = api.mount(document.getElementById('root'), 'contests'); });
-  assert.ok(document.querySelector('a[href="/office/contests/new"]'), 'Empty contests still offer the create action');
-  assert.equal(document.querySelectorAll('.teacher-contest-list-table th').length,6,'An empty library keeps the full table structure');
+  await api.act(async () => { root = api.mount(document.getElementById('root'), 'exam-sessions'); });
+  assert.ok(document.querySelector('a[href="/office/exam-sessions/new"]'), 'Empty exam sessions still offer the create action');
+  assert.equal(document.querySelectorAll('.teacher-exam-session-list-table th').length,6,'An empty library keeps the full table structure');
   assert.equal(document.querySelector('.teacher-empty-row').colSpan,6);
   assert.ok(document.querySelector('.teacher-filter-side .u027-toggle'),'The empty library keeps filters beside the create action');
   assert.ok(document.querySelector('.teacher-filter-side .teacher-list-detail-panel'),'The empty library keeps the detail panel');
-  console.log('PASS: loading transitions, contest status mapping, academic terms, results class/type/review filters, exact classes, submissions server filters, individual chips/reset, retained hidden values and action placement.');
+  console.log('PASS: loading transitions, exam session status mapping, academic terms, results class/type/review filters, exact classes, submissions server filters, individual chips/reset, retained hidden values and action placement.');
 } finally {
   if (root) await api.act(async () => root.unmount());
   await unlink(file).catch(() => {});

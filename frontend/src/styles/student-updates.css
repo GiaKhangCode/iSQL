@@ -851,7 +851,7 @@ body:has(.practice-page) {
   font-size: 10px;
   margin-top: 4px;
 }
-.contest-detail-banner {
+.exam-session-detail-banner {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -868,31 +868,31 @@ body:has(.practice-page) {
   background-size: cover;
   background-position: center;
 }
-.contest-detail-banner.has-image { aspect-ratio: 3/1; min-height: 240px; color: #fff; }
-.contest-detail-banner.has-image small { color: #e3e4ff; }
-.contest-detail-banner.has-image > * { position: relative; z-index: 1; }
-.contest-detail-banner .button:disabled { opacity: 1; cursor: default; }
-.contest-detail-banner h1 {
+.exam-session-detail-banner.has-image { aspect-ratio: 3/1; min-height: 240px; color: #fff; }
+.exam-session-detail-banner.has-image small { color: #e3e4ff; }
+.exam-session-detail-banner.has-image > * { position: relative; z-index: 1; }
+.exam-session-detail-banner .button:disabled { opacity: 1; cursor: default; }
+.exam-session-detail-banner h1 {
   font-size: 24px;
   margin: 8px 0;
 }
-.contest-detail-banner small {
+.exam-session-detail-banner small {
   color: var(--feature-mark);
   font-size: 10px;
 }
-.contest-detail-banner .button {
+.exam-session-detail-banner .button {
   background: #fff;
   color: var(--brand-primary);
   border-color: #fff;
 }
-.contest-banner-summary { text-align:right; }
-.contest-information-section { margin-bottom:28px; }
-.contest-information-section h2 { margin:0 0 12px; }
-.contest-information-section .section-heading { margin:0 0 8px; }
-.contest-markdown { color:var(--text); font-size:12px; line-height:1.7; overflow-wrap:anywhere; }
-.contest-markdown p { margin:0 0 10px; }
-.contest-markdown ul,.contest-markdown ol { padding-left:20px; }
-.contest-markdown pre { overflow-x:auto; padding:10px; border:1px solid var(--border); background:var(--surface); }
+.exam-session-banner-summary { text-align:right; }
+.exam-session-information-section { margin-bottom:28px; }
+.exam-session-information-section h2 { margin:0 0 12px; }
+.exam-session-information-section .section-heading { margin:0 0 8px; }
+.exam-session-markdown { color:var(--text); font-size:12px; line-height:1.7; overflow-wrap:anywhere; }
+.exam-session-markdown p { margin:0 0 10px; }
+.exam-session-markdown ul,.exam-session-markdown ol { padding-left:20px; }
+.exam-session-markdown pre { overflow-x:auto; padding:10px; border:1px solid var(--border); background:var(--surface); }
 .problem-markdown { min-width:0; overflow-wrap:anywhere; line-height:1.6; color:var(--text); }
 .problem-markdown > :first-child { margin-top:0; }
 .problem-markdown > :last-child { margin-bottom:0; }
@@ -904,24 +904,24 @@ body:has(.practice-page) {
 .problem-markdown .problem-expression { width:fit-content; max-width:100%; margin:0 0 12px; padding:8px 10px; border:1px solid var(--border-subtle); border-radius:4px; background:var(--subtle); color:var(--text); white-space:pre-wrap; overflow-wrap:anywhere; }
 .problem-markdown .problem-expression code { padding:0; background:transparent; }
 .teacher-preview-dialog > h4 { margin:14px 0 6px; font-size:12px; }
-.contest-rules { line-height:1.6; }
-.contest-rules p { white-space:pre-line; }
-.contest-leaderboard { margin-top:20px; }
-.contest-leaderboard h3 { font-size:13px; }
-.contest-leaderboard ol { margin:8px 0; padding:0; list-style:none; }
-.contest-leaderboard li { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-top:1px solid var(--border); font-size:11px; }
-.contest-detail-layout {
+.exam-session-rules { line-height:1.6; }
+.exam-session-rules p { white-space:pre-line; }
+.exam-session-leaderboard { margin-top:20px; }
+.exam-session-leaderboard h3 { font-size:13px; }
+.exam-session-leaderboard ol { margin:8px 0; padding:0; list-style:none; }
+.exam-session-leaderboard li { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-top:1px solid var(--border); font-size:11px; }
+.exam-session-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--student-sidebar-width);
   gap: 32px;
 }
-.contest-detail-layout h2 {
+.exam-session-detail-layout h2 {
   font-size: 16px;
 }
-.contest-detail-layout .section-heading {
+.exam-session-detail-layout .section-heading {
   margin: 32px 0 8px;
 }
-.contest-problem-row {
+.exam-session-problem-row {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -931,36 +931,36 @@ body:has(.practice-page) {
   border-bottom: 1px solid var(--border);
   font-size: 12px;
 }
-.contest-problem-row small {
+.exam-session-problem-row small {
   display: block;
   color: var(--muted);
   margin-top: 10px;
 }
-.contest-problem-row > span {
+.exam-session-problem-row > span {
   color: var(--accent);
   white-space: nowrap;
 }
-.contest-problem-row > .success-text {
+.exam-session-problem-row > .success-text {
   color: var(--success);
 }
-.contest-participation {
+.exam-session-participation {
   align-self: start;
 }
-.contest-participation dl {
+.exam-session-participation dl {
   font-size: 11px;
   border-bottom: 1px solid var(--border);
 }
-.contest-participation dl div {
+.exam-session-participation dl div {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
   margin: 20px 0;
 }
-.contest-participation dt {
+.exam-session-participation dt {
   color: var(--muted);
 }
-.contest-participation dd {
+.exam-session-participation dd {
   margin: 0;
 }
 .leader-row {
@@ -1233,7 +1233,7 @@ body:has(.practice-page) {
     font-size: 22px;
   }
   .scope-detail-layout,
-  .contest-detail-layout {
+  .exam-session-detail-layout {
     grid-template-columns: minmax(0, 1fr);
   }
   .scope-detail-summary .button {
@@ -1272,12 +1272,12 @@ body:has(.practice-page) {
   .detail-work-panel {
     min-height: 0;
   }
-  .contest-detail-banner {
+  .exam-session-detail-banner {
     flex-direction: column;
     align-items: stretch;
   }
-  .contest-banner-summary { text-align:left; }
-  .contest-problem-row {
+  .exam-session-banner-summary { text-align:left; }
+  .exam-session-problem-row {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -1484,8 +1484,8 @@ body:has(.assignment-work-page), body:has(.scope-detail-page) { background: var(
   .practice-pagination-mobile { display:block; }
 }
 
-/* Assignment, contest and submission screens. */
-.contest-tab-count { margin-left:3px; color:var(--muted); font-size:10px; }
+/* Assignment, exam session and submission screens. */
+.exam-session-tab-count { margin-left:3px; color:var(--muted); font-size:10px; }
 .submissions-page { max-width:1314px; }
 .submissions-filters { grid-template-columns:minmax(220px,3.4fr) 1fr 1fr; }
 .submissions-table { min-width:760px; }
@@ -1510,7 +1510,7 @@ body:has(.assignment-work-page), body:has(.scope-detail-page) { background: var(
 .submission-detail-footer { flex:none; background:var(--surface); }
 
 @media (max-width:760px) {
-  .contest-tab-count { font-size:9px; }
+  .exam-session-tab-count { font-size:9px; }
   .submissions-page { padding-top:20px; }
   .submissions-filters { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
   .submissions-filters .search-field { grid-column:1/-1; }
@@ -1539,10 +1539,10 @@ body:has(.assignment-work-page), body:has(.scope-detail-page) { background: var(
   .submission-detail-footer .button { justify-content:center; }
 }
 
-/* Pagination affects only the student contest feed. */
-.contest-feed-panel { scroll-margin-top: calc(var(--header-height) + 12px); }
-.contest-feed-panel > .section-heading { flex-wrap: wrap; gap: 12px; }
-.contest-list-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 14px; margin-left: auto; }
-.contest-list-pagination { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.contest-list-pagination > span { color: var(--muted); font-size: 11px; }
-.contest-list-pagination .button { min-height: 30px; padding: 5px 9px; font-size: 11px; }
+/* Pagination affects only the student exam session feed. */
+.exam-session-feed-panel { scroll-margin-top: calc(var(--header-height) + 12px); }
+.exam-session-feed-panel > .section-heading { flex-wrap: wrap; gap: 12px; }
+.exam-session-list-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 14px; margin-left: auto; }
+.exam-session-list-pagination { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.exam-session-list-pagination > span { color: var(--muted); font-size: 11px; }
+.exam-session-list-pagination .button { min-height: 30px; padding: 5px 9px; font-size: 11px; }

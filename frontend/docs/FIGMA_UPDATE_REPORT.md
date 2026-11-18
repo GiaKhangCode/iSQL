@@ -15,19 +15,19 @@ File: https://www.figma.com/design/A2mwI7yuWBhYWAMswSVrjw/Web-th%E1%BB%B1c-h%C3%
 | Workspace                   | 65:2623; interaction annotations in 65:2624    |
 | Class detail                | 91:179 desktop; 91:208 mobile                  |
 | Group detail                | 326:1893 desktop; 326:1975 mobile              |
-| Contests                    | 91:229 list; 91:279 detail; 116:2881 standings |
+| ExamSessions                    | 91:229 list; 91:279 detail; 116:2881 standings |
 | Submissions                 | 135:3190 list; 138:4323 detail overlay         |
 
-The shared header now uses notifications, learning streak and account identity. Appearance controls belong in the account menu. Practice includes a Favorite list and trending sidebar. Class/group views have dedicated detail layouts. Contest detail includes rules, problem links, participation and sample standings. Submission details preserve immutable SQL separately from the editable draft.
+The shared header now uses notifications, learning streak and account identity. Appearance controls belong in the account menu. Practice includes a Favorite list and trending sidebar. Class/group views have dedicated detail layouts. ExamSession detail includes rules, problem links, participation and sample standings. Submission details preserve immutable SQL separately from the editable draft.
 
 ## Implemented behavior
 
 - Shared Updates/Events popover, contextual destination links, persisted unread state, streak popover, account appearance selection and Logout. Only one header popover opens at a time. Escape returns focus, outside clicks/focus close it, and navigation dismisses it.
-- Protected class, group and contest detail routes, with shared workspace links. Existing intended-route restoration accepts the new destinations. Legacy contest query links remain compatible.
+- Protected class, group and examSession detail routes, with shared workspace links. Existing intended-route restoration accepts the new destinations. Legacy examSession query links remain compatible.
 - Class/group work and member sections use fixture relationships. Group 03 belongs to Database Systems. Member initials and the current Student identity are displayed coherently.
 - Practice lists eight fixture problems in ID order, supports persistent favorites, and includes contextual trending links. The sidebar aligns with the filters.
 - Dashboard learning/deadline regions scroll, expose keyboard focus, and use fixture counts rather than fabricated duplicate rows.
-- Workspace adds Save, a separate reset action, SQL indentation formatting, caret position and editor expansion/restoration. Formatting uses CodeMirror indentation and preserves SQL tokens. Reset preserves drafts. Contest workspace links disable hints and AI.
+- Workspace adds Save, a separate reset action, SQL indentation formatting, caret position and editor expansion/restoration. Formatting uses CodeMirror indentation and preserves SQL tokens. Reset preserves drafts. ExamSession workspace links disable hints and AI.
 - Submission drawer preserves list filters on close, shows immutable query/database snapshots, offers copy with a manual-copy fallback, and keeps auto/instructor scores separate. Opening a problem does not replace its draft.
 - Streak calculations use unique accepted calendar days in ICT, including illustrative fixture history and new in-memory Accepted attempts. The reference date has a 7-day streak and 12-day best; an expired streak becomes muted.
 - Existing conflicting account/header rules were removed or edited directly. Additional component/detail styles use the same theme tokens. CodeMirror language/view dependencies are declared directly and deduplicated.
@@ -35,7 +35,7 @@ The shared header now uses notifications, learning streak and account identity. 
 ## Main changed files
 
 - src/components/AppHeader.tsx, SubmissionDetails.tsx and ui.tsx
-- src/pages/student/AssignmentDetailPage.tsx and ContestDetailPage.tsx
+- src/pages/student/AssignmentDetailPage.tsx and ExamSessionDetailPage.tsx
 - All six existing Student page components
 - src/app/App.tsx, src/context/ThemeContext.tsx
 - src/services/studentApi.ts and studentPreferences.ts
@@ -47,7 +47,7 @@ The shared header now uses notifications, learning streak and account identity. 
 
 - npm run test: passes application TypeScript and service regression checks. New cases cover immutable query/database snapshots, draft independence, duplicate/out-of-order accepted days, missed-day streak expiry, empty streaks, favorites persistence/toggling and malformed preference data.
 - npm run build: passes TypeScript project checking and Vite production bundling. The editor remains lazy loaded; the deduplicated editor chunk is below Vite's 500 kB warning threshold.
-- HTTP: status 200 at http://127.0.0.1:5174/ for the entry, Login, Register, all six Student routes, /assignments/classes/c1, /assignments/groups/g1 and /contests/t1. Updated header/detail/editor source modules and all five local SVG assets also return 200.
+- HTTP: status 200 at http://127.0.0.1:5174/ for the entry, Login, Register, all six Student routes, /assignments/classes/c1, /assignments/groups/g1 and /exam-sessions/t1. Updated header/detail/editor source modules and all five local SVG assets also return 200.
 - .codex-backup hashes match the preserved originals. No backup file was modified.
 - Source inspection found no Teacher/Admin routes, screens, role switcher or navigation in src.
 - Dependency installation reports two moderate advisories in the existing React Router dependency chain; resolution requires a major-version migration and was not included in this design update.
@@ -56,9 +56,9 @@ The shared header now uses notifications, learning streak and account identity. 
 
 No application route was visually inspected in a browser, at desktop or mobile sizes, in either theme. The previous Computer Use inspection was stopped because it could not reliably determine Chrome's URL; the user explicitly prohibited retrying or bypassing that restriction. No retry was attempted. Figma screenshots were inspected, but browser rendering, measured overflow, browser console and pixel comparisons remain unverified. HTTP success verifies delivery rather than rendering or authentication behavior.
 
-Mock fixtures use two classes, one group, a four-member sample roster, three assignments and five seeded submissions. They do not reproduce every reference count or activity row. Dashboard currently has three in-progress fixtures rather than five repeated sample rows. Trending, notification ages, activity, contest availability and ranking times are illustrative. Streak dates follow the calendar and therefore change from the reference date. Logout is retained in the account menu although the new account reference concentrates on appearance.
+Mock fixtures use two classes, one group, a four-member sample roster, three assignments and five seeded submissions. They do not reproduce every reference count or activity row. Dashboard currently has three in-progress fixtures rather than five repeated sample rows. Trending, notification ages, activity, examSession availability and ranking times are illustrative. Streak dates follow the calendar and therefore change from the reference date. Logout is retained in the account menu although the new account reference concentrates on appearance.
 
-Real SQL execution, AI, authentication, grading, contest registration and authorization remain outside this frontend implementation. Attempts, progress and contest completion reset on refresh. Session, theme, drafts, favorites and notification read state persist locally where storage is available. Hidden test cases, reference answers and server error internals are not exposed.
+Real SQL execution, AI, authentication, grading, examSession registration and authorization remain outside this frontend implementation. Attempts, progress and examSession completion reset on refresh. Session, theme, drafts, favorites and notification read state persist locally where storage is available. Hidden test cases, reference answers and server error internals are not exposed.
 
 ## Latest page 2.2 revision
 
@@ -78,7 +78,7 @@ Reviewed Assignments list desktop light 91:112, desktop dark 100:1412, mobile li
 
 The Classes view now uses one bordered two-column grid with shared dividers and a fixed desktop content region, replacing independent spaced cards. Search and count align above it. Mobile uses compact glyph/identity/deadline rows with a Calendar dialog entry. The existing joined-group destinations remain discoverable through a small link; the Groups view keeps its scope tabs.
 
-Fixtures now provide four classes (Database Systems, SQL Fundamentals, Advanced SQL and Data Analytics), two joined groups and six assignments, of which five remain pending. The Assignments calendar excludes contests and completed work; Dashboard still combines assignment/contest deadlines. Class/group relationships, pending counts and next due dates are derived from the fixtures. The reference calendar date is September 17 for this page, matching the updated frame; other calendar callers retain their prior reference date.
+Fixtures now provide four classes (Database Systems, SQL Fundamentals, Advanced SQL and Data Analytics), two joined groups and six assignments, of which five remain pending. The Assignments calendar excludes examSessionList and completed work; Dashboard still combines assignment/exam-session deadlines. Class/group relationships, pending counts and next due dates are derived from the fixtures. The reference calendar date is September 17 for this page, matching the updated frame; other calendar callers retain their prior reference date.
 
 Class detail rows now use assignment codes, due/progress columns, and contextual Start/Continue/Review workspace links. All problems remain accessible through a read-only assignment dialog. Group roster displays respect the actual mock member count. The class roster remains a small illustrative fixture rather than the full 24-member Figma example.
 
@@ -90,8 +90,8 @@ Removed the fixed 628px list height, empty grid divider columns, and shared oute
 ### Class-only assignment view
 Removed the Classes/Groups selector and separate group list from the Assignment landing page. Classes link to their detail pages, where the student's group and members remain visible. Group detail navigation returns to its owning class. The class cards sit inside a distinct white surface in light mode (theme surface in dark mode), with the desktop calendar overlapping the panel edge by 24px. Mobile retains the calendar dialog and padded class panel. Verified with npm run test, npm run build, and HTTP 200 for /assignments; browser visual inspection remains unavailable.
 
-### Contest Hall of Fame fit
-Reviewed latest Figma frame 91:229, Hall of Fame node 306:8866. Replaced the sidebar divider with a bordered surface card, 16px padding, compact 20px winner rows, and the published-results link (opens the Past contest filter). Uses a 336px desktop column, 280px tablet column, and full-width mobile card; height follows wrapped content instead of clipping to the design frame's 447px. Tests and production build passed, /contests returned HTTP 200. Browser visual inspection remains unavailable.
+### ExamSession Hall of Fame fit
+Reviewed latest Figma frame 91:229, Hall of Fame node 306:8866. Replaced the sidebar divider with a bordered surface card, 16px padding, compact 20px winner rows, and the published-results link (opens the Past examSession filter). Uses a 336px desktop column, 280px tablet column, and full-width mobile card; height follows wrapped content instead of clipping to the design frame's 447px. Tests and production build passed, /exam-sessions returned HTTP 200. Browser visual inspection remains unavailable.
 
 ### New assignment problem details
 Reviewed Figma class detail 91:179 and new assignment detail 452:368. Assignment row arrows now open protected /assignments/work/:assignmentId with due date, problem count, progress, status, and numbered problems with Start/Continue/Review workspace actions. Class cards retain navigation to their class detail. Uses actual mock problem counts, and preserves the user's white Assignment background and shared sidebar widths. Responsive layouts wrap summary columns and problem actions on mobile. Browser visual verification remains unavailable. Tests, build, and HTTP checks used for validation.
@@ -105,21 +105,21 @@ Reviewed Figma node 19:112 and frame 506:1573 (Returning / Light v2). Dashboard 
 ### Authentication recovery screens
 Reconnected to the current Figma file and reviewed its Authentication section. In addition to Sign in and Register, it contains Verify OTP (504:206), Forgot Password (504:247), and Reset Password (504:281), with dark variants 504:322 through 504:491. Added `/forgot-password`, `/verify-otp`, and `/reset-password` public routes. Forgot Password and Verify OTP use the centered form-only layout; Reset Password shares the split editor-preview layout. Sign in's Forgot password link now opens the recovery screen. Updated registration fields, password visibility controls, and placeholders to match the current frames.
 
-The backend currently has no OTP, recovery-email, or password-reset endpoints. The recovery forms validate their inputs and show a clear unavailable message on submission; they do not claim to send a code or change a password. No backend behavior was added. The excluded Dashboard, Practice, and SQL Workspace screens were not reviewed. The previously reported class/group/contest/submission screens were not changed in this pass.
+The backend currently has no OTP, recovery-email, or password-reset endpoints. The recovery forms validate their inputs and show a clear unavailable message on submission; they do not claim to send a code or change a password. No backend behavior was added. The excluded Dashboard, Practice, and SQL Workspace screens were not reviewed. The previously reported class/group/exam-session/submission screens were not changed in this pass.
 
-## Assignments, contests and submissions refresh — September 23, 2026
+## Assignments, examSessionList and submissions refresh — September 23, 2026
 
 Reconnected to the current [SQL UIT Figma file](https://www.figma.com/design/A2mwI7yuWBhYWAMswSVrjw/Web-th%E1%BB%B1c-h%C3%A0nh-SQL-UIT) and compared the requested page sections using their desktop and mobile light frames:
 
 | Screen | Reference frames |
 | --- | --- |
 | Assignments, class and assignment detail | 91:112, 91:151, 91:179, 91:208, 452:368 |
-| Contest list and detail | 91:229, 91:258, 91:279, 91:308 |
+| ExamSession list and detail | 91:229, 91:258, 91:279, 91:308 |
 | Submission list and detail | 135:3190, 135:3542, 138:4323, 138:4529 |
 
-`studentApi.getAssignments()` and `getContests()` now return the existing typed fixtures. Their placeholder empty arrays left the updated assignment and contest views blank and triggered most of the supplied TypeScript build errors. The contest detail submission lookup now explicitly uses the `Submission` type.
+`studentApi.getAssignments()` and `getExamSessions()` now return the existing typed fixtures. Their placeholder empty arrays left the updated assignment and examSession views blank and triggered most of the supplied TypeScript build errors. The examSession detail submission lookup now explicitly uses the `Submission` type.
 
-The contest status tabs show counts derived from the fixture data, and the featured contests use a swipeable card row on mobile. Submission filters now follow Search, Source, Result; the desktop table matches the SQL problem, Source, Result, Submitted and chevron columns without a score column. Mobile uses compact tappable submission cards rather than a wide table. The submission drawer presents automatic and final scores separately, with an explicit pending state when there is no instructor score, keeps the submitted SQL read-only and preserves the draft when opening the problem.
+The examSession status tabs show counts derived from the fixture data, and the featured examSessionList use a swipeable card row on mobile. Submission filters now follow Search, Source, Result; the desktop table matches the SQL problem, Source, Result, Submitted and chevron columns without a score column. Mobile uses compact tappable submission cards rather than a wide table. The submission drawer presents automatic and final scores separately, with an explicit pending state when there is no instructor score, keeps the submitted SQL read-only and preserves the draft when opening the problem.
 
 No test suites were run. `npm run build` passes TypeScript and Vite production bundling. Vite reports the existing 585 kB lazy Workspace chunk above its 500 kB advisory threshold. The Figma light frames were inspected; application browser screenshots were not performed, consistent with the prior Computer Use restriction. Dashboard, Practice and SQL Workspace remain excluded from this review.
 
@@ -134,9 +134,9 @@ Reviewed the current Teacher Problem Editor and Teacher Management canvases, inc
 | Classes and groups | 367:6405 desktop, 367:6433 mobile |
 | Results | 367:6461 desktop, 367:6489 mobile |
 | Manual review | 367:6517 desktop, 367:6545 mobile |
-| Contest builder | 500:4041 desktop |
+| ExamSession builder | 500:4041 desktop |
 
-Added a role-specific Teacher area with Problems, Assignments, Classes and Results navigation. Assignment and contest builders share the Figma form layout; the assignment builder links to contest creation. Results link into manual review. Desktop uses the two-column editor and builder layouts; mobile stacks the forms, tables and grading sections to follow the reference frames. Existing theme tokens style both light and dark modes.
+Added a role-specific Teacher area with Problems, Assignments, Classes and Results navigation. Assignment and examSession builders share the Figma form layout; the assignment builder links to examSession creation. Results link into manual review. Desktop uses the two-column editor and builder layouts; mobile stacks the forms, tables and grading sections to follow the reference frames. Existing theme tokens style both light and dark modes.
 
 The login accepts the demo account `teacher` with password `123` and opens `/teacher/problems`. The demo session survives refresh in local storage and skips backend session verification. Drafts, publish state and review edits are stored locally; SQL validation, publishing, class changes, score review and CSV export are frontend demo behavior, with no teacher API calls.
 
@@ -144,9 +144,9 @@ The login accepts the demo account `teacher` with password `123` and opens `/tea
 
 ### Teacher Figma refresh — September 24, 2026
 
-Rechecked the latest light desktop and mobile contexts for the Problem Editor (365:113, 365:205), Assignment builder (367:6349, 367:6377), Classes and groups (367:6405, 367:6433), Results (367:6461, 367:6489), Manual review (367:6517, 367:6545), and Contest builder (500:4041, 596:371). Also reviewed the Problem Editor operational states (368:112).
+Rechecked the latest light desktop and mobile contexts for the Problem Editor (365:113, 365:205), Assignment builder (367:6349, 367:6377), Classes and groups (367:6405, 367:6433), Results (367:6461, 367:6489), Manual review (367:6517, 367:6545), and ExamSession builder (500:4041, 596:371). Also reviewed the Problem Editor operational states (368:112).
 
-Updated Teacher navigation to include Contests. The Problem Editor now has Private/Public visibility and a Mark as ready action. Assignment and Contest builders now expose local Hints, Comments and Leaderboard switches. Classes and groups now show class join-request counts and an approval/rejection queue. Results include attempt counts and a Review action, and Manual review lets the demo switch between attempts and move between submissions.
+Updated Teacher navigation to include ExamSessions. The Problem Editor now has Private/Public visibility and a Mark as ready action. Assignment and ExamSession builders now expose local Hints, Comments and Leaderboard switches. Classes and groups now show class join-request counts and an approval/rejection queue. Results include attempt counts and a Review action, and Manual review lets the demo switch between attempts and move between submissions.
 
 These controls use local demo state and fixtures; no Teacher backend API was added. `npm run build` passes TypeScript and Vite production bundling. Vite retains its existing 585 kB Workspace chunk advisory. No tests were run. Browser screenshot verification was not performed under the previously stated Computer Use restriction.
 
@@ -173,7 +173,7 @@ The login accepts `admin` with password `123` and opens `/admin/overview`. The d
 
 ### Teacher Figma follow-up — September 24, 2026
 
-Rechecked all six Teacher screens in desktop and mobile light and dark variants, plus the Problem Editor operational states (365:113–251, 368:112, 367:6349–6559, 500:4041, 501:6286, 596:371–469). The latest Problem Editor adds a SQL seed-data editor and places Topics before Visibility. Assignment and Contest builders show a three-column problem table and use the main Teacher navigation to switch between builders. The Results screen ends at the submission count, while each result row leads to manual review. Manual review retains the test detail from its result fixture.
+Rechecked all six Teacher screens in desktop and mobile light and dark variants, plus the Problem Editor operational states (365:113–251, 368:112, 367:6349–6559, 500:4041, 501:6286, 596:371–469). The latest Problem Editor adds a SQL seed-data editor and places Topics before Visibility. Assignment and ExamSession builders show a three-column problem table and use the main Teacher navigation to switch between builders. The Results screen ends at the submission count, while each result row leads to manual review. Manual review retains the test detail from its result fixture.
 
 Updated the local demo to match those changes. Seed SQL and its summary now save with the problem draft, including compatibility with drafts saved before this field existed. Removed builder actions and table controls absent from Figma, removed the extra Results shortcut, and aligned the test detail and problem table columns. Theme styling continues to use the existing light/dark tokens.
 
@@ -181,11 +181,11 @@ Updated the local demo to match those changes. Seed SQL and its summary now save
 
 ### Teacher landing pages and Results refresh — September 24, 2026
 
-Reviewed the updated Teacher Problem Library (596:675 desktop light, 596:828 desktop dark, 596:976 mobile light), Assignments (602:597, 602:745, 602:893), Contests (603:161, 603:331, 603:501), and Results (604:161, 604:309, 604:479) frames. Also checked the empty states for Problems (605:161), Assignments (605:317), Contests (605:495), and Classes (605:673), and the Assignment and Contest builder references (367:6349 and 500:4041).
+Reviewed the updated Teacher Problem Library (596:675 desktop light, 596:828 desktop dark, 596:976 mobile light), Assignments (602:597, 602:745, 602:893), ExamSessions (603:161, 603:331, 603:501), and Results (604:161, 604:309, 604:479) frames. Also checked the empty states for Problems (605:161), Assignments (605:317), ExamSessions (605:495), and Classes (605:673), and the Assignment and ExamSession builder references (367:6349 and 500:4041).
 
-Teacher sign-in now lands on the Problem library at `/teacher/problems`; the edit form opens from New problem or Edit. Assignments and Contests now open searchable, filterable list pages, with their existing builders at `/teacher/assignments/new` and `/teacher/contests/new`. Added the empty-state layouts for all four Teacher list areas. Rebuilt Results around assignment/contest activity with class, type and review filters, summary metrics, CSV export and actions leading into the demo review flow.
+Teacher sign-in now lands on the Problem library at `/teacher/problems`; the edit form opens from New problem or Edit. Assignments and ExamSessions now open searchable, filterable list pages, with their existing builders at `/teacher/assignments/new` and `/teacher/exam-sessions/new`. Added the empty-state layouts for all four Teacher list areas. Rebuilt Results around assignment/exam-session activity with class, type and review filters, summary metrics, CSV export and actions leading into the demo review flow.
 
-Added an AI assistance switch to both builder Student options. The disabled state is explicitly labeled “AI assistance is not allowed”; it defaults off for contests and on for assignments. Existing saved drafts without this field load using those defaults. Contest rule text follows the switch when toggled. Problem library edits, duplicates and deletions use browser-local demo data; assignment/contest list fixtures remain frontend-only.
+Added an AI assistance switch to both builder Student options. The disabled state is explicitly labeled “AI assistance is not allowed”; it defaults off for examSessionList and on for assignments. Existing saved drafts without this field load using those defaults. ExamSession rule text follows the switch when toggled. Problem library edits, duplicates and deletions use browser-local demo data; assignment/exam-session list fixtures remain frontend-only.
 
 `npm run build` passes TypeScript and Vite production bundling. Vite reports the existing 585 kB lazy Workspace chunk above its 500 kB advisory threshold. No tests were run. Application browser screenshot verification was not performed under the previously documented Computer Use restriction.
 
@@ -221,19 +221,19 @@ Made the full class row selectable, with a keyboard-focusable class control. Sel
 
 ### Teacher list detail panels — September 24, 2026
 
-Added selectable rows and right-side key detail panels for the Problem library, Contests and Results lists. The Problem and Contest panels link to their existing editors. The Results panel's **Edit** button opens the in-page result details dialog and does not navigate. `npm run build` passes; the existing 585 kB lazy Workspace chunk advisory remains. No tests were run.
+Added selectable rows and right-side key detail panels for the Problem library, ExamSessions and Results lists. The Problem and ExamSession panels link to their existing editors. The Results panel's **Edit** button opens the in-page result details dialog and does not navigate. `npm run build` passes; the existing 585 kB lazy Workspace chunk advisory remains. No tests were run.
 
 ### Teacher Assignments detail panel — September 24, 2026
 
 Added selectable assignment rows and a matching right-side panel with class, problem count, due date, submission count and status. Its **Edit** button links to the existing Assignment editor. `npm run build` passes; the existing 585 kB lazy Workspace chunk advisory remains. No tests were run.
 
-### Teacher contest actions — September 24, 2026
+### Teacher examSession actions — September 24, 2026
 
-Removed **Edit** from contest row actions. The selected contest detail panel now provides **Results** and **Leaderboard** actions, while row-level Preview, Duplicate and View actions remain where applicable. Leaderboard currently shows a demo notice. `npm run build` passes; the existing 585 kB lazy Workspace chunk advisory remains. No tests were run.
+Removed **Edit** from examSession row actions. The selected examSession detail panel now provides **Results** and **Leaderboard** actions, while row-level Preview, Duplicate and View actions remain where applicable. Leaderboard currently shows a demo notice. `npm run build` passes; the existing 585 kB lazy Workspace chunk advisory remains. No tests were run.
 
-### Assignment and Contest detail panels — September 24, 2026
+### Assignment and ExamSession detail panels — September 24, 2026
 
-Removed the Actions columns from the Assignments and Contests tables. Both lists now select the first visible item on load and show its details in the right panel. Assignment details include its classes, problem count, due date, submission progress and status, with Edit and Results actions. Contest details include classes, start time, duration, participant progress and status, with Results and Leaderboard actions. No tests were run.
+Removed the Actions columns from the Assignments and ExamSessions tables. Both lists now select the first visible item on load and show its details in the right panel. Assignment details include its classes, problem count, due date, submission progress and status, with Edit and Results actions. ExamSession details include classes, start time, duration, participant progress and status, with Results and Leaderboard actions. No tests were run.
 
 ### Problem library actions panel — September 24, 2026
 

@@ -16,7 +16,7 @@ import { TeacherListPagination } from "@/shared/components/TeacherListPagination
 import { TeacherListLoading } from "@/shared/components/TeacherListLoading";
 import { assignmentClassNames } from "@/features/teacher/filters/AssignmentFilters";
 
-export function ResultsList({isContest,assignments,loading,error,onSwitchKind}:{isContest:boolean;assignments?:any[];loading:boolean;error:string;onSwitchKind?:()=>void}) {
+export function ResultsList({isExamSession,assignments,loading,error,onSwitchKind}:{isExamSession:boolean;assignments?:any[];loading:boolean;error:string;onSwitchKind?:()=>void}) {
   const order=useListOrder();
   const dates = useListDateFilters();
   const { t: tr } = useLanguage("teacher");
@@ -32,17 +32,17 @@ export function ResultsList({isContest,assignments,loading,error,onSwitchKind}:{
   const navigate = useNavigate();
   const root=useLocation().pathname.startsWith("/admin/")?"/admin":useLocation().pathname.startsWith("/office/")?"/office":"/teacher";
 
-  const classOptions = useMemo(() => Array.from(new Set((assignments || []).filter(item=>(isContest ? Boolean(item.isContest || item.examinationId) : !item.isContest && !item.examinationId)).flatMap(item => assignmentClassNames(item.classes))))
-    .filter(name => name !== "No classes").sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), [assignments,isContest]);
+  const classOptions = useMemo(() => Array.from(new Set((assignments || []).filter(item=>(isExamSession ? Boolean(item.isExamSession || item.examinationId) : !item.isExamSession && !item.examinationId)).flatMap(item => assignmentClassNames(item.classes))))
+    .filter(name => name !== "No classes").sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), [assignments,isExamSession]);
 
   const filteredRows = useMemo(() => {
     if (!assignments) return [];
     return newestFirst(assignments, item=>item.createdAt).filter((item: any) => {
-      return dates.matches(item) && (isContest ? Boolean(item.isContest || item.examinationId) : !item.isContest && !item.examinationId) && matchesListSearch(search,item.id,item.title,item.classes) &&
+      return dates.matches(item) && (isExamSession ? Boolean(item.isExamSession || item.examinationId) : !item.isExamSession && !item.examinationId) && matchesListSearch(search,item.id,item.title,item.classes) &&
       (classFilter === "All classes" || assignmentClassNames(item.classes).includes(classFilter)) &&
       (statusFilter === "All" || (statusFilter === "Awaiting review" ? item.awaiting > 0 : item.awaiting === 0));
     });
-  }, [search, classFilter, statusFilter, assignments, isContest, dates.key]);
+  }, [search, classFilter, statusFilter, assignments, isExamSession, dates.key]);
 
   const filtered=order.apply(filteredRows,item=>item.id);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 15));
@@ -71,8 +71,8 @@ export function ResultsList({isContest,assignments,loading,error,onSwitchKind}:{
 
       <div className="teacher-list-detail-layout teacher-results-detail-layout teacher-filter-layout">
         <div className="teacher-list-detail-main teacher-results-table-wrap">
-          <TeacherListFilters order={order} suggestions={filtered.map(item=>({id:item.id,title:item.title,description:item.classes}))} dates={dates} actionsTarget={actionsTarget} search={search} onSearchChange={setSearch} searchLabel={tr(isContest?"Search exams…":"Search assignments…")}
-            primaryAction={onSwitchKind && <ListModeSwitch rooms={isContest} labels={["Assignments","Examinations"]} nextKind={isContest?"assignments":"exams"} onChange={()=>onSwitchKind()}/>}
+          <TeacherListFilters order={order} suggestions={filtered.map(item=>({id:item.id,title:item.title,description:item.classes}))} dates={dates} actionsTarget={actionsTarget} search={search} onSearchChange={setSearch} searchLabel={tr(isExamSession?"Search exams…":"Search assignments…")}
+            primaryAction={onSwitchKind && <ListModeSwitch rooms={isExamSession} labels={["Assignments","Examinations"]} nextKind={isExamSession?"assignments":"exams"} onChange={()=>onSwitchKind()}/>}
             filters={[
               { key: "class", label: tr("CLASS"), value: classFilter, defaultValue: "All classes", onChange: setClassFilter,
                 icon: <BookOpen size={17} aria-hidden="true" />, options: ["All classes", ...classOptions].map(value => ({ value, label: tr(value) })) },
@@ -83,7 +83,7 @@ export function ResultsList({isContest,assignments,loading,error,onSwitchKind}:{
             <Table className="teacher-table teacher-results-table teacher-activity-results-table sticky-list-table">
               <thead>
                 <tr>
-                  <th>ID</th><th><TranslatedText>{tr(isContest ? "Examinations" : "Assignments")}</TranslatedText></th><th><TranslatedText>{tr("CLASSES")}</TranslatedText></th><th><TranslatedText>{tr("SUBMITTED")}</TranslatedText></th><th><TranslatedText>{tr("AVG SCORE")}</TranslatedText></th><th><TranslatedText>{tr("AWAITING REVIEW")}</TranslatedText></th>
+                  <th>ID</th><th><TranslatedText>{tr(isExamSession ? "Examinations" : "Assignments")}</TranslatedText></th><th><TranslatedText>{tr("CLASSES")}</TranslatedText></th><th><TranslatedText>{tr("SUBMITTED")}</TranslatedText></th><th><TranslatedText>{tr("AVG SCORE")}</TranslatedText></th><th><TranslatedText>{tr("AWAITING REVIEW")}</TranslatedText></th>
                 </tr>
               </thead>
               <tbody>
@@ -95,7 +95,7 @@ export function ResultsList({isContest,assignments,loading,error,onSwitchKind}:{
                     onDoubleClick={() => openResultDetails(item)}
                   >
                     <td data-label="ID"><Link className="teacher-result-id-link" to={`${root}/results/activity/${encodeURIComponent(item.id)}`} aria-label={tr("Open results for {value0}", {value0:item.title})} onClick={event=>event.stopPropagation()}>{firstIndex + index + 1}</Link></td>
-                    <td data-label={tr(isContest ? "Examinations" : "Assignments")}><button className="teacher-selectable-row-title teacher-list-row-title" type="button" aria-label={tr("Show details for {value0}", { value0: item.title })} onClick={(event) => { event.stopPropagation(); chooseResult(item); }}>{item.title}</button></td>
+                    <td data-label={tr(isExamSession ? "Examinations" : "Assignments")}><button className="teacher-selectable-row-title teacher-list-row-title" type="button" aria-label={tr("Show details for {value0}", { value0: item.title })} onClick={(event) => { event.stopPropagation(); chooseResult(item); }}>{item.title}</button></td>
 
                     <td data-label={tr("CLASSES")}>{item.classes}</td>
                     <td data-label={tr("SUBMITTED")}>{item.submitted}</td>
@@ -125,7 +125,7 @@ export function ResultsList({isContest,assignments,loading,error,onSwitchKind}:{
           {selectedResult ? <>
             <span className="teacher-detail-eyebrow"><TranslatedText>{tr("RESULT DETAILS")}</TranslatedText></span>
             <h2>{selectedResult.title}</h2>
-            <p className="muted"><TranslatedText>{selectedResult.isContest ? tr("Examination") : tr("Assignment")}</TranslatedText> · {selectedResult.classes}</p>
+            <p className="muted"><TranslatedText>{selectedResult.isExamSession ? tr("Examination") : tr("Assignment")}</TranslatedText> · {selectedResult.classes}</p>
             <dl className="teacher-list-detail-facts">
               <div><dt><TranslatedText>{tr("Submitted")}</TranslatedText></dt><dd>{selectedResult.submitted}</dd></div>
               <div><dt><TranslatedText>{tr("Average score")}</TranslatedText></dt><dd>{selectedResult.average}</dd></div>

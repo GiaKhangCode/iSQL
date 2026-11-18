@@ -42,7 +42,6 @@ const GROUPS: PermissionGroup[] = [
     hint: "Giao bài và tổ chức thi",
     permissions: [
       { code: "assignment.create", label: "Tạo bài tập", description: "Tạo, sửa, xóa bài tập và giao cho lớp hoặc sinh viên." },
-      { code: "contest.create", label: "Tạo cuộc thi", description: "Tạo và quản lý cuộc thi, ca thi riêng." },
       { code: "examination.manage", label: "Tổ chức kỳ thi", description: "Lập kỳ thi chính thức, chia ca, gán lớp và phòng thi." },
       { code: "exam.credentials", label: "Cấp tài khoản ca thi", description: "Cấp và xuất tài khoản thi tạm cho sinh viên." },
       { code: "exam.proctor", label: "Giám sát phòng thi", description: "Coi thi mọi lớp trong ca thi được phân công." },

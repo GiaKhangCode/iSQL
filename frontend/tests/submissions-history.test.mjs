@@ -11,7 +11,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.ResizeObserver=class{observe(){}disconnect(){}};
 HTMLElement.prototype.scrollTo=()=>{};
 const sections=['DDL','DML','SQL','TRIGGER'].map((part,index)=>({part,status:'Accepted',questions:[{id:`q${index}`,description:`Prompt ${part}`,name:'private.sql',ratio:1,status:'Accepted',datasets:[{dataset:1,correct:true,message:'Your answer matches the reference.'}]}]}));
-const snapshot={id:'official',problemId:'P',source:'Contests',context:'C',contextTitle:'Test 3',appealStatus:'Graded',canAppeal:true,result:'Accepted',score:10,maxScore:10,evaluatedScore:10,submittedAt:'2026-11-01T10:00:00Z',sections,query:'-- DDL\n-- solution:q0\nCREATE TABLE T(id INT);\n\n-- DML\n-- solution:q1\nUPDATE T SET id=1;\n\n-- SQL\n-- solution:q2\nSELECT id FROM T;\n\n-- TRIGGER\n-- solution:q3\nCREATE TRIGGER trg ON T AFTER INSERT AS SELECT 1;'};
+const snapshot={id:'official',problemId:'P',source:'ExamSession',context:'C',contextTitle:'Test 3',appealStatus:'Graded',canAppeal:true,result:'Accepted',score:10,maxScore:10,evaluatedScore:10,submittedAt:'2026-11-01T10:00:00Z',sections,query:'-- DDL\n-- solution:q0\nCREATE TABLE T(id INT);\n\n-- DML\n-- solution:q1\nUPDATE T SET id=1;\n\n-- SQL\n-- solution:q2\nSELECT id FROM T;\n\n-- TRIGGER\n-- solution:q3\nCREATE TRIGGER trg ON T AFTER INSERT AS SELECT 1;'};
 const rows=[{...snapshot,id:'newest'},snapshot,{...snapshot,id:'draft',questionOnly:true}];
 globalThis.__historyApi={requestSubmissionAppeal:async id=>{const row=rows.find(row=>row.id===id);row.appealStatus='Awaiting regrade';row.canAppeal=false;return {status:'Awaiting regrade'};},getSubmissions:async filters=>{globalThis.__historyFilters=filters;return rows;},getProblems:async()=>[{id:'P',number:'251',title:'Sales'}]};
 const output=await build({stdin:{contents:`export {act,createElement} from 'react';export {createRoot} from 'react-dom/client';export {MemoryRouter} from 'react-router-dom';export {SubmissionsPage} from './src/features/student/SubmissionsPage';export {SubmissionQuestions,submissionQuestionGroups} from './src/shared/components/SubmissionQuestions';`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',plugins:[{name:'history-adapters',setup(b){
@@ -46,7 +46,7 @@ try{
  assert.equal(document.querySelector('textarea').value,'SELECT id FROM T;');
  await click(document.querySelectorAll('.submission-part-tabs button')[3]);
  assert.equal(document.querySelector('textarea').value,'CREATE TRIGGER trg ON T AFTER INSERT AS SELECT 1;');
- assert.ok(document.querySelector('.submission-detail-footer a').getAttribute('href').includes('source=Contests&context=C'));
+ assert.ok(document.querySelector('.submission-detail-footer a').getAttribute('href').includes('source=ExamSession&context=C'));
  assert.equal(document.querySelector('dialog'),null,'Per-question code is visible inline');
  assert.equal(submissionQuestionGroups({...snapshot,query:'-- SQL\n-- solution:q2\n',sections:[sections[2]]})[0].questions.length,1,'Empty last answer creates no phantom question');
  assert.equal(submissionQuestionGroups({...snapshot,query:'SELECT 42;',sections:[{part:'SQL',questions:[]}]})[0].questions[0].script,'SELECT 42;','Legacy SQL-only submissions retain their exact answer without markers');

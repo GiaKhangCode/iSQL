@@ -5,22 +5,22 @@ import { workspaceDraftKey } from "@/shared/lib/workspace/workspaceParts";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { studentApi } from "@/shared/api/studentApi";
-import type { Contest } from "@/data/models";
-import type { ContestSchema } from "@/features/workspace/types";
-import { ContestCardsView, ContestDiagramCanvas } from "@/features/workspace/components/ContestWorkspaceSchemaViews";
+import type { ExamSession } from "@/data/models";
+import type { ExamSessionSchema } from "@/features/workspace/types";
+import { ExamSessionCardsView, ExamSessionDiagramCanvas } from "@/features/workspace/components/ExamSessionWorkspaceSchemaViews";
 import { parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
-import "@/styles/contest-exam.css";
+import "@/styles/exam-session-workspace.css";
 
-export function useContestWorkspace() {
+export function useExamSessionWorkspace() {
   const { t: tr } = useLanguage("workspace");
   const { session } = useAuth();
   const hydratedDraftKey = useRef<string | null>(null);
-  const { contestId = "" } = useParams();
+  const { examSessionId = "" } = useParams();
   const navigate = useNavigate();
-  const draftKey = workspaceDraftKey(session?.id || "anonymous", contestId, "exam");
+  const draftKey = workspaceDraftKey(session?.id || "anonymous", examSessionId, "exam");
 
-  // Contest data
-  const [contest, setContest] = useState<Contest | null>(null);
+  // Exam session data
+  const [examSession, setExamSession] = useState<ExamSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export function useContestWorkspace() {
   const [ddlLog, setDdlLog] = useState<{ status: string; messages: string[]; error?: string } | null>(null);
 
   // Schema Inspector & Database Diagram
-  const [schemaData, setSchemaData] = useState<ContestSchema | null>(null);
+  const [schemaData, setSchemaData] = useState<ExamSessionSchema | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaVisible, setSchemaVisible] = useState(true);
   const [schemaViewMode, setSchemaViewMode] = useState<"diagram" | "cards">("diagram");
@@ -65,27 +65,27 @@ export function useContestWorkspace() {
   const [showScorecardModal, setShowScorecardModal] = useState(false);
   const [scorecard, setScorecard] = useState<any | null>(null);
 
-  // Load contest & setup database
+  // Load exam session & setup database
   useEffect(() => {
     let isMounted = true;
-    async function loadContest() {
+    async function loadExamSession() {
       try {
         setLoading(true);
-        const contestOrExam = await studentApi.getContestOrExam?.(contestId);
-        const found = contestOrExam;
+        const examSessionOrExam = await studentApi.getExamSessionOrExam?.(examSessionId);
+        const found = examSessionOrExam;
         if (!found) {
-          throw new Error("The contest was not found or is unavailable.");
+          throw new Error("The exam session was not found or is unavailable.");
         }
         if (found.examType !== "comprehensive") {
-          throw new Error("This contest does not use the comprehensive exam format (DDL + DML + SQL).");
+          throw new Error("This exam session does not use the comprehensive exam format (DDL + DML + SQL).");
         }
-        if (isMounted) setContest(found);
+        if (isMounted) setExamSession(found);
 
         // Set up the student exam database
-        await studentApi.setupContestDb(contestId);
+        await studentApi.setupExamSessionDb(examSessionId);
 
         // Load the initial table structure
-        const schema = await studentApi.inspectContestSchema(contestId);
+        const schema = await studentApi.inspectExamSessionSchema(examSessionId);
         if (isMounted) setSchemaData(schema);
 
         setDdlScript("");
@@ -108,38 +108,38 @@ export function useContestWorkspace() {
         if (isMounted) setLoading(false);
       }
     }
-    loadContest();
+    loadExamSession();
     return () => {
       isMounted = false;
     };
-  }, [contestId, draftKey]);
+  }, [examSessionId, draftKey]);
 
   // Timer countdown
   useEffect(() => {
     const timer = setInterval(() => {
       const current = Date.now();
       setNow(current);
-      if (contest?.closesAt) {
-        const end = parseServerDateTime(contest.closesAt).getTime();
+      if (examSession?.closesAt) {
+        const end = parseServerDateTime(examSession.closesAt).getTime();
         setTimeRemaining(Math.max(0, end - current));
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [contest]);
+  }, [examSession]);
 
   // Auto-save draft to localStorage whenever ddlScript or queryAnswers change
   useEffect(() => {
-    if (!contestId || loading || error || hydratedDraftKey.current !== draftKey) return;
+    if (!examSessionId || loading || error || hydratedDraftKey.current !== draftKey) return;
     const draft = { ddlScript, queryAnswers };
     localStorage.setItem(draftKey, JSON.stringify(draft));
-  }, [contestId, draftKey, ddlScript, queryAnswers, loading, error]);
+  }, [examSessionId, draftKey, ddlScript, queryAnswers, loading, error]);
 
   // Refresh Schema Inspector
   const refreshSchema = async () => {
-    if (!contestId) return;
+    if (!examSessionId) return;
     try {
       setSchemaLoading(true);
-      const schema = await studentApi.inspectContestSchema(contestId);
+      const schema = await studentApi.inspectExamSessionSchema(examSessionId);
       setSchemaData(schema);
     } catch (e) {
       console.error("Unable to refresh the schema:", e);
@@ -150,14 +150,14 @@ export function useContestWorkspace() {
 
   // Step 1: Execute DDL
   const handleRunDdl = async () => {
-    if (!contestId || !ddlScript.trim()) {
+    if (!examSessionId || !ddlScript.trim()) {
       setDdlLog({ status: "Error", messages: [], error: "Enter a DDL script before running it." });
       return;
     }
     try {
       setDdlRunning(true);
       setDdlLog(null);
-      const res = await studentApi.runContestDdl(contestId, ddlScript);
+      const res = await studentApi.runExamSessionDdl(examSessionId, ddlScript);
       setDdlLog({ status: "Success", messages: res.messages });
       // Refresh the schema inspector
       await refreshSchema();
@@ -170,11 +170,11 @@ export function useContestWorkspace() {
 
   // Step 2: Seed DML Data
   const handleSeedDml = async () => {
-    if (!contestId) return;
+    if (!examSessionId) return;
     try {
       setDmlRunning(true);
       setDmlResult(null);
-      const res = await studentApi.seedContestDml(contestId);
+      const res = await studentApi.seedExamSessionDml(examSessionId);
       setDmlResult({ status: "Success", message: res.message });
       // Refresh table row counts
       await refreshSchema();
@@ -187,8 +187,8 @@ export function useContestWorkspace() {
 
   // Step 3: Run Query
   const handleRunQuery = async () => {
-    if (!contest) return;
-    const activeQuestion = contest.problemDetails[activeQuestionIndex];
+    if (!examSession) return;
+    const activeQuestion = examSession.problemDetails[activeQuestionIndex];
     if (!activeQuestion) return;
     const query = queryAnswers[activeQuestion.id] || "";
     if (!query.trim()) {
@@ -198,7 +198,7 @@ export function useContestWorkspace() {
     try {
       setQueryRunning(true);
       setQueryResult(null);
-      const res = await studentApi.runContestQuery(contestId, query);
+      const res = await studentApi.runExamSessionQuery(examSessionId, query);
       setQueryResult(res);
     } catch (err: any) {
       setQueryResult({ columns: [], rows: [], rowCount: 0, error: err.message || "Unable to execute the SQL query." });
@@ -212,7 +212,7 @@ export function useContestWorkspace() {
     setShowConfirmModal(false);
     try {
       setSubmitting(true);
-      const result = await studentApi.submitContestExam(contestId, ddlScript, queryAnswers);
+      const result = await studentApi.submitExamSessionExam(examSessionId, ddlScript, queryAnswers);
       setScorecard(result.scorecard);
       setShowScorecardModal(true);
       // Clear the draft after successful submission
@@ -228,13 +228,13 @@ export function useContestWorkspace() {
     setCollapsedCards((prev) => ({ ...prev, [tableName]: !prev[tableName] }));
   };
 
-  const renderDiagramCanvas = (isModal: boolean = false) => <ContestDiagramCanvas schemaData={schemaData} isModal={isModal} tr={tr} />;
+  const renderDiagramCanvas = (isModal: boolean = false) => <ExamSessionDiagramCanvas schemaData={schemaData} isModal={isModal} tr={tr} />;
 
-  const renderCardsView = () => <ContestCardsView schemaData={schemaData} collapsedCards={collapsedCards} toggleCardCollapse={toggleCardCollapse} tr={tr} />;
+  const renderCardsView = () => <ExamSessionCardsView schemaData={schemaData} collapsedCards={collapsedCards} toggleCardCollapse={toggleCardCollapse} tr={tr} />;
 
-  return { contestId, navigate, contest, setContest, loading, setLoading, error, setError, now, setNow, timeRemaining, setTimeRemaining, activeTab, setActiveTab, ddlScript, setDdlScript, ddlRunning, setDdlRunning, ddlLog, setDdlLog, schemaData, setSchemaData, schemaLoading, setSchemaLoading, schemaVisible, setSchemaVisible, schemaViewMode, setSchemaViewMode, showFullscreenDiagram, setShowFullscreenDiagram, collapsedCards, setCollapsedCards, dmlRunning, setDmlRunning, dmlResult, setDmlResult, activeQuestionIndex, setActiveQuestionIndex, queryAnswers, setQueryAnswers, queryRunning, setQueryRunning, queryResult, setQueryResult, submitting, setSubmitting, showConfirmModal, setShowConfirmModal, showScorecardModal, setShowScorecardModal, scorecard, setScorecard, refreshSchema, handleRunDdl, handleSeedDml, handleRunQuery, handleSubmitExam, toggleCardCollapse, renderDiagramCanvas, renderCardsView };
+  return { examSessionId, navigate, examSession, setExamSession, loading, setLoading, error, setError, now, setNow, timeRemaining, setTimeRemaining, activeTab, setActiveTab, ddlScript, setDdlScript, ddlRunning, setDdlRunning, ddlLog, setDdlLog, schemaData, setSchemaData, schemaLoading, setSchemaLoading, schemaVisible, setSchemaVisible, schemaViewMode, setSchemaViewMode, showFullscreenDiagram, setShowFullscreenDiagram, collapsedCards, setCollapsedCards, dmlRunning, setDmlRunning, dmlResult, setDmlResult, activeQuestionIndex, setActiveQuestionIndex, queryAnswers, setQueryAnswers, queryRunning, setQueryRunning, queryResult, setQueryResult, submitting, setSubmitting, showConfirmModal, setShowConfirmModal, showScorecardModal, setShowScorecardModal, scorecard, setScorecard, refreshSchema, handleRunDdl, handleSeedDml, handleRunQuery, handleSubmitExam, toggleCardCollapse, renderDiagramCanvas, renderCardsView };
 }
 
 
-export type ContestWorkspaceController = ReturnType<typeof useContestWorkspace>;
+export type ExamSessionWorkspaceController = ReturnType<typeof useExamSessionWorkspace>;
 

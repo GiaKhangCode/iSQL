@@ -10,7 +10,7 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
 for (const name of ["window", "document", "navigator", "HTMLElement", "Element", "MutationObserver", "localStorage"]) Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
-globalThis.__workspaceApi = { getDraft: () => "", saveDraft() {}, getPreferences: async () => ({ favorites: [] }), getContestOrExam: async () => undefined };
+globalThis.__workspaceApi = { getDraft: () => "", saveDraft() {}, getPreferences: async () => ({ favorites: [] }), getExamSessionOrExam: async () => undefined };
 
 const output = await build({
   stdin: { contents: `
@@ -18,7 +18,7 @@ const output = await build({
     export { createRoot } from "react-dom/client";
     export { MemoryRouter } from "react-router-dom";
     export { ProblemWorkspace } from "./src/features/workspace/ProblemWorkspace";
-    export { SqlWorkspace, ContestSqlWorkspace } from "./src/features/workspace/SqlWorkspace";
+    export { SqlWorkspace, ExamSessionSqlWorkspace } from "./src/features/workspace/SqlWorkspace";
     export { WorkspaceSubmissionPanel } from "./src/features/workspace/components/WorkspaceSubmissionPanel";
   `, resolveDir: process.cwd(), loader: "tsx" },
   bundle: true, write: false, platform: "node", format: "cjs", jsx: "automatic",
@@ -34,7 +34,7 @@ const output = await build({
 const filename = join(tmpdir(), `sqluit-workspace-flow-${process.pid}.cjs`);
 await writeFile(filename, output.outputFiles[0].contents);
 try {
-  const { createElement: h, act, createRoot, MemoryRouter, ProblemWorkspace, SqlWorkspace, ContestSqlWorkspace, WorkspaceSubmissionPanel } = createRequire(import.meta.url)(filename);
+  const { createElement: h, act, createRoot, MemoryRouter, ProblemWorkspace, SqlWorkspace, ExamSessionSqlWorkspace, WorkspaceSubmissionPanel } = createRequire(import.meta.url)(filename);
   const root = createRoot(document.getElementById("root"));
   const problem = { id:"p1", number:"1", title:"Customer directory", workspaceParts:["DDL","DML","SQL"], description:"Find customers", requirements:"Legacy top-level requirements must stay hidden", schema:"CREATE TABLE Customers(id INT PRIMARY KEY)", seedData:"INSERT INTO Customers VALUES (91)", tables:[], draft:"", topic:"SELECT", difficulty:"Easy", progress:"Not started", hint:"Legacy hint should stay hidden", expected:{name:"Expected",columns:["id"],rows:[[314]]} };
   const schemaTables = [{name:"Customers",columns:[{name:"id",type:"int",constraints:"NOT NULL"}],primaryKeys:["id"],foreignKeys:[],constraints:[]}];
@@ -268,9 +268,9 @@ try {
   await click(document.querySelector('.pane-tabs button'));
   assert.ok(!document.querySelector('.problem-scroll').textContent.includes(problem.requirements), 'An empty SQL question must not reveal legacy top-level Requirements');
   assert.ok(![...document.querySelectorAll('.problem-scroll h3')].some(node=>node.textContent==='Câu hỏi'), 'An empty prompt does not add a blank Question section');
-  await act(async()=>root.render(h(ContestSqlWorkspace,{state:{contest:{problemDetails:[{id:'p1',title:'Customer directory',description:'Preserved contest problem statement',requirements:problem.requirements}]},activeQuestionIndex:0,queryAnswers:{},queryRunning:false,queryResult:null,error:'',setShowFullscreenDiagram(){},setActiveQuestionIndex(){},setQueryAnswers(){},setQueryResult(){},handleRunQuery(){}}})));
-  assert.ok(document.querySelector('.contest-prompt-pane').textContent.includes('Preserved contest problem statement'));
-  assert.ok(!document.querySelector('.contest-prompt-pane').textContent.includes(problem.requirements), 'Contest problemDetails.requirements is obsolete problem metadata, not a SQL question description');
+  await act(async()=>root.render(h(ExamSessionSqlWorkspace,{state:{examSession:{problemDetails:[{id:'p1',title:'Customer directory',description:'Preserved exam session problem statement',requirements:problem.requirements}]},activeQuestionIndex:0,queryAnswers:{},queryRunning:false,queryResult:null,error:'',setShowFullscreenDiagram(){},setActiveQuestionIndex(){},setQueryAnswers(){},setQueryResult(){},handleRunQuery(){}}})));
+  assert.ok(document.querySelector('.exam-session-prompt-pane').textContent.includes('Preserved exam session problem statement'));
+  assert.ok(!document.querySelector('.exam-session-prompt-pane').textContent.includes(problem.requirements), 'Exam session problemDetails.requirements is obsolete problem metadata, not a SQL question description');
 
   const layoutKey='sql-practice:workspace:student:preferences:layouts';
   localStorage.setItem(layoutKey,JSON.stringify({layout:'Debug',sizes:{Default:{problemWidth:36,secondBoundary:72,editorHeight:58}}}));

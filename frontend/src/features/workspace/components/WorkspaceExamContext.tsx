@@ -30,9 +30,9 @@ export function WorkspaceExamProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const source = params.get("source") || "Practice";
   const activity = params.get("context") || "";
-  const eligible = session?.role === "student" && ["Assignments", "Contests"].includes(source) && Boolean(activity);
+  const eligible = session?.role === "student" && ["Assignments", "ExamSession"].includes(source) && Boolean(activity);
   const endpoint = `/api/student/activity-attempts/${encodeURIComponent(activity)}`;
-  const out = session?.examSessionId ? "/examinations" : source === "Contests" ? "/examinations" : `/assignments/work/${encodeURIComponent(activity)}`;
+  const out = session?.examSessionId ? "/examinations" : source === "ExamSession" ? "/examinations" : `/assignments/work/${encodeURIComponent(activity)}`;
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [loading, setLoading] = useState(eligible);
   const [error, setError] = useState("");
@@ -376,7 +376,7 @@ export function WorkspaceExamProvider({ children }: { children: ReactNode }) {
   if (loading) return <Loading variant="table" columns={4} />;
   if (eligible && !attempt) return <div className="workspace-exam-gate" role="alert"><h1><TranslatedText>{t("Exam unavailable")}</TranslatedText></h1><p>{error}</p><Link to={out}><TranslatedText>{t("Back")}</TranslatedText></Link></div>;
   if (enabled && attempt?.status === "not_started") return <div className="workspace-exam-gate"><h1><TranslatedText>{t("Exam mode")}</TranslatedText></h1><p><TranslatedText>{t("The exam opens in full screen. Leaving the page submits all problems after confirmation. At {value0} violations, all work is submitted automatically.", {value0:violationLimit(attempt)})}</TranslatedText></p><p><TranslatedText>{t("You can switch between questions and the enabled sections in this examination.")}</TranslatedText></p>{error && <p role="alert">{error}</p>}<button className="button primary" disabled={busy} onClick={() => void start()}><TranslatedText>{t("Start exam")}</TranslatedText></button><Link to={out}><TranslatedText>{t("Back")}</TranslatedText></Link></div>;
-  if (activityClosed && (attempt?.examMode || source === "Contests")) return <div className="workspace-exam-gate"><h1><TranslatedText>{t("This activity has ended")}</TranslatedText></h1><Link to={out}><TranslatedText>{t("Back")}</TranslatedText></Link></div>;
+  if (activityClosed && (attempt?.examMode || source === "ExamSession")) return <div className="workspace-exam-gate"><h1><TranslatedText>{t("This activity has ended")}</TranslatedText></h1><Link to={out}><TranslatedText>{t("Back")}</TranslatedText></Link></div>;
   if (attempt?.status === "submitted") {
     const isViolationLocked = attempt.finishReason === "violations";
     return (

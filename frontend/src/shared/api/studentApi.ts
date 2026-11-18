@@ -1,7 +1,7 @@
 import { matchesListSearch } from "@/shared/lib/listSearch";
 import { apiFetch } from "@/shared/api/apiClient";
 import { storage } from "@/shared/api/storage";
-import type { Assignment, Contest, Deadline, WorkspacePart } from "@/data/models";
+import type { Assignment, ExamSession, Deadline, WorkspacePart } from "@/data/models";
 import type { WorkspaceDatabaseState } from "@/shared/types/workspaceDatabase";
 import { localDate, localTime, parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
 import type { QueryResult } from "@/shared/types/queryResult";
@@ -42,7 +42,7 @@ function localizeSchedule<T extends { date: string; time: string }>(item: T): T 
   return { ...item, date: localDate(timestamp), time: localTime(timestamp) };
 }
 
-function mapContest(item: any): Contest {
+function mapExamSession(item: any): ExamSession {
   return {
     id: item.id,
     title: item.title,
@@ -56,7 +56,7 @@ function mapContest(item: any): Contest {
     room: item.room || "",
     examViolationLimit: item.examViolationLimit || 2,
     proctors: item.proctors || [],
-    status: item.contestStatus,
+    status: item.sessionStatus,
     date: item.opens ? localDate(item.opens) : "",
     time: item.opens ? localTime(item.opens) : "",
     endDate: item.closes ? localDate(item.closes) : "",
@@ -88,13 +88,13 @@ function mapContest(item: any): Contest {
     dmlPoints: item.dmlPoints ?? item.dml_points ?? 20,
     sqlPoints: item.sqlPoints ?? item.sql_points ?? 50,
     dmlSeedScript: item.dmlSeedScript || item.dml_seed_script || "",
-  } as Contest;
+  } as ExamSession;
 }
 
 export const studentApi = {
   submitWorkspaceQuestion: (id: string, input: {part: WorkspacePart; solutionId:string;script:string;source:string;context:string}):Promise<QueryResult> =>
     apiFetch(`/api/problems/${encodeURIComponent(id)}/workspace/questions/submit`,{method:"POST",body:JSON.stringify(input)}),
-  getQuestionDatabase: (id: string, input: {part: "DDL" | "DML" | "SQL" | "TRIGGER"; solutionId: string; source: "Practice" | "Assignments" | "Contests"; context: string}): Promise<WorkspaceDatabaseState> =>
+  getQuestionDatabase: (id: string, input: {part: "DDL" | "DML" | "SQL" | "TRIGGER"; solutionId: string; source: "Practice" | "Assignments" | "ExamSession"; context: string}): Promise<WorkspaceDatabaseState> =>
     apiFetch(`/api/problems/${encodeURIComponent(id)}/workspace/database`, {method:"POST",body:JSON.stringify(input)}),
   getDashboard: async (): Promise<DashboardStats> => {
     const tzOffset = new Date().getTimezoneOffset();
@@ -141,20 +141,20 @@ export const studentApi = {
     const enrolled = (await apiFetch("/api/student/assignments")) as StudentAssignments;
     return {
       ...enrolled,
-      assignments: enrolled.assignments.filter((item: any) => !item.isContest).map(localizeSchedule),
+      assignments: enrolled.assignments.filter((item: any) => !item.isExamSession).map(localizeSchedule),
       deadlines: (enrolled.deadlines || []).map(localizeSchedule),
     };
   },
 
-  getExaminations: async (): Promise<Contest[]> => {
+  getExaminations: async (): Promise<ExamSession[]> => {
     const enrolled = (await apiFetch("/api/student/assignments")) as StudentAssignments;
-    return enrolled.assignments.filter((item: any) => Boolean(item.examinationId)).map(mapContest);
+    return enrolled.assignments.filter((item: any) => Boolean(item.examinationId)).map(mapExamSession);
   },
 
-  getContestOrExam: async (id: string): Promise<Contest | undefined> => {
+  getExamSessionOrExam: async (id: string): Promise<ExamSession | undefined> => {
     const enrolled = (await apiFetch("/api/student/assignments")) as StudentAssignments;
     const found = enrolled.assignments.find((item: any) => item.id === id);
-    return found ? mapContest(found) : undefined;
+    return found ? mapExamSession(found) : undefined;
   },
 
 
@@ -186,7 +186,7 @@ export const studentApi = {
     });
   },
 
-  setupContestDb: async (contestId: string): Promise<{
+  setupExamSessionDb: async (examSessionId: string): Promise<{
     status: string;
     schemaName: string;
     databaseName: string;
@@ -197,30 +197,30 @@ export const studentApi = {
     sqlPoints: number;
     hasSeedScript: boolean;
   }> => {
-    return await apiFetch(`/api/contests/${contestId}/setup-db`, { method: "POST" });
+    return await apiFetch(`/api/exam-sessions/${examSessionId}/setup-db`, { method: "POST" });
   },
 
-  runContestDdl: async (contestId: string, script: string): Promise<{
+  runExamSessionDdl: async (examSessionId: string, script: string): Promise<{
     status: string;
     messages: string[];
     tables: string[];
     schemaName: string;
   }> => {
-    return await apiFetch(`/api/contests/${contestId}/run-ddl`, {
+    return await apiFetch(`/api/exam-sessions/${examSessionId}/run-ddl`, {
       method: "POST",
       body: JSON.stringify({ script }),
     });
   },
 
-  seedContestDml: async (contestId: string): Promise<{
+  seedExamSessionDml: async (examSessionId: string): Promise<{
     status: string;
     message: string;
     tables: string[];
   }> => {
-    return await apiFetch(`/api/contests/${contestId}/seed-dml`, { method: "POST" });
+    return await apiFetch(`/api/exam-sessions/${examSessionId}/seed-dml`, { method: "POST" });
   },
 
-  inspectContestSchema: async (contestId: string): Promise<{
+  inspectExamSessionSchema: async (examSessionId: string): Promise<{
     schemaName: string;
     tables: Array<{
       tableName: string;
@@ -243,23 +243,23 @@ export const studentApi = {
       toCol: string;
     }>;
   }> => {
-    return await apiFetch(`/api/contests/${contestId}/schema-inspector`);
+    return await apiFetch(`/api/exam-sessions/${examSessionId}/schema-inspector`);
   },
 
-  runContestQuery: async (contestId: string, query: string): Promise<{
+  runExamSessionQuery: async (examSessionId: string, query: string): Promise<{
     status: string;
     columns: string[];
     rows: any[][];
     rowCount: number;
   }> => {
-    return await apiFetch(`/api/contests/${contestId}/run-query`, {
+    return await apiFetch(`/api/exam-sessions/${examSessionId}/run-query`, {
       method: "POST",
       body: JSON.stringify({ query }),
     });
   },
 
-  submitContestExam: async (
-    contestId: string,
+  submitExamSessionExam: async (
+    examSessionId: string,
     ddlScript: string,
     queryAnswers: Record<string, string>
   ): Promise<{
@@ -286,7 +286,7 @@ export const studentApi = {
       schemaName: string;
     };
   }> => {
-    return await apiFetch(`/api/contests/${contestId}/submit-exam`, {
+    return await apiFetch(`/api/exam-sessions/${examSessionId}/submit-exam`, {
       method: "POST",
       body: JSON.stringify({ ddlScript, queryAnswers }),
     });

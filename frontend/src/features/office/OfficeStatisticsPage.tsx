@@ -80,7 +80,7 @@ export function OfficeStatisticsPage() {
         <div className="statistics-kind" role="group" aria-label="Phạm vi hoạt động">
           {([
             ["all", "Tất cả"],
-            ["exams", "Kỳ thi / Cuộc thi"],
+            ["exams", "Kỳ thi / Ca thi"],
             ["assignments", "Bài tập"],
           ] as const).map(([value, label]) => (
             <button

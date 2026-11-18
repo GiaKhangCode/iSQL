@@ -1,5 +1,5 @@
 /** Hide exact copies of banner copy in the overview without changing stored Markdown. */
-export function contestOverview(markdown: string | null | undefined, title: string, summary?: string | null) {
+export function examSessionOverview(markdown: string | null | undefined, title: string, summary?: string | null) {
   if (!markdown) return "";
   const normalize = (value: string) => value.replace(/[*_~`]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
   const bannerTitle = normalize(title);
@@ -16,7 +16,7 @@ export function contestOverview(markdown: string | null | undefined, title: stri
     return bannerSummary && normalize(filtered) === bannerSummary ? "" : filtered;
   }).filter((block) => block.trim()).join("\n\n");
 
-  // Fenced SQL/code is content, even when it happens to match the contest title.
+  // Fenced SQL/code is content, even when it happens to match the exam session title.
   const result: string[] = [];
   let prose: string[] = [], fence = "";
   for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {

@@ -16,8 +16,8 @@ export function ResultsDashboardPage({defaultKind="assignments",onlyExams=false}
     setParams(previous=>{const next=new URLSearchParams(previous);next.set("kind",nextKind);return next;},{replace:true});
   };
   return <div className="teacher-page teacher-results-dashboard">
-    {onlyExams ? <ResultsList isContest assignments={assignments} loading={loading} error={error}/> : (["assignments","exams"] as const).map(tab=><div key={tab} id={`results-panel-${tab}`} role="region" aria-label={t(tab==="assignments"?"Assignments":"Examinations")} hidden={kind!==tab}>
-      <ResultsList isContest={tab==="exams"} assignments={assignments} loading={loading} error={error} onSwitchKind={switchKind}/>
+    {onlyExams ? <ResultsList isExamSession assignments={assignments} loading={loading} error={error}/> : (["assignments","exams"] as const).map(tab=><div key={tab} id={`results-panel-${tab}`} role="region" aria-label={t(tab==="assignments"?"Assignments":"Examinations")} hidden={kind!==tab}>
+      <ResultsList isExamSession={tab==="exams"} assignments={assignments} loading={loading} error={error} onSwitchKind={switchKind}/>
     </div>)}
   </div>;
 }

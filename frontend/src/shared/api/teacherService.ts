@@ -229,10 +229,10 @@ export const teacherService = {
     return apiFetch(`/api/assignments/${encodeURIComponent(id)}`);
   },
 
-  async uploadContestBanner(banner: Blob, source: Blob): Promise<{ bannerUrl: string; bannerSourceUrl: string }> {
+  async uploadExamSessionBanner(banner: Blob, source: Blob): Promise<{ bannerUrl: string; bannerSourceUrl: string }> {
     const body = new FormData();
-    body.append("banner", banner, "contest-banner.webp");
-    body.append("source", source, "contest-banner-source.webp");
+    body.append("banner", banner, "exam-session-banner.webp");
+    body.append("source", source, "exam-session-banner-source.webp");
     return apiFetch("/api/assignments/banners", { method: "POST", body });
   },
 

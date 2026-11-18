@@ -50,7 +50,7 @@ export function AssignmentWorkPage() {
     </header>
     <div className="assignment-work-columns">
     <div className="assignment-work-main">
-    {work.instructions && <section className="assignment-instructions"><h2><TranslatedText>{tr("Instructions")}</TranslatedText></h2><ProblemMarkdown className="contest-markdown">{work.instructions}</ProblemMarkdown></section>}
+    {work.instructions && <section className="assignment-instructions"><h2><TranslatedText>{tr("Instructions")}</TranslatedText></h2><ProblemMarkdown className="exam-session-markdown">{work.instructions}</ProblemMarkdown></section>}
     <section className="assignment-problems-card">
       <div className="section-heading"><h2><TranslatedText>{tr("Problems")}</TranslatedText></h2>
         <div className="assignment-problem-pagination">
@@ -91,7 +91,7 @@ function AssignmentProblemDetails({ problemId, assignmentId, problem, progress }
     <Link className="button primary" to={to}><TranslatedText>{progress === "Solved" ? tr("Review") : progress === "In progress" ? tr("Continue solving") : tr("Start solving")}</TranslatedText> →</Link>
     <dl className="assignment-selected-facts"><div><dt><TranslatedText>{tr("Topic")}</TranslatedText></dt><dd>{problem.topic}</dd></div></dl>
     {loading ? <Loading variant="inline" rows={6} label={tr("Loading problem details…")} /> : error ? <p className="tiny muted"><TranslatedText>{tr("Problem details could not be loaded.")}</TranslatedText></p> : data && <>
-      <section><h4><TranslatedText>{tr("Problem")}</TranslatedText></h4><ProblemMarkdown className="contest-markdown">{data.description || tr("No description available.")}</ProblemMarkdown></section>
+      <section><h4><TranslatedText>{tr("Problem")}</TranslatedText></h4><ProblemMarkdown className="exam-session-markdown">{data.description || tr("No description available.")}</ProblemMarkdown></section>
     </>}
   </>;
 }

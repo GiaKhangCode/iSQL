@@ -16,7 +16,7 @@ const exam={enabled:false,maxSubmissions:3,submissionCounts:{},draft(){},update(
 globalThis.__submitExam=exam;
 const calls=[];
 let failNext=false, pendingResolve;
-globalThis.__submitApi={getDraft:()=>'',saveDraft(){},getPreferences:async()=>({favorites:[]}),getSubmissions:async()=>[],getContestOrExam:async()=>({id:'C',title:'Final SQL Contest',examType:'classic'}),getExaminations:async()=>[{id:'C',title:'Final SQL Contest',examType:'classic'}],
+globalThis.__submitApi={getDraft:()=>'',saveDraft(){},getPreferences:async()=>({favorites:[]}),getSubmissions:async()=>[],getExamSessionOrExam:async()=>({id:'C',title:'Final SQL Exam session',examType:'classic'}),getExaminations:async()=>[{id:'C',title:'Final SQL Exam session',examType:'classic'}],
   submitWorkspace:async(id,input)=>{calls.push({type:'mixed',id,input});if(failNext){failNext=false;throw Error('Network unavailable');}if(pendingResolve===null)return new Promise(resolve=>pendingResolve=resolve);return {status:'Accepted',message:'Saved',scoreVisible:true,score:10,maxScore:10,submissionsUsed:1,maxSubmissions:3};},
   submitSolution:async(...args)=>{calls.push({type:'sql',args});return {status:'Accepted',message:'Saved',scoreVisible:true,score:10,maxScore:10,submissionsUsed:1,maxSubmissions:3};}};
 const output=await build({stdin:{contents:`
@@ -45,10 +45,10 @@ try{
  const problem={id:'P',number:'1',title:'Create customers',topic:'SQL',difficulty:'Easy',progress:'Not started',description:'Customers',requirements:'Create a table',tables:[],draft:'',hint:'',workspaceParts:['DDL','DML','SQL']};
  const click=async node=>{assert.ok(node);assert.equal(node.disabled,false);await act(async()=>{node.click();await new Promise(resolve=>setTimeout(resolve,0));});};
  const button=(text,scope=document)=>[...scope.querySelectorAll('button')].find(node=>node.textContent.trim()===text);
- const mount=async(sql=false)=>{localStorage.clear();await act(async()=>root.render(h(MemoryRouter,{key:++revision,initialEntries:['/workspace/P?source=Contests&context=C']},h(Routes,null,h(Route,{path:'/workspace/P',element:h(ProblemWorkspace,{problem:{...problem,workspaceParts:sql?['SQL']:problem.workspaceParts}})}),h(Route,{path:'/contests/C',element:h('p',null,'Contest overview')}),h(Route,{path:'/submissions',element:h('p',null,'Official history')})),h(Location))));};
+ const mount=async(sql=false)=>{localStorage.clear();await act(async()=>root.render(h(MemoryRouter,{key:++revision,initialEntries:['/workspace/P?source=ExamSession&context=C']},h(Routes,null,h(Route,{path:'/workspace/P',element:h(ProblemWorkspace,{problem:{...problem,workspaceParts:sql?['SQL']:problem.workspaceParts}})}),h(Route,{path:'/exam-sessions/C',element:h('p',null,'Exam session overview')}),h(Route,{path:'/submissions',element:h('p',null,'Official history')})),h(Location))));};
  const edit=async(selector,value)=>act(async()=>{const input=document.querySelector(selector);input.value=value;input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
  await mount();
- assert.equal(document.querySelector('header strong').textContent,'Final SQL Contest','Resolve the contest title even when an old workspace URL has no contextTitle');
+ assert.equal(document.querySelector('header strong').textContent,'Final SQL Exam session','Resolve the exam session title even when an old workspace URL has no contextTitle');
  assert.equal(document.querySelector('.workspace-submission-count b').textContent,'0 / 3');
  await edit('#workspace-stage-DDL textarea','CREATE TABLE Customers(id INT)');
  await edit('#workspace-stage-DML textarea','INSERT INTO Customers VALUES(1)');
@@ -107,6 +107,6 @@ try{
  assert.ok([...document.querySelectorAll('button,input')].every(node=>!node.disabled),'Exam mode leaves the submission limit editable');
  assert.equal(document.querySelector('input').value,'2');
  await act(async()=>root.unmount());root=null;
- console.log('PASS: submit-and-exit cancel/retry/save-before-navigation, combined scripts, locked editors, submission counts, contest title, no duplicate submissions and editable Unlimited/2 controls.');
+ console.log('PASS: submit-and-exit cancel/retry/save-before-navigation, combined scripts, locked editors, submission counts, exam session title, no duplicate submissions and editable Unlimited/2 controls.');
 }finally{if(root)root.unmount();await unlink(filename);dom.window.close();}
 process.exit(0);

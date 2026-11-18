@@ -25,7 +25,7 @@ export function LoginPage() {
     intended && /^\/admin(?:\/|\?|#|$)/.test(intended) ? intended : null;
   const destination =
     intended &&
-    /^\/(dashboard|practice|workspace|assignments|contests|submissions)(\/|\?|#|$)/.test(
+    /^\/(dashboard|practice|workspace|assignments|submissions)(\/|\?|#|$)/.test(
       intended,
     )
       ? intended

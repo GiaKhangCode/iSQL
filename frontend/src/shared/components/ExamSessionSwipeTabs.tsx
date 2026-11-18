@@ -1,11 +1,11 @@
 // Lucian UX/UI Prompt #048 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#048
 import { useId, useLayoutEffect, useRef, type ReactNode } from "react";
-import "@/shared/components/ContestSwipeTabs.css";
+import "@/shared/components/ExamSessionSwipeTabs.css";
 
-type ContestTab = { id: string; label: ReactNode; count?: number };
+type ExamSessionTab = { id: string; label: ReactNode; count?: number };
 
-export function ContestSwipeTabs({ tabs, value, onChange, label, toolbar, aside, className = "", children }: {
-  tabs: ContestTab[];
+export function ExamSessionSwipeTabs({ tabs, value, onChange, label, toolbar, aside, className = "", children }: {
+  tabs: ExamSessionTab[];
   value: string;
   onChange: (value: string) => void;
   label: string;
@@ -94,8 +94,8 @@ export function ContestSwipeTabs({ tabs, value, onChange, label, toolbar, aside,
   // Translated labels can change width without changing the viewport.
   useLayoutEffect(() => { sync(); edges(); });
 
-  return <div className={`u048 contest-list-region ${className}`}>
-    <div className="contest-toolbar">
+  return <div className={`u048 exam-session-list-region ${className}`}>
+    <div className="exam-session-toolbar">
       <div className="u048-tw"><div className="u048-tabs" ref={bar} role="tablist" aria-label={label} onScroll={edges}>
         {tabs.map((tab, index) => <button key={tab.id} type="button" className="u048-tab" role="tab"
           id={`${uid}-t${index}`} aria-controls={`${uid}-p${index}`} aria-selected={value === tab.id} tabIndex={value === tab.id ? 0 : -1}
@@ -107,7 +107,7 @@ export function ContestSwipeTabs({ tabs, value, onChange, label, toolbar, aside,
       </div></div>
       {toolbar}
     </div>
-    <div className="contest-columns">
+    <div className="exam-session-columns">
       <div ref={pages} className="u048-pages" onScroll={sync}
         onClickCapture={(event) => { if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; } }}
         onPointerDown={(event) => {

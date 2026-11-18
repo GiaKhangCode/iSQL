@@ -47,7 +47,7 @@ const bundle=await build({
   plugins:[{name:'reading-fixture',setup(builder){
     const stub=(filter,contents)=>builder.onLoad({filter},()=>({contents,loader:'tsx',resolveDir:process.cwd()}));
     stub(/[\\/]teacherService\.ts$/,'export const teacherService={getProblem:async()=>structuredClone(globalThis.__readingProblem),getDatabaseLibrary:async()=>[],validateStage:async request=>({schemaTables:request.question.startFrom==="empty"?[]:[{name:"T",columns:[{name:"id",type:"int",constraints:"PRIMARY KEY"}],primaryKeys:["id"],foreignKeys:[],constraints:[]}],tables:request.question.startFrom==="provided"?[{name:"T",columns:["id"],rows:[[101]]}]:[]})};');
-    stub(/[\\/]studentApi\.ts$/,'export const studentApi={getSubmissions:async()=>[],getDraft:()=>"",saveDraft(){},getPreferences:async()=>({favorites:[]}),getContests:async()=>[]};');
+    stub(/[\\/]studentApi\.ts$/,'export const studentApi={getSubmissions:async()=>[],getDraft:()=>"",saveDraft(){},getPreferences:async()=>({favorites:[]}),getExamSessions:async()=>[]};');
     stub(/components[\\/]AppHeader\.tsx$/,'export const AppHeader=({workspaceActions,workspaceProblemNavigation})=><header>{workspaceProblemNavigation}{workspaceActions}</header>;');
     stub(/context[\\/]AuthContext\.tsx$/,'export const useAuth=()=>({session:{id:"student"}});');
     stub(/[\\/]ProblemSqlEditor\.tsx$/,'export function ProblemSqlEditor({value,label,onChange}){return <textarea aria-label={label} value={value} onChange={e=>onChange(e.target.value)}/>;}');

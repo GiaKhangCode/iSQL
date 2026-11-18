@@ -37,8 +37,8 @@
 }
 
 /* Secondary panels and their nested lists use a slimmer track. */
-:is(.contest-problem-details-panel, .contest-participation, .contest-overview-card, .submission-inline-panel, .practice-sidebar, .deadline-panel, .hall-of-fame, .dashboard-continue-details, .admin-side, .detail-side-panel, .teacher-list-detail-panel, .teacher-class-details, .teacher-builder-sidebar, .teacher-grading-panel, .notification-popover, .trending-scroll, .deadline-scroll, .assignment-deadline-scroll)::-webkit-scrollbar,
-:is(.contest-problem-details-panel, .contest-participation, .contest-overview-card, .submission-inline-panel, .practice-sidebar, .deadline-panel, .hall-of-fame, .dashboard-continue-details, .admin-side, .detail-side-panel, .teacher-list-detail-panel, .teacher-class-details, .teacher-builder-sidebar, .teacher-grading-panel, .notification-popover, .trending-scroll, .deadline-scroll, .assignment-deadline-scroll) *::-webkit-scrollbar {
+:is(.exam-session-problem-details-panel, .exam-session-participation, .exam-session-overview-card, .submission-inline-panel, .practice-sidebar, .deadline-panel, .hall-of-fame, .dashboard-continue-details, .admin-side, .detail-side-panel, .teacher-list-detail-panel, .teacher-class-details, .teacher-builder-sidebar, .teacher-grading-panel, .notification-popover, .trending-scroll, .deadline-scroll, .assignment-deadline-scroll)::-webkit-scrollbar,
+:is(.exam-session-problem-details-panel, .exam-session-participation, .exam-session-overview-card, .submission-inline-panel, .practice-sidebar, .deadline-panel, .hall-of-fame, .dashboard-continue-details, .admin-side, .detail-side-panel, .teacher-list-detail-panel, .teacher-class-details, .teacher-builder-sidebar, .teacher-grading-panel, .notification-popover, .trending-scroll, .deadline-scroll, .assignment-deadline-scroll) *::-webkit-scrollbar {
   width: 2px !important;
   height: 2px !important;
 }

@@ -301,8 +301,8 @@ export function DatabaseLibraryPage() {
             <p><TranslatedText>{tr("{value0} saved databases", { value0: entries.length })}</TranslatedText></p>
           </div>
           <button className="button teacher-database-library-list-back" type="button" disabled={saving} onClick={leaveEditor}><TranslatedText>{tr(returnTo ? "Back to problem" : "Back to database library")}</TranslatedText></button>
-          <nav ref={navigationRef} className="teacher-contest-page-nav teacher-library-section-nav" aria-label={tr("Database editor sections")}>
-            <span className="teacher-contest-page-nav-indicator" aria-hidden="true" style={{width:indicator.width,height:indicator.height,transform:`translate(${indicator.x}px,${indicator.y}px)`}} />
+          <nav ref={navigationRef} className="teacher-exam-session-page-nav teacher-library-section-nav" aria-label={tr("Database editor sections")}>
+            <span className="teacher-exam-session-page-nav-indicator" aria-hidden="true" style={{width:indicator.width,height:indicator.height,transform:`translate(${indicator.x}px,${indicator.y}px)`}} />
             <h3><TranslatedText>{tr("On this page")}</TranslatedText></h3>
             {librarySections.map(section=><button key={section.id} ref={activeSection===section.id?activeItemRef:undefined} type="button" className={activeSection===section.id?"is-active":""} aria-current={activeSection===section.id?"location":undefined} onClick={()=>openLibrarySection(section.id)}><TranslatedText>{tr(section.label)}</TranslatedText></button>)}
           </nav>

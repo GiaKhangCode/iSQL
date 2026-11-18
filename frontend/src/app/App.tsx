@@ -43,9 +43,9 @@ const WorkspacePage = lazy(() =>
     default: module.WorkspacePage,
   })),
 );
-const ContestWorkspacePage = lazy(() =>
-  import("@/features/workspace/ContestWorkspacePage").then((module) => ({
-    default: module.ContestWorkspacePage,
+const ExamSessionWorkspacePage = lazy(() =>
+  import("@/features/workspace/ExamSessionWorkspacePage").then((module) => ({
+    default: module.ExamSessionWorkspacePage,
   })),
 );
 import { AssignmentsPage } from "@/features/student/AssignmentsPage";
@@ -53,9 +53,9 @@ import { AssignmentDetailPage } from "@/features/student/AssignmentDetailPage";
 import { SubmissionsPage } from "@/features/student/SubmissionsPage";
 import { ProblemEditorPage } from "@/features/teacher/ProblemEditorPage";
 import { DatabaseLibraryPage } from "@/features/teacher/DatabaseLibraryPage";
-import { AssignmentBuilderPage, ContestBuilderPage } from "@/features/teacher/builder/BuilderPages";
+import { AssignmentBuilderPage, ExamSessionBuilderPage } from "@/features/teacher/builder/BuilderPages";
 import { AssignmentsListPage, ProblemLibraryPage } from "@/features/teacher/TeacherLandingPages";
-import { ContestsListPage } from "@/features/teacher/ContestsListPage";
+import { ExamSessionsListPage } from "@/features/teacher/ExamSessionsListPage";
 import { ClassesPage } from "@/features/teacher/ClassesPage";
 import { ManualReviewPage, ResultsDashboardPage } from "@/features/teacher/ResultsPages";
 import { ActivityResultsPage } from "@/features/teacher/ActivityResultsPage";
@@ -160,10 +160,10 @@ export function App() {
             }
           />
           <Route
-            path="/examinations/:contestId/exam"
+            path="/examinations/:examSessionId/exam"
             element={
               <Suspense fallback={<Loading variant="workspace" />}>
-                <ContestWorkspacePage />
+                <ExamSessionWorkspacePage />
               </Suspense>
             }
           />
@@ -204,8 +204,8 @@ export function App() {
             <Route path="examinations/:examId/admissions" element={<CapabilityGuard permission="exam.credentials"><ExamAdmissionsPage/></CapabilityGuard>}/>
             <Route path="examinations/new" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
             <Route path="examinations/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
-            <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ContestsListPage/></CapabilityGuard>}/>
-            <Route path="sessions/:id/edit" element={<CapabilityGuard permission="examination.manage"><ContestBuilderPage/></CapabilityGuard>}/>
+            <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ExamSessionsListPage/></CapabilityGuard>}/>
+            <Route path="sessions/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExamSessionBuilderPage/></CapabilityGuard>}/>
             <Route path="regrade" element={<CapabilityGuard permission="examination.manage"><RegradeAssignmentsPage/></CapabilityGuard>}/>
             <Route path="results" element={<CapabilityGuard permission="results.grade"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
             <Route path="statistics" element={<CapabilityGuard permission="results.grade"><OfficeStatisticsPage/></CapabilityGuard>}/>
@@ -221,8 +221,8 @@ export function App() {
             <Route path="examinations/new" element={<ExaminationBuilderPage/>}/>
             <Route path="examinations/:id/edit" element={<ExaminationBuilderPage/>}/>
             <Route path="examinations/:examId/admissions" element={<ExamAdmissionsPage/>}/>
-            <Route path="sessions" element={<ContestsListPage/>}/>
-            <Route path="sessions/:id/edit" element={<ContestBuilderPage/>}/>
+            <Route path="sessions" element={<ExamSessionsListPage/>}/>
+            <Route path="sessions/:id/edit" element={<ExamSessionBuilderPage/>}/>
             <Route path="regrade" element={<RegradeAssignmentsPage/>}/>
             <Route path="results" element={<ResultsDashboardPage defaultKind="exams" onlyExams/>}/>
             <Route path="results/activity/:activityId" element={<ActivityResultsPage/>}/>

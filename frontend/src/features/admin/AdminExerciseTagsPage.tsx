@@ -169,7 +169,7 @@ export function AdminExerciseTagsPage() {
   const selectedTag = filteredTags.find((t) => t.id === selectedId) || pageTags[0] || filteredTags[0];
 
   return (
-    <section className="teacher-page teacher-list-page compact-teacher-contests admin-courses-page admin-tags-page">
+    <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-courses-page admin-tags-page">
       <h1 className="sr-only"><TranslatedText>{tr("Exercise tags management")}</TranslatedText></h1>
       {notice && <p className="teacher-form-message" role="status"><TranslatedText>{notice}</TranslatedText></p>}
       <div className="teacher-list-detail-layout teacher-filter-layout">

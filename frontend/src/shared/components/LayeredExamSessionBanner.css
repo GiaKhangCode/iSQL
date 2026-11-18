@@ -12,8 +12,8 @@
   background:var(--brand-night); box-shadow:0 30px 60px -30px var(--ux-shadow-strong);
   transition:transform .6s var(--ux-ease),box-shadow .6s var(--ux-ease);
 }
-.u049.contest-banner-visual-1 { --sky-start:var(--feature-1-start); --sky-mid:var(--feature-1-end); --sky-end:var(--brand-mint); --hill-back:var(--feature-1-end); --hill-mid:var(--feature-1-start); }
-.u049.contest-banner-visual-2 { --sky-start:var(--feature-0-start); --sky-mid:var(--feature-2-end); --sky-end:var(--feature-mark); --hill-back:var(--feature-2-start); --hill-mid:color-mix(in srgb,var(--feature-2-start) 60%,var(--brand-night)); }
+.u049.exam-session-banner-visual-1 { --sky-start:var(--feature-1-start); --sky-mid:var(--feature-1-end); --sky-end:var(--brand-mint); --hill-back:var(--feature-1-end); --hill-mid:var(--feature-1-start); }
+.u049.exam-session-banner-visual-2 { --sky-start:var(--feature-0-start); --sky-mid:var(--feature-2-end); --sky-end:var(--feature-mark); --hill-back:var(--feature-2-start); --hill-mid:color-mix(in srgb,var(--feature-2-start) 60%,var(--brand-night)); }
 .u049.is-open { transform:translateY(-4px); box-shadow:0 40px 70px -32px var(--ux-shadow-strong); }
 .u049 .u049-art { position:absolute; inset:-20px; z-index:-2; pointer-events:none; }
 .u049 .u049-art svg, .u049 .u049-image { position:absolute; inset:0; width:100%; height:100%; transition:transform .9s var(--ux-ease); }
@@ -46,15 +46,15 @@
 .u049 .u049-cta:hover { transform:translateX(2px); }
 .u049:focus-visible { outline:2px solid var(--ux-accent); outline-offset:-4px; }
 /* Keep the existing wide carousel and detail layouts while adopting the layered artwork. */
-.featured-carousel .u049.featured-contest { display:flex; justify-content:flex-end; aspect-ratio:auto; min-height:210px; padding:58px 20px 18px; border-radius:6px; }
-.u049.featured-contest .u049-t { font-size:24px; line-height:1.2; }
-.u049.featured-contest .u049-sum { margin-top:8px; font-size:12px; line-height:1.5; }
-.u049.featured-contest .featured-contest-meta { margin-top:0; }
-.contest-detail-shell .u049.contest-detail-banner { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-end; aspect-ratio:auto; min-height:230px; padding:58px 20px 18px; border-radius:6px; }
-.u049.contest-detail-banner.has-image > .u049-art { position:absolute; z-index:-2; }
-.u049.contest-detail-banner.has-image > .u049-shade { position:absolute; z-index:-1; }
-.u049.contest-detail-banner .u049-t { font-size:26px; line-height:1.2; }
-.u049.contest-detail-banner .contest-banner-summary { text-align:left; }
+.featured-carousel .u049.featured-exam-session { display:flex; justify-content:flex-end; aspect-ratio:auto; min-height:210px; padding:58px 20px 18px; border-radius:6px; }
+.u049.featured-exam-session .u049-t { font-size:24px; line-height:1.2; }
+.u049.featured-exam-session .u049-sum { margin-top:8px; font-size:12px; line-height:1.5; }
+.u049.featured-exam-session .featured-exam-session-meta { margin-top:0; }
+.exam-session-detail-shell .u049.exam-session-detail-banner { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-end; aspect-ratio:auto; min-height:230px; padding:58px 20px 18px; border-radius:6px; }
+.u049.exam-session-detail-banner.has-image > .u049-art { position:absolute; z-index:-2; }
+.u049.exam-session-detail-banner.has-image > .u049-shade { position:absolute; z-index:-1; }
+.u049.exam-session-detail-banner .u049-t { font-size:26px; line-height:1.2; }
+.u049.exam-session-detail-banner .exam-session-banner-summary { text-align:left; }
 .u049 .u049-top { left:20px; right:20px; top:16px; }
 /* Legacy image banners position every direct child relatively. Keep this overlay anchored. */
 .u049.has-image > .u049-top { position:absolute; }
@@ -67,8 +67,8 @@
   .u049 .u049-foot { opacity:1; transform:none; }
 }
 @media (max-width:760px) {
-  .featured-carousel .u049.featured-contest, .contest-detail-shell .u049.contest-detail-banner { min-height:210px; padding:54px 18px 18px; border-radius:6px; }
-  .u049.featured-contest .u049-t, .u049.contest-detail-banner .u049-t { font-size:22px; }
+  .featured-carousel .u049.featured-exam-session, .exam-session-detail-shell .u049.exam-session-detail-banner { min-height:210px; padding:54px 18px 18px; border-radius:6px; }
+  .u049.featured-exam-session .u049-t, .u049.exam-session-detail-banner .u049-t { font-size:22px; }
   .u049 .u049-foot { flex-wrap:wrap; }
   .u049 .u049-cta { font-size:12px; }
 }
@@ -77,9 +77,9 @@
   .u049.is-open, .u049 .u049-l1, .u049 .u049-l2, .u049 .u049-l3, .u049.is-open .u049-l1 { transform:none; }
 }
 
-.u048-page.page.contests-page { padding-top:12px; }
-.u048-page .featured-contest-section { margin-bottom:14px; }
-.u048-page .featured-contest-heading-row { margin-bottom:8px; }
+.u048-page.page.exam-sessions-page { padding-top:12px; }
+.u048-page .featured-exam-session-section { margin-bottom:14px; }
+.u048-page .featured-exam-session-heading-row { margin-bottom:8px; }
 .u048-page .featured-carousel-controls { gap:4px; }
 .u048-page .featured-carousel-control { width:26px; height:26px; border-radius:4px; }
 .u049.teacher-layered-banner-preview { display:flex; flex-direction:column; justify-content:flex-end; width:100%; min-height:180px; padding:54px 20px 20px; border-radius:6px; box-shadow:none; }

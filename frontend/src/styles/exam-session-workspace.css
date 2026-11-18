@@ -1,8 +1,8 @@
 /* ========================================================
-   CONTEST EXAM WORKSPACE STYLES (DDL + DML + SQL)
+   EXAM SESSION WORKSPACE STYLES (DDL + DML + SQL)
    ======================================================== */
 
-.contest-exam-container {
+.exam-session-exam-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -14,7 +14,7 @@
 }
 
 /* --- EXAM HEADER --- */
-.contest-exam-header {
+.exam-session-exam-header {
   height: 60px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -27,13 +27,13 @@
   z-index: 20;
 }
 
-.contest-exam-header-left {
+.exam-session-exam-header-left {
   display: flex;
   align-items: center;
   gap: 16px;
 }
 
-.contest-exam-back-btn {
+.exam-session-exam-back-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -47,12 +47,12 @@
   transition: all 0.2s ease;
 }
 
-.contest-exam-back-btn:hover {
+.exam-session-exam-back-btn:hover {
   color: var(--text);
   border-color: var(--border-strong, var(--accent));
 }
 
-.contest-exam-title-group h1 {
+.exam-session-exam-title-group h1 {
   font-size: 16px;
   font-weight: 700;
   margin: 0;
@@ -61,7 +61,7 @@
   gap: 10px;
 }
 
-.contest-exam-badge {
+.exam-session-exam-badge {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -73,7 +73,7 @@
   border: 1px solid rgba(14, 165, 233, 0.3);
 }
 
-.contest-db-pill {
+.exam-session-db-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -86,7 +86,7 @@
   font-family: "JetBrains Mono", monospace;
 }
 
-.contest-db-pulse {
+.exam-session-db-pulse {
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -101,13 +101,13 @@
   100% { transform: scale(0.95); opacity: 0.8; }
 }
 
-.contest-exam-header-right {
+.exam-session-exam-header-right {
   display: flex;
   align-items: center;
   gap: 16px;
 }
 
-.contest-timer-pill {
+.exam-session-timer-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -121,7 +121,7 @@
   font-family: "JetBrains Mono", monospace;
 }
 
-.contest-timer-pill.warning {
+.exam-session-timer-pill.warning {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.3);
@@ -132,7 +132,7 @@
   50% { opacity: 0.6; }
 }
 
-.contest-submit-btn {
+.exam-session-submit-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -147,20 +147,20 @@
   transition: all 0.2s ease;
 }
 
-.contest-submit-btn:hover {
+.exam-session-submit-btn:hover {
   background: #16a34a;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
-.contest-submit-btn:disabled {
+.exam-session-submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
 }
 
 /* --- STEP TABS NAV --- */
-.contest-steps-nav {
+.exam-session-steps-nav {
   height: 48px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -171,7 +171,7 @@
   flex: none;
 }
 
-.contest-step-tab {
+.exam-session-step-tab {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -186,13 +186,13 @@
   transition: all 0.2s ease;
 }
 
-.contest-step-tab:hover {
+.exam-session-step-tab:hover {
   color: var(--text);
   background: var(--subtle);
   border-radius: 4px 4px 0 0;
 }
 
-.contest-step-tab.active {
+.exam-session-step-tab.active {
   color: var(--accent);
   font-weight: 600;
   border-bottom-color: var(--accent);
@@ -200,7 +200,7 @@
   border-radius: 4px 4px 0 0;
 }
 
-.contest-step-number {
+.exam-session-step-number {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -212,13 +212,13 @@
   border: 1px solid var(--border);
 }
 
-.contest-step-tab.active .contest-step-number {
+.exam-session-step-tab.active .exam-session-step-number {
   background: var(--accent);
   color: #ffffff;
   border-color: var(--accent);
 }
 
-.contest-step-points {
+.exam-session-step-points {
   font-size: 11px;
   opacity: 0.75;
   background: rgba(0, 0, 0, 0.08);
@@ -227,7 +227,7 @@
 }
 
 /* --- EXAM BODY CONTENT --- */
-.contest-exam-body {
+.exam-session-exam-body {
   flex: 1;
   display: flex;
   overflow: hidden;
@@ -235,14 +235,14 @@
 }
 
 /* --- TAB 1: DDL STAGE --- */
-.contest-ddl-layout {
+.exam-session-ddl-layout {
   display: flex;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.contest-ddl-editor-pane {
+.exam-session-ddl-editor-pane {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -251,7 +251,7 @@
   height: 100%;
 }
 
-.contest-editor-header {
+.exam-session-editor-header {
   height: 42px;
   background: var(--subtle);
   border-bottom: 1px solid var(--border);
@@ -263,13 +263,13 @@
   font-weight: 600;
 }
 
-.contest-editor-actions {
+.exam-session-editor-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.contest-btn-primary {
+.exam-session-btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -284,11 +284,11 @@
   transition: all 0.2s ease;
 }
 
-.contest-btn-primary:hover {
+.exam-session-btn-primary:hover {
   filter: brightness(1.1);
 }
 
-.contest-btn-secondary {
+.exam-session-btn-secondary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -303,17 +303,17 @@
   transition: all 0.2s ease;
 }
 
-.contest-btn-secondary:hover {
+.exam-session-btn-secondary:hover {
   background: var(--subtle);
 }
 
-.contest-editor-scroll {
+.exam-session-editor-scroll {
   flex: 1;
   overflow: auto;
   position: relative;
 }
 
-.contest-log-drawer {
+.exam-session-log-drawer {
   max-height: 180px;
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -323,19 +323,19 @@
   font-size: 12px;
 }
 
-.contest-log-drawer.success {
+.exam-session-log-drawer.success {
   border-top: 2px solid #22c55e;
   background: rgba(34, 197, 94, 0.04);
 }
 
-.contest-log-drawer.error {
+.exam-session-log-drawer.error {
   border-top: 2px solid #ef4444;
   background: rgba(239, 68, 68, 0.04);
   color: #ef4444;
 }
 
 /* SCHEMA INSPECTOR SIDEBAR */
-.contest-inspector-pane {
+.exam-session-inspector-pane {
   width: 480px;
   flex: none;
   display: flex;
@@ -348,13 +348,13 @@
   position: relative;
 }
 
-.contest-inspector-pane.collapsed {
+.exam-session-inspector-pane.collapsed {
   width: 0;
   border-left: none;
   visibility: hidden;
 }
 
-.contest-inspector-floating-btn {
+.exam-session-inspector-floating-btn {
   position: absolute;
   right: 16px;
   top: 54px;
@@ -374,13 +374,13 @@
   transition: all 0.2s ease;
 }
 
-.contest-inspector-floating-btn:hover {
+.exam-session-inspector-floating-btn:hover {
   background: var(--subtle);
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }
 
-.contest-inspector-header {
+.exam-session-inspector-header {
   height: 44px;
   background: var(--subtle);
   border-bottom: 1px solid var(--border);
@@ -394,13 +394,13 @@
   flex: none;
 }
 
-.contest-inspector-tools {
+.exam-session-inspector-tools {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.contest-view-mode-pill {
+.exam-session-view-mode-pill {
   display: inline-flex;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -409,7 +409,7 @@
   gap: 2px;
 }
 
-.contest-view-mode-btn {
+.exam-session-view-mode-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -424,12 +424,12 @@
   transition: all 0.15s ease;
 }
 
-.contest-view-mode-btn.active {
+.exam-session-view-mode-btn.active {
   background: var(--accent);
   color: #ffffff;
 }
 
-.contest-inspector-content {
+.exam-session-inspector-content {
   flex: 1;
   overflow-y: auto;
   padding: 14px;
@@ -439,19 +439,19 @@
 }
 
 /* --- DATABASE DIAGRAM VIEW --- */
-.contest-diagram-canvas {
+.exam-session-diagram-canvas {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.contest-diagram-grid {
+.exam-session-diagram-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
 }
 
-.contest-diagram-table-node {
+.exam-session-diagram-table-node {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -460,12 +460,12 @@
   transition: all 0.2s ease;
 }
 
-.contest-diagram-table-node:hover {
+.exam-session-diagram-table-node:hover {
   border-color: var(--accent);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
 }
 
-.contest-diagram-table-header {
+.exam-session-diagram-table-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -479,13 +479,13 @@
   letter-spacing: 0.5px;
 }
 
-.contest-diagram-cols-list {
+.exam-session-diagram-cols-list {
   padding: 6px 12px;
   display: flex;
   flex-direction: column;
 }
 
-.contest-diagram-col-row {
+.exam-session-diagram-col-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -495,24 +495,24 @@
   font-family: "JetBrains Mono", monospace;
 }
 
-.contest-diagram-col-row:last-child {
+.exam-session-diagram-col-row:last-child {
   border-bottom: none;
 }
 
-.contest-diagram-col-row.is-pk {
+.exam-session-diagram-col-row.is-pk {
   background: rgba(234, 179, 8, 0.06);
   margin: 0 -12px;
   padding: 5px 12px;
   font-weight: 600;
 }
 
-.contest-diagram-col-row.is-fk {
+.exam-session-diagram-col-row.is-fk {
   background: rgba(59, 130, 246, 0.06);
   margin: 0 -12px;
   padding: 5px 12px;
 }
 
-.contest-fk-target-chip {
+.exam-session-fk-target-chip {
   font-size: 10px;
   color: #3b82f6;
   background: rgba(59, 130, 246, 0.12);
@@ -522,14 +522,14 @@
   font-weight: 500;
 }
 
-.contest-diagram-relations-box {
+.exam-session-diagram-relations-box {
   background: var(--subtle);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
 }
 
-.contest-diagram-relations-box h4 {
+.exam-session-diagram-relations-box h4 {
   margin: 0 0 8px 0;
   font-size: 12px;
   font-weight: 700;
@@ -541,13 +541,13 @@
   letter-spacing: 0.5px;
 }
 
-.contest-relations-list {
+.exam-session-relations-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.contest-relation-item {
+.exam-session-relation-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -559,13 +559,13 @@
   border: 1px solid var(--border);
 }
 
-.contest-relation-arrow {
+.exam-session-relation-arrow {
   color: #3b82f6;
   font-weight: bold;
 }
 
 /* --- FULLSCREEN DIAGRAM MODAL --- */
-.contest-fullscreen-erd {
+.exam-session-fullscreen-erd {
   max-width: 1200px;
   width: 95vw;
   height: 82vh;
@@ -573,20 +573,20 @@
   flex-direction: column;
 }
 
-.contest-fullscreen-erd-content {
+.exam-session-fullscreen-erd-content {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
 }
 
-.contest-fullscreen-erd-grid {
+.exam-session-fullscreen-erd-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 20px;
 }
 
 /* --- CARDS VIEW --- */
-.contest-table-card {
+.exam-session-table-card {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -594,11 +594,11 @@
   transition: border-color 0.2s ease;
 }
 
-.contest-table-card:hover {
+.exam-session-table-card:hover {
   border-color: var(--border-strong, var(--accent));
 }
 
-.contest-table-card-header {
+.exam-session-table-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -611,7 +611,7 @@
   user-select: none;
 }
 
-.contest-table-name {
+.exam-session-table-name {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -619,7 +619,7 @@
   color: var(--text);
 }
 
-.contest-row-count-badge {
+.exam-session-row-count-badge {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 4px;
@@ -628,14 +628,14 @@
   color: var(--muted);
 }
 
-.contest-table-columns {
+.exam-session-table-columns {
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.contest-col-item {
+.exam-session-col-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -644,11 +644,11 @@
   border-bottom: 1px dashed var(--border);
 }
 
-.contest-col-item:last-child {
+.exam-session-col-item:last-child {
   border-bottom: none;
 }
 
-.contest-col-left {
+.exam-session-col-left {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -656,7 +656,7 @@
   flex-wrap: wrap;
 }
 
-.contest-col-badge-pk {
+.exam-session-col-badge-pk {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -668,7 +668,7 @@
   border-radius: 4px;
 }
 
-.contest-col-badge-fk {
+.exam-session-col-badge-fk {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -680,7 +680,7 @@
   border-radius: 4px;
 }
 
-.contest-col-right {
+.exam-session-col-right {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -690,7 +690,7 @@
 }
 
 /* --- TAB 2: DML STAGE --- */
-.contest-dml-layout {
+.exam-session-dml-layout {
   display: flex;
   width: 100%;
   height: 100%;
@@ -699,40 +699,40 @@
   overflow-y: auto;
 }
 
-.contest-dml-main {
+.exam-session-dml-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.contest-dml-card {
+.exam-session-dml-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;
 }
 
-.contest-dml-card h3 {
+.exam-session-dml-card h3 {
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 600;
 }
 
-.contest-dml-card p {
+.exam-session-dml-card p {
   margin: 0 0 16px 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
 }
 
-.contest-dml-actions {
+.exam-session-dml-actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.contest-dml-status-box {
+.exam-session-dml-status-box {
   margin-top: 16px;
   padding: 12px 16px;
   border-radius: 8px;
@@ -742,19 +742,19 @@
   gap: 10px;
 }
 
-.contest-dml-status-box.success {
+.exam-session-dml-status-box.success {
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.3);
   color: #22c55e;
 }
 
-.contest-dml-status-box.error {
+.exam-session-dml-status-box.error {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: #ef4444;
 }
 
-.contest-dml-seed-preview {
+.exam-session-dml-seed-preview {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -765,14 +765,14 @@
 }
 
 /* --- TAB 3: QUERIES STAGE --- */
-.contest-queries-layout {
+.exam-session-queries-layout {
   display: flex;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.contest-questions-sidebar {
+.exam-session-questions-sidebar {
   width: 280px;
   flex: none;
   background: var(--surface);
@@ -782,7 +782,7 @@
   height: 100%;
 }
 
-.contest-questions-header {
+.exam-session-questions-header {
   height: 42px;
   background: var(--subtle);
   border-bottom: 1px solid var(--border);
@@ -793,7 +793,7 @@
   font-weight: 600;
 }
 
-.contest-questions-list {
+.exam-session-questions-list {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
@@ -802,7 +802,7 @@
   gap: 4px;
 }
 
-.contest-question-btn {
+.exam-session-question-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -817,29 +817,29 @@
   font-size: 13px;
 }
 
-.contest-question-btn:hover {
+.exam-session-question-btn:hover {
   background: var(--subtle);
 }
 
-.contest-question-btn.active {
+.exam-session-question-btn.active {
   background: var(--subtle);
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
 }
 
-.contest-question-status-dot {
+.exam-session-question-status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--border);
 }
 
-.contest-question-status-dot.answered {
+.exam-session-question-status-dot.answered {
   background: #22c55e;
 }
 
-.contest-query-workspace {
+.exam-session-query-workspace {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -847,7 +847,7 @@
   overflow: hidden;
 }
 
-.contest-prompt-pane {
+.exam-session-prompt-pane {
   padding: 16px 20px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -855,7 +855,7 @@
   overflow-y: auto;
 }
 
-.contest-prompt-pane h2 {
+.exam-session-prompt-pane h2 {
   font-size: 15px;
   font-weight: 700;
   margin: 0 0 8px 0;
@@ -864,7 +864,7 @@
   justify-content: space-between;
 }
 
-.contest-prompt-points {
+.exam-session-prompt-points {
   font-size: 12px;
   font-weight: 600;
   background: var(--subtle);
@@ -874,14 +874,14 @@
   color: var(--accent);
 }
 
-.contest-query-editor-area {
+.exam-session-query-editor-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.contest-query-result-pane {
+.exam-session-query-result-pane {
   height: 220px;
   flex: none;
   background: var(--surface);
@@ -891,7 +891,7 @@
   overflow: hidden;
 }
 
-.contest-result-header {
+.exam-session-result-header {
   height: 36px;
   background: var(--subtle);
   border-bottom: 1px solid var(--border);

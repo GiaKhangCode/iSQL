@@ -12,17 +12,17 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 HTMLElement.prototype.scrollTo=()=>{};
 globalThis.__examinations=Array.from({length:16},(_,index)=>({id:`E${index+1}`,title:`Exam ${index+1}`,examDate:'2026-11-05',
   createdAt:index===14?'invalid':index===13?null:'2026-11-04T18:00:00Z',sessions:[]}));
-globalThis.__sessions=[...Array.from({length:4},(_,index)=>({id:`slot${index+1}`,title:`Exam 16 · Ca ${index+1}`,examinationId:'E16',isContest:true,status:'Draft',classes:'Class A'})),
-  {id:'other-parent',title:'Exam 16 · Ca 1',examinationId:'other',isContest:true,status:'Draft',classes:'Class A'},
-  {id:'standalone',title:'Exam 16 · Ca 1',isContest:true,status:'Draft',classes:'Class A'}];
+globalThis.__sessions=[...Array.from({length:4},(_,index)=>({id:`slot${index+1}`,title:`Exam 16 · Ca ${index+1}`,examinationId:'E16',isExamSession:true,status:'Draft',classes:'Class A'})),
+  {id:'other-parent',title:'Exam 16 · Ca 1',examinationId:'other',isExamSession:true,status:'Draft',classes:'Class A'},
+  {id:'standalone',title:'Exam 16 · Ca 1',isExamSession:true,status:'Draft',classes:'Class A'}];
 globalThis.__examinations[15].sessions=Array.from({length:4},(_,index)=>({id:`slot${index+1}`,index:index+1,starts:'07:30',ends:'09:00',classIds:['Class A'],eligibleStudents:1,proctors:[],published:false}));
 const built=await build({stdin:{contents:`
   import React from 'react'; export {act} from 'react'; export {Simulate} from 'react-dom/test-utils'; export {createRoot} from 'react-dom/client';
   import {MemoryRouter,Routes,Route,useLocation,useParams} from 'react-router-dom'; import {ExaminationsPage} from './src/features/office/ExaminationsPage';
-  import {ContestsListPage} from './src/features/teacher/ContestsListPage';
+  import {ExamSessionsListPage} from './src/features/teacher/ExamSessionsListPage';
   function EditorTarget(){return <div data-editor data-session={useParams().id}/>;}
   export const page=key=><MemoryRouter key={key} initialEntries={['/office/examinations']} future={{v7_startTransition:true,v7_relativeSplatPath:true}}><Routes>
-    <Route path='/office/examinations' element={<ExaminationsPage/>}/><Route path='/office/contests' element={<ContestsListPage/>}/><Route path='/office/sessions' element={<ContestsListPage sessionsOnly/>}/><Route path='/office/examinations/:id/edit' element={<EditorTarget/>}/><Route path='/office/sessions/:id/edit' element={<EditorTarget/>}/><Route path='/office/contests/:id/edit' element={<EditorTarget/>}/>
+    <Route path='/office/examinations' element={<ExaminationsPage/>}/><Route path='/office/exam-sessions' element={<ExamSessionsListPage/>}/><Route path='/office/sessions' element={<ExamSessionsListPage sessionsOnly/>}/><Route path='/office/examinations/:id/edit' element={<EditorTarget/>}/><Route path='/office/sessions/:id/edit' element={<EditorTarget/>}/><Route path='/office/exam-sessions/:id/edit' element={<EditorTarget/>}/>
   </Routes></MemoryRouter>;
  export const adminPage=()=> <MemoryRouter initialEntries={['/admin/examinations']}><Routes><Route path='/admin/examinations' element={<ExaminationsPage/>}/><Route path='/admin/examinations/:id/edit' element={<EditorTarget/>}/></Routes></MemoryRouter>;
 `,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',plugins:[{
@@ -49,7 +49,7 @@ try{
   assert.equal(document.querySelectorAll('.office-examination-table th').length,6);
   assert.equal(rows().length,15);
   await click(document.querySelector('.office-exam-dashboard > div:not([hidden]) .class-room-switch'));
-  assert.equal(document.querySelectorAll('.teacher-contest-list-table tbody tr').length,5,'Integrated mode shows exam sessions only');
+  assert.equal(document.querySelectorAll('.teacher-exam-session-list-table tbody tr').length,5,'Integrated mode shows exam sessions only');
   assert.equal(document.querySelector('.office-exam-dashboard > div:not([hidden]) .office-exam-create'),null,'Create examination is hidden in session mode');
   await click(document.querySelector('.office-exam-dashboard > div:not([hidden]) .class-room-switch'));
   assert.equal(rows().length,15,'Switch returns to examinations');
@@ -82,30 +82,30 @@ try{
   assert.equal(document.querySelector('.u027-input').value,'Exam 16','Admission details fill the parent examination name');
   assert.equal(document.querySelector('.teacher-filter-side .u027-toggle').getAttribute('aria-expanded'),'false','The destination keeps its filters collapsed');
   await click(document.querySelector('.teacher-filter-side .u027-toggle'));
-  assert.equal(document.querySelectorAll('.teacher-contest-list-table tbody tr').length,4,'Only the four matching parent sessions appear, even when other examinations have the same title');
+  assert.equal(document.querySelectorAll('.teacher-exam-session-list-table tbody tr').length,4,'Only the four matching parent sessions appear, even when other examinations have the same title');
   await click(document.querySelector('.u027-reset'));
-  assert.equal(document.querySelectorAll('.teacher-contest-list-table tbody tr').length,5,'Reset shows sessions from every examination');
-  assert.equal(document.querySelector('.teacher-contest-list-table th').textContent,'ID');
-  assert.deepEqual([...document.querySelectorAll('.teacher-contest-list-table tbody tr')].map(row=>row.cells[0].textContent),['1','2','3','4','5']);
-  const initiallySelected=document.querySelector('.teacher-contest-list-table tr.is-selected');
+  assert.equal(document.querySelectorAll('.teacher-exam-session-list-table tbody tr').length,5,'Reset shows sessions from every examination');
+  assert.equal(document.querySelector('.teacher-exam-session-list-table th').textContent,'ID');
+  assert.deepEqual([...document.querySelectorAll('.teacher-exam-session-list-table tbody tr')].map(row=>row.cells[0].textContent),['1','2','3','4','5']);
+  const initiallySelected=document.querySelector('.teacher-exam-session-list-table tr.is-selected');
   const initialEditPath=new URL(document.querySelector('.teacher-list-detail-actions .primary').href).pathname;
   await click(initiallySelected);
   assert.equal(document.querySelector('[data-editor]').dataset.session,initialEditPath.split('/')[3],'One click opens the row selected by default');
   await api.act(async()=>root.render(api.page('select-and-open')));
   await click(document.querySelector('.teacher-list-detail-actions .primary'));
-  const anotherRow=document.querySelectorAll('.teacher-contest-list-table tbody tr')[1];
+  const anotherRow=document.querySelectorAll('.teacher-exam-session-list-table tbody tr')[1];
   await click(anotherRow);
   assert.ok(!document.querySelector('[data-editor]'),'Clicking a different row first selects it');
   assert.ok(anotherRow.classList.contains('is-selected'));
   const selectedEditPath=new URL(document.querySelector('.teacher-list-detail-actions .primary').href).pathname;
   await click(anotherRow);
   assert.equal(document.querySelector('[data-editor]').dataset.session,selectedEditPath.split('/')[3],'Clicking the selected row again opens it without a double-click');
-  globalThis.__sessions.push(...Array.from({length:16},(_,i)=>({id:`extra${i}`,title:`Extra ${i}`,examinationId:'other',isContest:true,status:'Draft',classes:'Class A'})));
+  globalThis.__sessions.push(...Array.from({length:16},(_,i)=>({id:`extra${i}`,title:`Extra ${i}`,examinationId:'other',isExamSession:true,status:'Draft',classes:'Class A'})));
   await api.act(async()=>root.render(api.page('all-sessions')));
   await click(document.querySelector('.teacher-list-detail-actions .primary'));
   await click(document.querySelector('.u027-reset'));
   await click(document.querySelector('.teacher-list-footer nav button:last-child'));
-  assert.equal(document.querySelector('.teacher-contest-list-table tbody tr').cells[0].textContent,'16','Contest IDs continue across pages');
+  assert.equal(document.querySelector('.teacher-exam-session-list-table tbody tr').cells[0].textContent,'16','Exam session IDs continue across pages');
   await api.act(async()=>root.render(api.page('edit-link')));
   await click(document.querySelector('.office-examination-edit'));
   assert.ok(document.querySelector('[data-editor]'),'Edit opens the multi-session examination editor');

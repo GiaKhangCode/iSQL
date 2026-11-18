@@ -2,7 +2,7 @@ import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/shared/ui/ui";
-import { resolveContestBannerUrl } from "@/shared/lib/contest/contestBanner";
+import { resolveExamSessionBannerUrl } from "@/shared/lib/exam-session/examSessionBanner";
 
 export type BannerCrop = { x: number; y: number; zoom: number };
 export const defaultBannerCrop: BannerCrop = { x: 0.5, y: 0.5, zoom: 1 };
@@ -31,7 +31,7 @@ function toWebP(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   }, "image/webp", quality));
 }
 
-export function ContestBannerCrop({ sourceUrl, initialCrop, onClose, onApply }: {
+export function ExamSessionBannerCrop({ sourceUrl, initialCrop, onClose, onApply }: {
   sourceUrl: string;
   initialCrop: BannerCrop;
   onClose: () => void;
@@ -59,7 +59,7 @@ export function ContestBannerCrop({ sourceUrl, initialCrop, onClose, onApply }: 
     };
     image.onerror = () => setError("Could not load this banner image.");
     if (!sourceUrl.startsWith("blob:") && !sourceUrl.startsWith("data:")) image.crossOrigin = "anonymous";
-    image.src = resolveContestBannerUrl(sourceUrl) || sourceUrl;
+    image.src = resolveExamSessionBannerUrl(sourceUrl) || sourceUrl;
     return () => { image.onload = null; image.onerror = null; };
   }, [sourceUrl]);
 
@@ -118,7 +118,7 @@ export function ContestBannerCrop({ sourceUrl, initialCrop, onClose, onApply }: 
     }
   }
 
-  return <Dialog title={tr("Adjust contest banner")} className="teacher-banner-crop-dialog" onClose={() => { if (!busy) onClose(); }}>
+  return <Dialog title={tr("Adjust exam session banner")} className="teacher-banner-crop-dialog" onClose={() => { if (!busy) onClose(); }}>
     <p className="tiny muted"><TranslatedText>{tr("Drag the image inside the fixed 3:1 banner frame. Zoom to choose the visible area.")}</TranslatedText></p>
     <div className="teacher-banner-crop-frame" ref={frameRef}
       onPointerDown={(event) => { if (!width) return; event.currentTarget.setPointerCapture(event.pointerId); lastPointer.current = { x: event.clientX, y: event.clientY }; }}

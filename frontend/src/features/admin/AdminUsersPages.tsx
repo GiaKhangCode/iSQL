@@ -126,7 +126,7 @@ export function AdminUsersPage() {
 
   if (loading) {
     return (
-      <section className="teacher-page teacher-list-page compact-teacher-contests admin-users-page">
+      <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-users-page">
         <h1 className="sr-only"><TranslatedText>{tr("Users")}</TranslatedText></h1>
         <TeacherListLoading
           label={tr("Loading users…")}
@@ -140,7 +140,7 @@ export function AdminUsersPage() {
 
   if (loadError) {
     return (
-      <section className="teacher-page teacher-list-page compact-teacher-contests admin-users-page">
+      <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-users-page">
         <h1 className="sr-only"><TranslatedText>{tr("Users")}</TranslatedText></h1>
         <ErrorState
           title={tr("Could not load users")}
@@ -152,7 +152,7 @@ export function AdminUsersPage() {
   }
 
   return (
-    <section className="teacher-page teacher-list-page compact-teacher-contests admin-users-page">
+    <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-users-page">
       <h1 className="sr-only"><TranslatedText>{tr("Users")}</TranslatedText></h1>
       {pendingRequestCount > 0 && (
         <div className="admin-pending-banner">

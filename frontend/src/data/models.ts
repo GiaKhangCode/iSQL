@@ -65,7 +65,7 @@ export type Assignment = {
   problemProgress: Record<string, Progress>;
 };
 
-export type Contest = {
+export type ExamSession = {
   admissionRequired?: boolean;
   admissionUnlocked?: boolean;
   attemptStatus?: "active" | "submitted" | null;
@@ -124,7 +124,7 @@ export type Submission = {
   sections?: QueryResult[];
   id: string;
   problemId: string;
-  source: "Practice" | "Assignments" | "Contests";
+  source: "Practice" | "Assignments" | "ExamSession";
   context: string;
   contextTitle?: string;
   result: Verdict;
@@ -148,7 +148,7 @@ export type Deadline = {
   title: string;
   date: string;
   time: string;
-  kind: "Assignment" | "Contest";
+  kind: "Assignment" | "ExamSession";
   context: string;
   to: string;
 };

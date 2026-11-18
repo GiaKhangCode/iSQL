@@ -4,7 +4,7 @@
 .session-management-builder .session-setup-tabs { margin:8px 0 12px; gap:18px; }
 .session-management-builder .teacher-builder-audience { padding:0; gap:0; }
 .session-management-builder .teacher-builder-class-assignment { margin:0; }
-.session-management-builder .teacher-contest-page-nav button { padding-block:9px; }
+.session-management-builder .teacher-exam-session-page-nav button { padding-block:9px; }
 .session-management-builder .session-embedded .teacher-page { padding:0; width:100%; min-width:0; }
 .session-management-builder .session-room-toolbar { gap:8px; margin:0 0 12px; }
 .session-management-builder .session-allocation-heading { align-items:center; }

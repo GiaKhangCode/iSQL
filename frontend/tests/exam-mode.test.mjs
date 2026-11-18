@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 
-const dom = new JSDOM('<html><body><div id="root"></div></body></html>', { url: "http://localhost/workspace/P?source=Contests&context=A" });
+const dom = new JSDOM('<html><body><div id="root"></div></body></html>', { url: "http://localhost/workspace/P?source=ExamSession&context=A" });
 for (const name of ["window", "document", "navigator", "HTMLElement", "MutationObserver", "localStorage", "location"]) Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let fullscreenRequests = 0;
@@ -51,7 +51,7 @@ await writeFile(filename,output.outputFiles[0].contents);
 try {
   const {act,createElement:h,createRoot,createMemoryRouter,RouterProvider,Page}=createRequire(import.meta.url)(filename);
   const root=createRoot(document.getElementById('root'));
-  const entry='/workspace/P?source=Contests&context=A';
+  const entry='/workspace/P?source=ExamSession&context=A';
   const router=createMemoryRouter([{path:'/workspace/:id',element:h(Page)},{path:'/dashboard',element:h('p',null,'Dashboard')}],{initialEntries:[entry]});
   const click=async button=>{assert.ok(button);await act(async()=>{button.click();await new Promise(r=>setTimeout(r,0));});};
   const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text);
@@ -62,7 +62,7 @@ try {
   assert.equal(document.querySelector('#edit'),null,'Editing is gated until the student accepts exam rules');
   await click(button('Start exam'));
   await click(document.querySelector('#edit'));
-  await act(async()=>router.navigate('/workspace/Q?source=Contests&context=A'));
+  await act(async()=>router.navigate('/workspace/Q?source=ExamSession&context=A'));
   assert.equal(document.querySelector('#id').textContent,'Q','Switching within an activity must stay allowed');
   assert.equal(globalThis.__examState.violationCount,0);
   await click(document.querySelector('#edit'));
@@ -94,7 +94,7 @@ try {
   localStorage.clear();
   globalThis.__examState={examMode:true,status:'active',problemIds:['P','Q'],violationCount:0,drafts:{}};
   const root2=createRoot(document.getElementById('root'));
-  const router2=createMemoryRouter([{path:'/workspace/:id',element:h(Page)},{path:'/dashboard',element:h('p',null,'Dashboard')},{path:'/contests/A',element:h('p',null,'Contest overview')}],{initialEntries:[entry]});
+  const router2=createMemoryRouter([{path:'/workspace/:id',element:h(Page)},{path:'/dashboard',element:h('p',null,'Dashboard')},{path:'/exam-sessions/A',element:h('p',null,'Exam session overview')}],{initialEntries:[entry]});
   await act(async()=>root2.render(h(RouterProvider,{router:router2})));
   await act(async()=>{await router2.navigate('/dashboard');await new Promise(r=>setTimeout(r,0));});
   assert.equal(router2.state.location.pathname,'/workspace/P');
@@ -103,7 +103,7 @@ try {
   await click(button('Continue exam'));
   await click(button('Submit & Exit'));
   await click([...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Submit & Exit'));
-  assert.equal(router2.state.location.pathname,'/contests/A','Submit & Exit must leave only after the server confirms submission');
+  assert.equal(router2.state.location.pathname,'/exam-sessions/A','Submit & Exit must leave only after the server confirms submission');
   assert.equal(globalThis.__examState.finishReason,'student');
   await act(async()=>root2.unmount());
   localStorage.clear();
@@ -113,7 +113,7 @@ try {
   const routerLeave=createMemoryRouter([{path:'/workspace/:id',element:h(Page)},{path:'/dashboard',element:h('p',null,'Dashboard')}],{initialEntries:[entry]});
   await act(async()=>rootLeave.render(h(RouterProvider,{router:routerLeave})));
   await click(document.querySelector('#edit'));
-  await act(async()=>routerLeave.navigate('/workspace/Q?source=Contests&context=A'));
+  await act(async()=>routerLeave.navigate('/workspace/Q?source=ExamSession&context=A'));
   await click(document.querySelector('#edit'));
   await act(async()=>{await routerLeave.navigate('/dashboard');await new Promise(r=>setTimeout(r,0));});
   assert.equal(routerLeave.state.location.pathname,'/workspace/Q');
@@ -220,7 +220,7 @@ try {
   await act(async()=>root3.render(h(RouterProvider,{router:router3})));
   assert.equal(document.querySelector('.workspace-deadline b').textContent,'00:01:00');
   await click(document.querySelector('#edit'));
-  await act(async()=>router3.navigate('/workspace/Q?source=Contests&context=A'));
+  await act(async()=>router3.navigate('/workspace/Q?source=ExamSession&context=A'));
   await click(document.querySelector('#edit'));
   fakeNow+=60001;
   await act(async()=>{document.dispatchEvent(new dom.window.Event('visibilitychange'));await new Promise(r=>setTimeout(r,0));});

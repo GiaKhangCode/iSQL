@@ -80,7 +80,7 @@ export function ActivityResultsPage() {
 
   const fromTeacherExams = location.pathname.startsWith("/teacher/exams/");
   const reviewBase = fromTeacherExams ? "/teacher/exams/review" : `${root}/results/review`;
-  const isExam = Boolean(data?.activity?.examinationId || data?.activity?.isContest || location.pathname.includes("/exams/"));
+  const isExam = Boolean(data?.activity?.examinationId || data?.activity?.isExamSession || location.pathname.includes("/exams/"));
   const exitPath = fromTeacherExams ? "/teacher/exams" : `${root}/results${isExam ? "?kind=exams" : ""}`;
 
   const search = params.get("search") || "";
@@ -228,7 +228,7 @@ export function ActivityResultsPage() {
               {regradeNotice && <p role="status" className="muted tiny" style={{ marginTop: 8 }}>{regradeNotice}</p>}
             </div>
             <footer className="grading-detail-footer" style={{ display: "grid", gap: 8 }}>
-              {canAssignRegrade && Boolean(data.activity?.isContest || data.activity?.examinationId || data.activity?.studentOptions?.examMode || isExam) && (
+              {canAssignRegrade && Boolean(data.activity?.isExamSession || data.activity?.examinationId || data.activity?.studentOptions?.examMode || isExam) && (
                 <button
                   type="button"
                   className="button"

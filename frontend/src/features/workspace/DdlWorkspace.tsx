@@ -4,8 +4,8 @@ import { StageEditor, type StageEditorProps } from "@/features/workspace/compone
 import CodeMirror from "@uiw/react-codemirror";
 import { Database, Layers, Play, RefreshCw, Table as TableIcon, CheckCircle2, AlertCircle, PanelRightClose, PanelRightOpen, Maximize2, LayoutGrid } from "lucide-react";
 import { sqlEditorExtensions } from "@/shared/components/sqlEditorExtensions";
-import type { ContestWorkspaceController } from "@/features/workspace/useContestWorkspace";
-import type { Contest } from "@/data/models";
+import type { ExamSessionWorkspaceController } from "@/features/workspace/useExamSessionWorkspace";
+import type { ExamSession } from "@/data/models";
 
 export function DdlWorkspace(props: StageEditorProps) {
   const { t: tr } = useLanguage("workspace");
@@ -13,10 +13,10 @@ export function DdlWorkspace(props: StageEditorProps) {
 }
 
 
-export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceController & { contest: Contest } }) {
+export function ExamSessionDdlWorkspace({ state }: { state: ExamSessionWorkspaceController & { examSession: ExamSession } }) {
   const { t: tr } = useLanguage("workspace");
   const {
-    contest,
+    examSession,
     error,
     ddlScript,
     setDdlScript,
@@ -35,14 +35,14 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
     renderCardsView
   } = state;
   return (
-          <div className="contest-ddl-layout">
-            <div className="contest-ddl-editor-pane">
-              <div className="contest-editor-header">
+          <div className="exam-session-ddl-layout">
+            <div className="exam-session-ddl-editor-pane">
+              <div className="exam-session-editor-header">
                 <span><TranslatedText>{tr("DDL script (CREATE TABLE, ALTER TABLE, primary keys, foreign keys)")}</TranslatedText></span>
-                <div className="contest-editor-actions">
+                <div className="exam-session-editor-actions">
                   <button
                     type="button"
-                    className="contest-btn-secondary"
+                    className="exam-session-btn-secondary"
                     onClick={() => setSchemaVisible(!schemaVisible)}
                     title={schemaVisible ? tr("Hide the schema panel to expand the editor") : tr("Show the schema panel")}
                   >
@@ -51,7 +51,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
                   </button>
                   <button
                     type="button"
-                    className="contest-btn-primary"
+                    className="exam-session-btn-primary"
                     disabled={ddlRunning}
                     onClick={handleRunDdl}
                   >
@@ -61,7 +61,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
                 </div>
               </div>
 
-              <div className="contest-editor-scroll">
+              <div className="exam-session-editor-scroll">
                 <CodeMirror
                   value={ddlScript}
                   height="100%"
@@ -73,7 +73,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
               </div>
 
               {ddlLog && (
-                <div className={`contest-log-drawer ${ddlLog.status === "Success" ? "success" : "error"}`}>
+                <div className={`exam-session-log-drawer ${ddlLog.status === "Success" ? "success" : "error"}`}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, fontWeight: 600 }}>
                     {ddlLog.status === "Success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
                     <span><TranslatedText>{ddlLog.status === "Success" ? tr("DDL executed successfully!") : tr("DDL execution failed")}</TranslatedText></span>
@@ -90,7 +90,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
             {!schemaVisible && (
               <button
                 type="button"
-                className="contest-inspector-floating-btn"
+                className="exam-session-inspector-floating-btn"
                 onClick={() => setSchemaVisible(true)}
                 title={tr("Reopen the schema panel")}
               >
@@ -100,17 +100,17 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
             )}
 
             {/* LIVE SCHEMA INSPECTOR */}
-            <aside className={`contest-inspector-pane ${!schemaVisible ? "collapsed" : ""}`}>
-              <div className="contest-inspector-header">
+            <aside className={`exam-session-inspector-pane ${!schemaVisible ? "collapsed" : ""}`}>
+              <div className="exam-session-inspector-header">
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <Database size={15} color="var(--accent)" />
                   <span style={{ fontWeight: 600 }}><TranslatedText>{tr("Schema (")}</TranslatedText>{schemaData?.tableCount ?? 0})</span>
 
                   {/* Mode switcher: Diagram vs Cards */}
-                  <div className="contest-view-mode-pill">
+                  <div className="exam-session-view-mode-pill">
                     <button
                       type="button"
-                      className={`contest-view-mode-btn ${schemaViewMode === "diagram" ? "active" : ""}`}
+                      className={`exam-session-view-mode-btn ${schemaViewMode === "diagram" ? "active" : ""}`}
                       onClick={() => setSchemaViewMode("diagram")}
                       title={tr("Show the ER diagram")}
                     >
@@ -118,7 +118,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
                     </button>
                     <button
                       type="button"
-                      className={`contest-view-mode-btn ${schemaViewMode === "cards" ? "active" : ""}`}
+                      className={`exam-session-view-mode-btn ${schemaViewMode === "cards" ? "active" : ""}`}
                       onClick={() => setSchemaViewMode("cards")}
                       title={tr("Show schema cards")}
                     >
@@ -130,7 +130,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <button
                     type="button"
-                    className="contest-btn-secondary"
+                    className="exam-session-btn-secondary"
                     onClick={() => setShowFullscreenDiagram(true)}
                     title={tr("Open the database diagram in full screen")}
                     style={{ padding: "4px 8px" }}
@@ -139,7 +139,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
                   </button>
                   <button
                     type="button"
-                    className="contest-btn-secondary"
+                    className="exam-session-btn-secondary"
                     disabled={schemaLoading}
                     onClick={refreshSchema}
                     title={tr("Refresh the schema from the database")}
@@ -149,7 +149,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
                   </button>
                   <button
                     type="button"
-                    className="contest-btn-secondary"
+                    className="exam-session-btn-secondary"
                     onClick={() => setSchemaVisible(false)}
                     title={tr("Hide the schema panel")}
                     style={{ padding: "4px 8px" }}
@@ -159,7 +159,7 @@ export function ContestDdlWorkspace({ state }: { state: ContestWorkspaceControll
                 </div>
               </div>
 
-              <div className="contest-inspector-content">
+              <div className="exam-session-inspector-content">
                 {!schemaData?.tables || schemaData.tables.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "40px 16px", color: "var(--muted)" }}>
                     <TableIcon size={32} style={{ opacity: 0.4, marginBottom: 12 }} />

@@ -4,7 +4,7 @@ import { Download, FileSpreadsheet, Upload, X } from "lucide-react";
 import { Dialog } from "@/shared/ui/ui";
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { toast } from "@/shared/ui/StackingToasts";
-import { audienceTemplateText,createAudienceTemplate,readAudienceFile,type AudienceFileData,type AudienceFileMode } from "@/shared/lib/contest/audienceFiles";
+import { audienceTemplateText,createAudienceTemplate,readAudienceFile,type AudienceFileData,type AudienceFileMode } from "@/shared/lib/exam-session/audienceFiles";
 import "@/features/teacher/components/AudienceImportDialog.css";
 
 export function AudienceImportDialog({mode,classIds,onImport,onClose}:{mode:AudienceFileMode;classIds:string[];onImport:(data:AudienceFileData)=>Promise<void>;onClose:()=>void}){

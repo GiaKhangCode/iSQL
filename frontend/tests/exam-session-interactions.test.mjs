@@ -31,22 +31,22 @@ const output = await build({
   stdin: { contents: `
     export { createElement, act, useState } from "react";
     export { createRoot } from "react-dom/client";
-    export { ContestSwipeTabs } from "./src/shared/components/ContestSwipeTabs";
-    export { LayeredContestBanner } from "./src/shared/components/LayeredContestBanner";
+    export { ExamSessionSwipeTabs } from "./src/shared/components/ExamSessionSwipeTabs";
+    export { LayeredExamSessionBanner } from "./src/shared/components/LayeredExamSessionBanner";
   `, resolveDir: process.cwd(), loader: "tsx" },
   bundle: true, write: false, platform: "node", format: "cjs", jsx: "automatic",
   loader: { ".css": "empty" }, define: { "process.env.NODE_ENV": '"development"', "import.meta.env.VITE_API_URL": '""' },
 });
-const filename = join(tmpdir(), `sqluit-contest-interactions-${process.pid}.cjs`);
+const filename = join(tmpdir(), `sqluit-exam-session-interactions-${process.pid}.cjs`);
 await writeFile(filename, output.outputFiles[0].contents);
 try {
-  const { createElement: h, act, useState, createRoot, ContestSwipeTabs, LayeredContestBanner } = createRequire(import.meta.url)(filename);
+  const { createElement: h, act, useState, createRoot, ExamSessionSwipeTabs, LayeredExamSessionBanner } = createRequire(import.meta.url)(filename);
   const root = createRoot(document.getElementById("root"));
   const tabs = ["All", "Upcoming", "Live", "Past"].map((id, i) => ({ id, label: id, count: [24, 0, 6, 18][i] }));
   let opened = 0;
   function Harness() {
     const [value, onChange] = useState("All");
-    return h(ContestSwipeTabs, { tabs, value, onChange, label: "Contest status", toolbar: h("input", { "aria-label": "Search" }), aside: h("aside", null, "Hall of Fame") },
+    return h(ExamSessionSwipeTabs, { tabs, value, onChange, label: "Exam session status", toolbar: h("input", { "aria-label": "Search" }), aside: h("aside", null, "Hall of Fame") },
       id => h("div", null, id, h("button", { onClick: () => opened++ }, "Details")));
   }
   await act(async () => root.render(h(Harness)));
@@ -84,7 +84,7 @@ try {
   assert.equal(selected(), buttons[1], "Mouse drag snaps to the next panel");
   assert.equal(opened, 0, "Dragging suppresses the resulting navigation click");
 
-  await act(async () => root.render(h(LayeredContestBanner, { id: "real-contest", className: "featured-contest", label: "Open contest", onOpen: () => opened++, bannerUrl: "/uploads/banner.png" }, h("h3", null, "SQL"))));
+  await act(async () => root.render(h(LayeredExamSessionBanner, { id: "real-exam-session", className: "featured-exam-session", label: "Open exam session", onOpen: () => opened++, bannerUrl: "/uploads/banner.png" }, h("h3", null, "SQL"))));
   const banner = document.querySelector(".u049");
   assert.match(document.querySelector(".u049-image").style.backgroundImage, /uploads\/banner.png/);
   await act(async () => banner.focus());
@@ -92,10 +92,10 @@ try {
   await key(banner, "Escape");
   assert.ok(!banner.classList.contains("is-open"));
   await act(async () => banner.click());
-  assert.equal(opened, 1, "A single tap opens the real contest action");
+  assert.equal(opened, 1, "A single tap opens the real exam session action");
   assert.equal(document.querySelectorAll("button button").length, 0);
   await act(async () => root.unmount());
-  console.log("Contest interactions passed: keyboard, swipe geometry, reduced motion, drag suppression, banner focus and navigation.");
+  console.log("Exam session interactions passed: keyboard, swipe geometry, reduced motion, drag suppression, banner focus and navigation.");
 } finally {
   await unlink(filename);
   dom.window.close();

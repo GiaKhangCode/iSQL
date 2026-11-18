@@ -55,7 +55,7 @@ export function StageEditor({ problem, value, onChange, onRun, onReset, busy, re
   const targetTables = useMemo(() => part === "DML" && (!questionId || questionKind === "seed") ? workspaceReference(problem).tables : [], [problem, part, questionId, questionKind]);
   const [params] = useSearchParams();
   const {session} = useAuth();
-  const source = params.get("source") === "Contests" ? "Contests" : params.get("source") === "Assignments" ? "Assignments" : "Practice";
+  const source = params.get("source") === "ExamSession" ? "ExamSession" : params.get("source") === "Assignments" ? "Assignments" : "Practice";
   const context = params.get("context") || source;
   const [problemTab, setProblemTab] = useWorkspacePane(workspaceDraftKey(session?.id || "anonymous",problem.id,context) + `:pane:${part}`);
   const hasSetup = Boolean(currentQuestions.find(question => question.id === questionId)?.hasSetup);

@@ -8,14 +8,14 @@ import "@/styles/workspace-viewport.css";
 import { DataGrid, Loading } from "@/shared/ui/ui";
 import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
 import { AlertCircle, Play, LayoutGrid } from "lucide-react";
-import { type ContestWorkspaceController } from "@/features/workspace/useContestWorkspace";
-import type { Contest } from "@/data/models";
+import { type ExamSessionWorkspaceController } from "@/features/workspace/useExamSessionWorkspace";
+import type { ExamSession } from "@/data/models";
 
 import "@/features/workspace/components/WorkspaceReadingPane.css";
-export function ContestSqlWorkspace({ state }: { state: ContestWorkspaceController & { contest: Contest } }) {
+export function ExamSessionSqlWorkspace({ state }: { state: ExamSessionWorkspaceController & { examSession: ExamSession } }) {
   const { t: tr } = useLanguage("workspace");
   const {
-    contest,
+    examSession,
     error,
     setShowFullscreenDiagram,
     activeQuestionIndex,
@@ -27,30 +27,30 @@ export function ContestSqlWorkspace({ state }: { state: ContestWorkspaceControll
     setQueryResult,
     handleRunQuery
   } = state;
-  const activeQuestion = contest.problemDetails[activeQuestionIndex];
+  const activeQuestion = examSession.problemDetails[activeQuestionIndex];
   return (
-          <div className="contest-queries-layout">
+          <div className="exam-session-queries-layout">
             {/* Questions sidebar */}
-            <aside className="contest-questions-sidebar">
-              <div className="contest-questions-header">
-                <span><TranslatedText>{tr("Questions (")}</TranslatedText>{contest.problemDetails.length})</span>
+            <aside className="exam-session-questions-sidebar">
+              <div className="exam-session-questions-header">
+                <span><TranslatedText>{tr("Questions (")}</TranslatedText>{examSession.problemDetails.length})</span>
               </div>
-              <div className="contest-questions-list">
-                {contest.problemDetails.map((q, idx) => {
+              <div className="exam-session-questions-list">
+                {examSession.problemDetails.map((q, idx) => {
                   const hasAnswer = Boolean(queryAnswers[q.id]?.trim());
                   const isActive = idx === activeQuestionIndex;
                   return (
                     <button
                       key={q.id}
                       type="button"
-                      className={`contest-question-btn ${isActive ? "active" : ""}`}
+                      className={`exam-session-question-btn ${isActive ? "active" : ""}`}
                       onClick={() => {
                         setActiveQuestionIndex(idx);
                         setQueryResult(null);
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span className={`contest-question-status-dot ${hasAnswer ? "answered" : ""}`} />
+                        <span className={`exam-session-question-status-dot ${hasAnswer ? "answered" : ""}`} />
                         <span><TranslatedText><TranslatedText>{tr("Question")}</TranslatedText></TranslatedText> {idx + 1}. {q.title}</span>
                       </div>
                       <span style={{ fontSize: 11, opacity: 0.7 }}>{q.points ?? 10} <TranslatedText>{tr("pts")}</TranslatedText></span>
@@ -61,26 +61,26 @@ export function ContestSqlWorkspace({ state }: { state: ContestWorkspaceControll
             </aside>
 
             {/* Query Workspace */}
-            <div className="contest-query-workspace">
+            <div className="exam-session-query-workspace">
               {activeQuestion ? (
                 <>
-                  <div className="contest-prompt-pane">
+                  <div className="exam-session-prompt-pane">
                     <h2>
                       <span><TranslatedText><TranslatedText>{tr("Question")}</TranslatedText></TranslatedText> {activeQuestionIndex + 1}: {activeQuestion.title}</span>
-                      <span className="contest-prompt-points">{activeQuestion.points ?? 10} <TranslatedText>{tr("points")}</TranslatedText></span>
+                      <span className="exam-session-prompt-points">{activeQuestion.points ?? 10} <TranslatedText>{tr("points")}</TranslatedText></span>
                     </h2>
                     <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text)" }}>
                       <ProblemMarkdown>{activeQuestion.description || tr("No description available.")}</ProblemMarkdown>
                     </div>
                   </div>
 
-                  <div className="contest-query-editor-area">
-                    <div className="contest-editor-header">
+                  <div className="exam-session-query-editor-area">
+                    <div className="exam-session-editor-header">
                       <span><TranslatedText>{tr("Your SQL query")}</TranslatedText></span>
-                      <div className="contest-editor-actions">
+                      <div className="exam-session-editor-actions">
                         <button
                           type="button"
-                          className="contest-btn-secondary"
+                          className="exam-session-btn-secondary"
                           onClick={() => setShowFullscreenDiagram(true)}
                           title={tr("View the database diagram while writing your query")}
                         >
@@ -89,7 +89,7 @@ export function ContestSqlWorkspace({ state }: { state: ContestWorkspaceControll
                         </button>
                         <button
                           type="button"
-                          className="contest-btn-primary"
+                          className="exam-session-btn-primary"
                           disabled={queryRunning}
                           onClick={handleRunQuery}
                         >
@@ -113,8 +113,8 @@ export function ContestSqlWorkspace({ state }: { state: ContestWorkspaceControll
                     </div>
 
                     {/* Result table pane */}
-                    <div className="contest-query-result-pane">
-                      <div className="contest-result-header">
+                    <div className="exam-session-query-result-pane">
+                      <div className="exam-session-result-header">
                         <span><TranslatedText>{tr("Exam query results")}</TranslatedText></span>
                         {queryResult && !queryResult.error && (
                           <span style={{ color: "#22c55e" }}>
