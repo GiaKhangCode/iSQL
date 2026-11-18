@@ -6,7 +6,7 @@ services:
     container_name: isql_php
     restart: unless-stopped
     volumes:
-      - ../:/var/www/html
+      - ../backend:/var/www/html
     environment:
       - DB_CONNECTION=mysql
       - DB_HOST=mysql
@@ -39,7 +39,7 @@ services:
     ports:
       - "8000:80"
     volumes:
-      - ../:/var/www/html
+      - ../backend:/var/www/html
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - php

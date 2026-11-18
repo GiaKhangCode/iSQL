@@ -44,18 +44,19 @@ Hệ thống áp dụng mô hình kiến trúc cơ sở dữ liệu kép:
 
 ```text
 iSQL/
-├── app/                # Laravel Controllers, Models, Services, Middleware
-├── config/             # Cấu hình Laravel, Database, CORS, JWT
-├── database/           # Migrations, Seeders, Factories
-├── docker/             # Dockerfile, docker-compose.yml, nginx.conf
-├── routes/             # Định tuyến API (api.php, admin.php, teacher.php, student.php...)
-├── tests/              # Bộ kiểm thử tự động PHPUnit (Backend)
-├── frontend/           # Ứng dụng Web React + TypeScript + Vite (copy từ SQL-UIT/frontend)
+├── backend/            # Ứng dụng Backend Laravel 11 API
+│   ├── app/            # Controllers, Models, Services, Middleware
+│   ├── config/         # Cấu hình Laravel, Database, CORS, JWT
+│   ├── database/       # Migrations, Seeders, Factories
+│   ├── routes/         # Định tuyến API (api.php, admin.php, teacher.php, student.php...)
+│   ├── tests/          # Bộ kiểm thử tự động PHPUnit (Backend)
+│   └── .env.example    # Mẫu biến môi trường Backend
+├── frontend/           # Ứng dụng Web React + TypeScript + Vite
 │   ├── src/            # Mã nguồn giao diện (Admin, Office, Teacher, Student)
 │   ├── tests/          # Bộ kiểm thử Frontend
 │   ├── package.json    # Thư viện & scripts npm
 │   └── vite.config.ts  # Cấu hình Vite & proxy /api -> http://127.0.0.1:8000
-├── .env.example        # Mẫu biến môi trường Backend
+├── docker/             # Dockerfile, docker-compose.yml, nginx.conf
 └── README.md
 ```
 
@@ -76,21 +77,21 @@ Trước khi cài đặt, máy của bạn cần có:
 
 Toàn bộ dịch vụ Backend, MySQL, SQL Server, Redis và phpMyAdmin đã được đóng gói sẵn trong Docker.
 
-#### Bước 1: Clone dự án và tạo file `.env`
+#### Bước 1: Clone dự án và tạo file `backend/.env`
 
 ```bash
 git clone https://github.com/GiaKhangCode/iSQL.git
 cd iSQL
 ```
 
-Sao chép file `.env.example` thành `.env`:
+Sao chép file `backend/.env.example` thành `backend/.env`:
 
 ```bash
 # Trên Windows (PowerShell / CMD):
-copy .env.example .env
+copy backend\.env.example backend\.env
 
 # Hoặc trên Linux / macOS:
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
 > 💡 **Lưu ý về `.env`:**
