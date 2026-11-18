@@ -3,53 +3,39 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Course;
+use App\Http\Requests\Admin\CourseRequest;
+use App\Services\CatalogService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class CourseController extends Controller
 {
-    public function index(): JsonResponse
+    public function __construct(private readonly CatalogService $catalogService)
     {
-        return response()->json(Course::withCount('classes')->orderBy('name')->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'unique:courses,code'],
-            'name' => ['required', 'string', 'max:255', 'unique:courses,name'],
-            'description' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', Rule::in(['Active', 'Archived'])],
-        ]);
+        return response()->json($this->catalogService->listCourses());
+    }
 
-        return response()->json(Course::create($data), 201);
+    public function store(CourseRequest $request): JsonResponse
+    {
+        return response()->json($this->catalogService->createCourse($request->validated()), 201);
     }
 
     public function show(string $id): JsonResponse
     {
-        return response()->json(Course::withCount('classes')->findOrFail($id));
+        return response()->json($this->catalogService->findCourse($id));
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(CourseRequest $request, string $id): JsonResponse
     {
-        $course = Course::findOrFail($id);
-        $data = $request->validate([
-            'code' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('courses', 'code')->ignore($id, 'id')],
-            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('courses', 'name')->ignore($id, 'id')],
-            'description' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', Rule::in(['Active', 'Archived'])],
-        ]);
-
-        $course->update($data);
-
-        return response()->json($course->refresh());
+        return response()->json($this->catalogService->updateCourse($id, $request->validated()));
     }
 
     public function destroy(string $id): JsonResponse
     {
-        Course::findOrFail($id)->delete();
+        $this->catalogService->deleteCourse($id);
 
         return response()->json(['message' => 'Course deleted successfully']);
     }
