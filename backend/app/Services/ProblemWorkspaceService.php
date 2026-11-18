@@ -1262,7 +1262,7 @@ class ProblemWorkspaceService
                 );
             }
 
-            $activity = (in_array($source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true) && $context && $context !== 'Practice')
+            $activity = (in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true) && $context && $context !== 'Practice')
                 ? Assignment::find($context)
                 : null;
             $scoreVisible = !$activity || (bool) $activity->show_scores_after_submit;
@@ -1473,7 +1473,7 @@ class ProblemWorkspaceService
         $source = (string) ($data['source'] ?? 'Practice');
         $context = (string) ($data['context'] ?? 'Practice');
 
-        $activity = (in_array($source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true) && $context && $context !== 'Practice')
+        $activity = (in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true) && $context && $context !== 'Practice')
             ? Assignment::find($context)
             : null;
         if ($activity && $activity->exam_mode && ($user->role === User::ROLE_STUDENT || $user->role === 'student')) {
@@ -1486,7 +1486,7 @@ class ProblemWorkspaceService
             $officialCount = Submission::where('user_id', $user->id)
                 ->where('context', $activity->id)
                 ->where('problem_id', $problem->id)
-                ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 })
@@ -1664,7 +1664,7 @@ class ProblemWorkspaceService
         $databaseType = (string) ($data['database'] ?? 'SQL Server');
         $schemaName = $this->sandbox()->studentSchemaName($user->id, $context, $problem->id);
 
-        $isActivity = in_array($source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true)
+        $isActivity = in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true)
             && $context !== '' && $context !== 'Practice';
 
         $activity = $isActivity ? Assignment::find($context) : null;
@@ -1683,7 +1683,7 @@ class ProblemWorkspaceService
             $officialCount = Submission::where('user_id', $user->id)
                 ->where('context', $activity->id)
                 ->where('problem_id', $problem->id)
-                ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 })

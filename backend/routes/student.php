@@ -18,7 +18,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:PRACTICE_MGMT,view'])->
     Route::get('/personal-db/status', [PersonalDbController::class, 'status']);
     Route::post('/personal-db/run', [PersonalDbController::class, 'runQuery']);
 
-    // Activity Attempts (Exams / Assignments / Contests)
+    // Activity Attempts (Exams / Assignments)
     Route::get('/activity-attempts/{activityId}', [ActivityAttemptController::class, 'show']);
     Route::post('/activity-attempts/{activityId}/start', [ActivityAttemptController::class, 'start']);
     Route::post('/activity-attempts/{activityId}/{action}', [ActivityAttemptController::class, 'updateAction']);

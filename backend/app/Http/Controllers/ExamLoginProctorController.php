@@ -518,7 +518,7 @@ class ExamLoginProctorController extends Controller
                 if ($attempt->status === 'submitted' && in_array($attempt->finish_reason, ['violation_limit', 'violations'], true)) {
                     $subIds = Submission::where('user_id', $studentId)
                         ->where('context', $session->id)
-                        ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                        ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                         ->pluck('id')
                         ->all();
 

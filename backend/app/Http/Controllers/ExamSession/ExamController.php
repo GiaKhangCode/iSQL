@@ -1,21 +1,21 @@
 <?php
 
-namespace App\Http\Controllers\Contest;
+namespace App\Http\Controllers\ExamSession;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RunQueryRequest;
 use App\Http\Requests\SubmitExamRequest;
 use App\Services\SqlServer\SandboxService;
-use App\Services\Grading\ContestGradingService;
+use App\Services\Grading\ExamSessionGradingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ExamController extends Controller
 {
     protected SandboxService $sandboxService;
-    protected ContestGradingService $gradingService;
+    protected ExamSessionGradingService $gradingService;
 
-    public function __construct(SandboxService $sandboxService, ContestGradingService $gradingService)
+    public function __construct(SandboxService $sandboxService, ExamSessionGradingService $gradingService)
     {
         $this->sandboxService = $sandboxService;
         $this->gradingService = $gradingService;
@@ -25,7 +25,7 @@ class ExamController extends Controller
     {
         return response()->json([
             'status'  => 'success',
-            'message' => 'Sandbox database schema initialized for contest ' . $id,
+            'message' => 'Sandbox database schema initialized for exam session ' . $id,
         ]);
     }
 

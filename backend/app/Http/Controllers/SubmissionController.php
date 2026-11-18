@@ -53,8 +53,8 @@ class SubmissionController extends Controller
         if ($sourceFilter = trim((string) $request->query('source', ''))) {
             if (in_array($sourceFilter, ['Assignments', 'Assignment'], true)) {
                 $query->whereIn('source', ['Assignments', 'Assignment']);
-            } elseif (in_array($sourceFilter, ['Contests', 'Contest'], true)) {
-                $query->whereIn('source', ['Contests', 'Contest']);
+            } elseif (in_array($sourceFilter, ['ExamSession'], true)) {
+                $query->whereIn('source', ['ExamSession']);
             } else {
                 $query->where('source', $sourceFilter);
             }
@@ -149,7 +149,7 @@ class SubmissionController extends Controller
         $sub = Submission::where('context', $activityId)
             ->where('user_id', $studentId)
             ->where('problem_id', $problemId)
-            ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+            ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
             ->whereDoesntHave('workspaceResult', function ($q) {
                 $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
             })
@@ -199,7 +199,7 @@ class SubmissionController extends Controller
             'feedback'          => null,
             'submittedAt'       => ($attempt && $attempt->submitted_at) ? $attempt->submitted_at->toISOString() : '',
             'database'          => (string) ($draft['database'] ?? $problem->database_type ?? 'SQL Server'),
-            'source'            => $activity->is_contest ? 'Contests' : 'Assignments',
+            'source'            => $activity->is_exam_session ? 'ExamSession' : 'Assignments',
             'context'           => (string) $activity->id,
             'activityId'        => (string) $activity->id,
             'activityTitle'     => (string) $activity->title,
@@ -247,7 +247,7 @@ class SubmissionController extends Controller
         $feedback = $request->input('feedback');
         $questionScores = $request->input('questionScores', $request->input('question_scores'));
 
-        $isActivity = in_array($sub->source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true)
+        $isActivity = in_array($sub->source, ['Assignments', 'ExamSession', 'Assignment'], true)
             && $sub->context && $sub->context !== 'Practice';
         $activity = $isActivity ? Assignment::find($sub->context) : null;
         $ap = ($activity && $sub->problem_id)
@@ -447,9 +447,9 @@ class SubmissionController extends Controller
         abort_if($isQuestionOnly, 422, 'Không thể gửi phúc khảo cho bài nộp từng câu.');
 
         $activity = ($sub->context && $sub->context !== 'Practice') ? Assignment::find($sub->context) : null;
-        $isContestOrExam = in_array($sub->source, ['Contest', 'Contests'], true)
-            || ($activity && ($activity->examination_id || $activity->is_contest || $activity->exam_mode));
-        abort_unless($isContestOrExam, 422, 'Chỉ bài thi hoặc cuộc thi mới được gửi đơn phúc khảo.');
+        $isExamSession = in_array($sub->source, ['ExamSession'], true)
+            || ($activity && ($activity->examination_id || $activity->exam_mode));
+        abort_unless($isExamSession, 422, 'Chỉ bài thi mới được gửi đơn phúc khảo.');
         abort_unless($sub->evaluated_score !== null, 422, 'Bài nộp chưa được chấm chính thức, chưa thể gửi phúc khảo.');
         if ($activity && !$activity->show_scores_after_submit) {
             abort(422, 'Điểm thi chưa được công bố, chưa thể gửi phúc khảo.');
@@ -557,7 +557,7 @@ class SubmissionController extends Controller
             ->count();
 
         $subs = Submission::where('user_id', $user->id)
-            ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+            ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
             ->whereNotNull('context')
             ->where('context', '!=', 'Practice')
             ->whereDoesntHave('workspaceResult', function ($q) {
@@ -611,7 +611,7 @@ class SubmissionController extends Controller
             $history[] = [
                 'id'                => (string) $act->id,
                 'title'             => (string) $act->title,
-                'kind'              => $act->examination_id ? 'Examination' : ($act->is_contest ? 'Contest' : 'Assignment'),
+                'kind'              => $act->examination_id ? 'Examination' : 'Assignment',
                 'examinationId'     => $act->examination_id,
                 'sessionIndex'      => $act->session_index,
                 'room'              => $act->room ?? '',
@@ -697,9 +697,9 @@ class SubmissionController extends Controller
             $appealStatus = 'Graded';
         }
 
-        $isContestOrExam = in_array($sub->source, ['Contest', 'Contests'], true)
-            || ($activity && ($activity->examination_id || $activity->is_contest || $activity->exam_mode));
-        $canAppeal = $isContestOrExam
+        $isExamSession = in_array($sub->source, ['ExamSession'], true)
+            || ($activity && ($activity->examination_id || $activity->exam_mode));
+        $canAppeal = $isExamSession
             && !empty($sub->context)
             && $scoreVisible
             && $sub->evaluated_score !== null
@@ -740,10 +740,10 @@ class SubmissionController extends Controller
 
     protected function isExamActivity(Assignment $activity, ?Submission $sub = null): bool
     {
-        if ($activity->examination_id || $activity->is_contest || $activity->exam_mode) {
+        if ($activity->examination_id || $activity->exam_mode) {
             return true;
         }
-        return $sub !== null && in_array($sub->source, ['Contest', 'Contests'], true);
+        return $sub !== null && in_array($sub->source, ['ExamSession'], true);
     }
 
     protected function isPracticalClassInstructorForStudent(User $viewer, string $studentId, Assignment $activity): bool
@@ -827,7 +827,7 @@ class SubmissionController extends Controller
             return false;
         }
 
-        $isActivity = in_array($sub->source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true)
+        $isActivity = in_array($sub->source, ['Assignments', 'ExamSession', 'Assignment'], true)
             && $sub->context && $sub->context !== 'Practice';
 
         if ($isActivity) {
@@ -964,7 +964,7 @@ class SubmissionController extends Controller
             'context'           => (string) ($sub->context ?: 'Practice'),
             'activityId'        => $activity ? (string) $activity->id : null,
             'activityTitle'     => $activity ? (string) $activity->title : null,
-            'isExam'            => $activity ? (bool) ($activity->is_contest || $activity->examination_id || $activity->exam_mode) : ($sub->source === 'Contests'),
+            'isExam'            => $activity ? (bool) ($activity->examination_id || $activity->exam_mode) : ($sub->source === 'ExamSession'),
             'examinationId'     => $activity && $activity->examination_id ? (string) $activity->examination_id : null,
             'canEditReview'     => $isStaff
                 && !$viewer->isFacultyOffice()

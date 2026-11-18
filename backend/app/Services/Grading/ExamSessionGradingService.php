@@ -2,7 +2,7 @@
 
 namespace App\Services\Grading;
 
-class ContestGradingService
+class ExamSessionGradingService
 {
     protected DdlGrader $ddlGrader;
     protected DmlGrader $dmlGrader;

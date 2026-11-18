@@ -15,8 +15,8 @@ use Tests\TestCase;
 /**
  * Cuộc thi độc lập (contest) đã bị loại bỏ; kỳ thi (examination) được giữ lại.
  *
- * Ca thi vẫn lưu trong bảng assignments với cờ is_contest = true (tạm giữ cho tới khi
- * đổi tên), nên các test này vừa khóa "không còn tạo/xem được cuộc thi độc lập" vừa khóa
+ * Ca thi vẫn lưu trong bảng assignments (nhận biết bằng examination_id, cột is_contest đã bị
+ * bỏ), nên các test này vừa khóa "không còn tạo/xem được cuộc thi độc lập" vừa khóa
  * "ca thi không bị ảnh hưởng".
  */
 class ContestRemovalTest extends TestCase
@@ -80,7 +80,7 @@ class ContestRemovalTest extends TestCase
         ], $extra);
     }
 
-    /** Tạo một ca thi tối thiểu như ExaminationService (is_contest + examination_id). */
+    /** Tạo một ca thi tối thiểu như ExaminationService (có examination_id). */
     private function makeExamSession(array $attrs = []): Assignment
     {
         $exam = Examination::create([
@@ -94,7 +94,6 @@ class ContestRemovalTest extends TestCase
             'instructor_id'      => $this->instructor->id,
             'examination_id'     => $exam->id,
             'session_index'      => 1,
-            'is_contest'         => true,
             'exam_mode'          => true,
             'admission_required' => false,
             'audience_type'      => 'classes',
@@ -114,8 +113,8 @@ class ContestRemovalTest extends TestCase
         foreach (['isContest' => true, 'is_contest' => true] as $key => $value) {
             $res = $this->postJson('/api/assignments', $this->payload([$key => $value]))->assertStatus(201);
 
-            $this->assertFalse($res->json('isContest'), "{$key} không được tạo cuộc thi");
-            $this->assertDatabaseHas('assignments', ['id' => $res->json('id'), 'is_contest' => false]);
+            $this->assertFalse($res->json('isExamSession'), "{$key} không được tạo ca thi");
+            $this->assertDatabaseHas('assignments', ['id' => $res->json('id'), 'examination_id' => null]);
         }
     }
 
@@ -125,7 +124,7 @@ class ContestRemovalTest extends TestCase
 
         $this->putJson("/api/assignments/{$id}", ['title' => 'CR đổi tên', 'isContest' => true])->assertOk();
 
-        $this->assertDatabaseHas('assignments', ['id' => $id, 'title' => 'CR đổi tên', 'is_contest' => false]);
+        $this->assertDatabaseHas('assignments', ['id' => $id, 'title' => 'CR đổi tên', 'examination_id' => null]);
     }
 
     public function test_all_students_audience_is_no_longer_accepted(): void
@@ -153,7 +152,6 @@ class ContestRemovalTest extends TestCase
         $legacy = Assignment::create([
             'title'         => 'CR cuộc thi cũ',
             'instructor_id' => $this->instructor->id,
-            'is_contest'    => true,
             'audience_type' => 'all_students',
             'published'     => true,
             'opens'         => now()->subHour(),
@@ -179,9 +177,11 @@ class ContestRemovalTest extends TestCase
 
         $row = collect($res->json('assignments'))->firstWhere('id', $session->id);
         $this->assertNotNull($row, 'ca thi của lớp phải còn hiện cho sinh viên');
-        $this->assertTrue($row['isContest'], 'cờ tạm giữ cho ca thi');
+        $this->assertTrue($row['isExamSession']);
+        $this->assertArrayNotHasKey('isContest', $row);
+        $this->assertArrayNotHasKey('is_contest', $row);
         $this->assertSame($session->examination_id, $row['examinationId']);
-        $this->assertArrayHasKey('contestStatus', $row);
+        $this->assertArrayHasKey('sessionStatus', $row);
 
         $deadline = collect($res->json('deadlines'))->firstWhere('id', $session->id);
         $this->assertNotNull($deadline);

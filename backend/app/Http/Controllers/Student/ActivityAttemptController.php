@@ -736,7 +736,7 @@ class ActivityAttemptController extends Controller
 
         $countsRows = Submission::where('user_id', $user->id)
             ->where('context', $activity->id)
-            ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+            ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
             ->whereDoesntHave('workspaceResult', function ($q) {
                 $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
             })

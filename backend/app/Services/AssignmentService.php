@@ -305,7 +305,7 @@ class AssignmentService
     }
 
     /**
-     * Create a new assignment / contest
+     * Create a new assignment / exam session
      */
     public function createAssignment(array $data, User|string $instructor): array
     {
@@ -589,7 +589,7 @@ class AssignmentService
 
         $submissionsQuery = Submission::where('context', $assignment->id)
             ->whereIn('problem_id', $problemIds)
-            ->whereIn('source', ['Assignment', 'Contest', 'Assignments', 'Contests'])
+            ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
             ->whereDoesntHave('workspaceResult', function ($q) {
                 $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
             });
@@ -703,7 +703,7 @@ class AssignmentService
     }
 
     /**
-     * Upload contest banner and source image
+     * Upload exam-session banner and source image
      */
     public function uploadBanner(UploadedFile $banner, UploadedFile $source, User $user): array
     {
@@ -1065,7 +1065,7 @@ class AssignmentService
 
             $latestSubsQuery = Submission::where('context', $a->id)
                 ->whereIn('problem_id', $problemIds)
-                ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 })
@@ -1120,8 +1120,7 @@ class AssignmentService
         return [
             'id'               => (string) $a->id,
             'title'            => (string) $a->title,
-            'isContest'        => (bool) $a->is_contest,
-            'is_contest'       => (bool) $a->is_contest,
+            'isExamSession'    => $a->is_exam_session,
             'scoringMode'      => (string) ($a->scoring_mode ?: 'equal_questions'),
             'scoring_mode'     => (string) ($a->scoring_mode ?: 'equal_questions'),
             'audienceType'     => $audienceType,
@@ -1129,9 +1128,9 @@ class AssignmentService
             'shortDescription' => (string) ($a->short_description ?? ''),
             'description'      => (string) ($a->description ?? ''),
             'rules'            => (string) ($a->rules ?? ''),
-            'bannerUrl'        => $a->is_contest ? $a->banner_url : null,
-            'bannerSourceUrl'  => $a->is_contest ? $a->banner_source_url : null,
-            'bannerCrop'       => $a->is_contest ? $a->banner_crop : null,
+            'bannerUrl'        => $a->is_exam_session ? $a->banner_url : null,
+            'bannerSourceUrl'  => $a->is_exam_session ? $a->banner_source_url : null,
+            'bannerCrop'       => $a->is_exam_session ? $a->banner_crop : null,
             'eligibleStudents' => $eligibleStudents,
             'classes'          => $classStr,
             'problems'         => count($problemsList),
@@ -1246,7 +1245,7 @@ class AssignmentService
         foreach ($studentAssignments as $a) {
             $assignedClassIds = $studentAssignmentClasses->where('assignment_id', $a->id)->pluck('class_id')->all();
 
-            if (!$a->is_contest && empty($assignedClassIds)) {
+            if (!$a->is_exam_session && empty($assignedClassIds)) {
                 $assignedClassIds = [$individualClassId];
                 $individual[] = $a;
             }
@@ -1256,9 +1255,9 @@ class AssignmentService
             $attempt = $attemptsMap->get($a->id);
             $isOpen = (empty($a->opens) || $a->opens <= $now)
                 && (!$a->admission_required || $admissionUnlocked || ($attempt && $attempt->status === 'submitted'));
-            $contestStatus = null;
-            if ($a->is_contest) {
-                $contestStatus = ($a->opens && $now < $a->opens)
+            $sessionStatus = null;
+            if ($a->is_exam_session) {
+                $sessionStatus =($a->opens && $now < $a->opens)
                     ? 'Upcoming'
                     : (($a->closes && $now >= $a->closes) ? 'Closed' : 'Live');
             }
@@ -1270,7 +1269,7 @@ class AssignmentService
             $subs = Submission::where('user_id', $currentUser->id)
                 ->whereIn('problem_id', $pIds)
                 ->where('context', $a->id)
-                ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 })
@@ -1331,7 +1330,7 @@ class AssignmentService
             $scope = !empty($matchedNames) ? implode(', ', $matchedNames) : 'Selected students';
 
             $problemDetails = [];
-            if ($isOpen && $a->is_contest) {
+            if ($isOpen && $a->is_exam_session) {
                 $probs = Problem::whereIn('id', $pIds)->get();
                 foreach ($probs as $p) {
                     $ap = $aProblems->firstWhere('problem_id', $p->id);
@@ -1358,17 +1357,17 @@ class AssignmentService
                 'problemDetails'        => $problemDetails,
                 'problemCount'          => count($pIds),
                 'problemProgress'       => $isOpen ? (object) $problemProgress : (object) [],
-                'isContest'             => (bool) $a->is_contest,
+                'isExamSession'         => $a->is_exam_session,
                 'audienceType'          => 'classes',
                 'scope'                 => $scope,
                 'shortDescription'      => (string) ($a->short_description ?? ''),
                 'description'           => (string) ($a->description ?? ''),
                 'rules'                 => (string) ($a->rules ?? ''),
-                'bannerUrl'             => $a->is_contest ? $a->banner_url : null,
+                'bannerUrl'             => $a->is_exam_session ? $a->banner_url : null,
                 'opens'                 => $a->opens ? $a->opens->toISOString() : null,
                 'closes'                => $a->closes ? $a->closes->toISOString() : null,
-                'contestStatus'         => $contestStatus,
-                'leaderboardEnabled'    => (bool) ($a->is_contest && $a->leaderboard_enabled),
+                'sessionStatus'         => $sessionStatus,
+                'leaderboardEnabled'    => (bool) ($a->is_exam_session && $a->leaderboard_enabled),
                 'aiAllowed'             => (bool) $a->ai_allowed,
                 'examMode'              => (bool) $a->exam_mode,
                 'showScoresAfterSubmit' => (bool) $a->show_scores_after_submit,

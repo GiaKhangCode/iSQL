@@ -1130,7 +1130,6 @@ class ExaminationService
         $session->examination_id = $exam->id;
         $session->session_index = (int) $item['index'];
         $session->title = $item['title'];
-        $session->is_contest = true;
         $session->scoring_mode = (string) ($payload['scoringMode'] ?? $payload['scoring_mode'] ?? 'equal_questions');
         $session->audience_type = 'classes';
         $session->short_description = (string) ($payload['shortDescription'] ?? $payload['short_description'] ?? '');

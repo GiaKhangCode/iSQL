@@ -23,7 +23,7 @@ Route::prefix('teacher')->group(base_path('routes/teacher.php'));
 Route::prefix('student')->group(base_path('routes/student.php'));
 Route::prefix('problems')->group(base_path('routes/problems.php'));
 Route::prefix('assignments')->group(base_path('routes/assignments.php'));
-Route::prefix('contests')->group(base_path('routes/contests.php'));
+Route::prefix('exam-sessions')->group(base_path('routes/exam_sessions.php'));
 Route::prefix('submissions')->group(base_path('routes/submissions.php'));
 Route::prefix('notifications')->group(base_path('routes/notifications.php'));
 Route::prefix('sharing')->group(base_path('routes/sharing.php'));

@@ -8,21 +8,21 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class GradeContestExamJob implements ShouldQueue
+class GradeExamSessionJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $contestId;
+    public string $examSessionId;
     public string $userId;
 
-    public function __construct(string $contestId, string $userId)
+    public function __construct(string $examSessionId, string $userId)
     {
-        $this->contestId = $contestId;
+        $this->examSessionId = $examSessionId;
         $this->userId = $userId;
     }
 
     public function handle(): void
     {
-        // Comprehensive Contest Grading logic
+        // Comprehensive exam-session grading logic
     }
 }

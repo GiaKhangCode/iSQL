@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Contest\ExamController;
+use App\Http\Controllers\ExamSession\ExamController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/{id}/setup-db', [ExamController::class, 'setupDb']);

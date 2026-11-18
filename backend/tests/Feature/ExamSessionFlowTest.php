@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 
-class ContestExamFlowTest extends TestCase
+class ExamSessionFlowTest extends TestCase
 {
-    public function test_contest_flow(): void
+    public function test_exam_session_flow(): void
     {
         $this->assertTrue(true);
     }

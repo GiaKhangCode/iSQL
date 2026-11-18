@@ -82,10 +82,10 @@ class RegradeAssignmentController extends Controller
 
     protected function isRegradeEligibleActivity(?Assignment $activity, Submission $sub): bool
     {
-        if (in_array($sub->source, ['Contest', 'Contests'], true)) {
+        if (in_array($sub->source, ['ExamSession'], true)) {
             return true;
         }
-        return $activity !== null && (bool) ($activity->examination_id || $activity->is_contest || $activity->exam_mode);
+        return $activity !== null && (bool) ($activity->examination_id || $activity->exam_mode);
     }
 
     protected function serializeRows(Collection $subs): array
@@ -188,7 +188,7 @@ class RegradeAssignmentController extends Controller
                 'examinationId'           => $activity && $activity->examination_id ? (string) $activity->examination_id : null,
                 'activityId'              => $activity ? (string) $activity->id : (string) ($sub->context ?? ''),
                 'activityTitle'           => $activity ? (string) $activity->title : (string) ($sub->source ?? 'Practice'),
-                'isContest'               => $activity ? (bool) ($activity->is_contest || $activity->examination_id || $activity->exam_mode) : ($sub->source === 'Contests'),
+                'isExamSession'           => $activity ? (bool) ($activity->examination_id || $activity->exam_mode) : ($sub->source === 'ExamSession'),
                 'studentId'               => (string) $sub->user_id,
                 'studentName'             => $student ? (string) $student->name : 'Unknown Student',
                 'student'                 => $student ? (string) $student->name : 'Unknown Student',
@@ -239,19 +239,16 @@ class RegradeAssignmentController extends Controller
         $appealOnly = filter_var($request->query('appeal_only'), FILTER_VALIDATE_BOOLEAN);
 
         $standaloneActivities = Assignment::whereNull('examination_id')
-            ->where(function ($q) {
-                $q->where('is_contest', true)->orWhere('exam_mode', true);
-            })
+            ->where('exam_mode', true)
             ->orderByDesc('created_at')
-            ->get(['id', 'title', 'is_contest', 'exam_mode'])
+            ->get(['id', 'title', 'exam_mode'])
             ->map(fn (Assignment $a) => [
-                'id'        => (string) $a->id,
-                'title'     => (string) $a->title,
-                'isContest' => (bool) $a->is_contest,
-                'examMode'  => (bool) $a->exam_mode,
+                'id'       => (string) $a->id,
+                'title'    => (string) $a->title,
+                'examMode' => (bool) $a->exam_mode,
             ])->values()->all();
 
-        $subsQuery = Submission::whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+        $subsQuery = Submission::whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
             ->whereNotNull('context')
             ->where('context', '!=', 'Practice')
             ->whereDoesntHave('workspaceResult', function ($q) {
@@ -270,7 +267,6 @@ class RegradeAssignmentController extends Controller
         } else {
             $examActivityIds = Assignment::where(function ($q) {
                 $q->whereNotNull('examination_id')
-                    ->orWhere('is_contest', true)
                     ->orWhere('exam_mode', true);
             })->pluck('id')->all();
             if (empty($examActivityIds)) {

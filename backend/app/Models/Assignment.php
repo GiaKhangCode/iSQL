@@ -12,7 +12,6 @@ class Assignment extends Model
     protected $fillable = [
         'id',
         'title',
-        'is_contest',
         'scoring_mode',
         'instructions',
         'audience_type',
@@ -49,7 +48,6 @@ class Assignment extends Model
     ];
 
     protected $casts = [
-        'is_contest'               => 'boolean',
         'published'                => 'boolean',
         'hints_enabled'            => 'boolean',
         'comments_enabled'         => 'boolean',
@@ -69,6 +67,18 @@ class Assignment extends Model
         'dml_points'               => 'integer',
         'sql_points'               => 'integer',
     ];
+
+    /** Ca thi của một kỳ thi: nhận biết bằng examination_id (không còn cột is_contest). */
+    public function getIsExamSessionAttribute(): bool
+    {
+        return $this->examination_id !== null;
+    }
+
+    /** Chỉ lấy các ca thi (assignments gắn với một kỳ thi). */
+    public function scopeExamSessions($query)
+    {
+        return $query->whereNotNull('examination_id');
+    }
 
     public function instructor()
     {

@@ -338,7 +338,6 @@ SQL;
             ['title' => 'Bài thực hành 01: Truy vấn dữ liệu cơ bản trên CSDL Quản lý bán hàng'],
             [
                 'instructor_id'            => $teacher->id,
-                'is_contest'               => false,
                 'audience_type'            => 'classes',
                 'short_description'        => 'Bài thực hành truy vấn SQL cơ bản',
                 'instructions'             => "<p>- Sinh viên hoàn thành các câu truy vấn SQL trên cơ sở dữ liệu Quản lý bán hàng.</p><p>- Sử dụng đúng tên bảng và tên cột theo quy định.</p><p>- Hệ thống sẽ chấm điểm tự động thông qua các bộ test case công khai và ẩn.</p>",
@@ -375,7 +374,6 @@ SQL;
             ['title' => 'Bài thực hành 02: Các phép toán Gom nhóm (GROUP BY) và Kết nối (JOIN)'],
             [
                 'instructor_id'            => $teacher->id,
-                'is_contest'               => false,
                 'audience_type'            => 'classes',
                 'short_description'        => 'Bài thực hành nâng cao với JOIN và GROUP BY',
                 'instructions'             => '<p>Sinh viên thực hiện các câu truy vấn nâng cao kết nối nhiều bảng.</p>',
