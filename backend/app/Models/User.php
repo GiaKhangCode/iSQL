@@ -72,7 +72,14 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
-    public function directRoles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    /** Vai trò phân quyền kiểu capability (AccessRole), khác roleGroups() của ma trận cũ. */
+    public function accessRoles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(AccessRole::class, 'user_access_roles', 'user_id', 'access_role_id')
+                    ->withTimestamps();
+    }
+
+    public function directRoles():\Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'account_assign_role', 'account_id', 'role_id')
                     ->withTimestamps();

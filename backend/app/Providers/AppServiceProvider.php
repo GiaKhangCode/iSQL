@@ -11,7 +11,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Scoped: bộ nhớ đệm quyền sống trong một request/job, không rò sang request sau (queue worker).
+        $this->app->scoped(\App\Services\Access\AccessControlService::class);
     }
 
     /**
