@@ -51,6 +51,12 @@ class ClassController extends Controller
         return response()->json($this->classService->formatClassResponse($class));
     }
 
+    /** GET /api/admin/instructors: người được phân công dạy lớp (Active + class.teach). */
+    public function instructors(): JsonResponse
+    {
+        return response()->json($this->classService->eligibleInstructors());
+    }
+
     public function assignInstructor(AssignClassInstructorRequest $request, string $id): JsonResponse
     {
         $assignmentType = $request->assignmentType();

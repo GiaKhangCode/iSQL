@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ClassModel;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -13,13 +14,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * Danh sách sinh viên của lớp: phân quyền theo lớp, tra cứu sinh viên, thêm/bớt/thay thế,
  * import CSV/TXT và đặt lại mật khẩu sinh viên.
  *
- * Phạm vi truy cập (theo vai trò):
- *  - admin, trưởng bộ môn: mọi lớp;
- *  - giảng viên (INSTRUCTOR_ROLES): ĐỌC lớp mình dạy (lý thuyết hoặc thực hành), GHI chỉ lớp mình
- *    là giảng viên thực hành; kể cả khi có quyền CLASS_MGMT:edit từ nhóm quyền (quyền đó cho phép
- *    THAO TÁC, không mở rộng PHẠM VI lớp);
- *  - sinh viên: không được xem danh sách lớp/sinh viên qua các endpoint này;
- *  - vai trò khác (ví dụ giáo vụ): mọi lớp nếu ma trận quyền cho CLASS_MGMT view/edit.
+ * Quyền và phạm vi (không dùng loại tài khoản để cấp quyền; account_type chỉ nhận diện sinh viên):
+ *  - ĐỌC: người xem mọi lớp (ClassService::seesEveryClass) đọc mọi lớp; người khác chỉ đọc lớp mình dạy
+ *    (lý thuyết hoặc thực hành); không dạy lớp nào thì nhận 404 (kể cả sinh viên);
+ *  - GHI danh sách (thêm/bớt/thay thế/import) và danh bạ sinh viên: chỉ quyền class.manage;
+ *  - ĐẶT LẠI MẬT KHẨU: quyền student.reset_password, trong lớp mình dạy thực hành; siêu quản trị: mọi lớp.
  *
  * Lỗi được ném dưới dạng HttpException/ValidationException để bootstrap/app.php trả JSON
  * `{message, detail, errors?}`.
@@ -30,6 +29,7 @@ class ClassRosterService
         private readonly ClassService $classService,
         private readonly UserService $userService,
         private readonly RosterImportParser $parser,
+        private readonly AccessControlService $access,
     ) {
     }
 
@@ -37,48 +37,23 @@ class ClassRosterService
 
     public function classForReading(User $user, string $classId): ClassModel
     {
-        if ($this->seesEveryClass($user)) {
-            return $this->classService->getClass($classId);
-        }
-        if ($this->isInstructor($user)) {
-            return $this->classService->getClassTaughtBy($classId, $user->id);
-        }
-        if ($user->role !== User::ROLE_STUDENT && $user->canDo('CLASS_MGMT', 'view')) {
+        if ($this->classService->seesEveryClass($user)) {
             return $this->classService->getClass($classId);
         }
 
-        abort(403, 'Permission denied');
+        return $this->classService->getClassTaughtBy($classId, $user->id);
     }
 
     public function classForManaging(User $user, string $classId): ClassModel
     {
-        if ($this->seesEveryClass($user)) {
-            return $this->classService->getClass($classId);
-        }
-        if ($this->isInstructor($user)) {
-            return $this->classService->getClass($classId, $user->id);
-        }
-        if ($user->role !== User::ROLE_STUDENT && $user->canDo('CLASS_MGMT', 'edit')) {
-            return $this->classService->getClass($classId);
-        }
+        $this->assertCanManageClasses($user);
 
-        abort(403, 'This role can view the class roster but cannot edit it.');
+        return $this->classService->getClass($classId);
     }
 
-    private function seesEveryClass(User $user): bool
+    private function assertCanManageClasses(User $user): void
     {
-        return $user->isAdmin() || $user->role === User::ROLE_DEPARTMENT_HEAD;
-    }
-
-    private function isInstructor(User $user): bool
-    {
-        return in_array($user->role, User::INSTRUCTOR_ROLES, true);
-    }
-
-    /** Giá trị truyền cho ClassService để giới hạn theo giảng viên (null = không giới hạn). */
-    private function ownerFilter(User $user): ?string
-    {
-        return $this->isInstructor($user) && ! $this->seesEveryClass($user) ? $user->id : null;
+        abort_unless($this->access->can($user, 'class.manage'), 403, 'Chỉ người quản lý lớp mới được thay đổi danh sách lớp.');
     }
 
     // ───────────────────────── đọc ─────────────────────────
@@ -86,11 +61,9 @@ class ClassRosterService
     /** Danh sách sinh viên Active để chọn thêm vào lớp. */
     public function allActiveStudents(User $user): array
     {
-        if ($user->role === User::ROLE_STUDENT) {
-            abort(403, 'Permission denied');
-        }
+        $this->assertCanManageClasses($user);
 
-        return User::where('role', User::ROLE_STUDENT)
+        return User::where('account_type', User::ACCOUNT_STUDENT)
             ->where('status', 'Active')
             ->orderBy('name')
             ->get()
@@ -148,7 +121,7 @@ class ClassRosterService
         }
 
         $student = $candidates->first();
-        if ($student->role !== User::ROLE_STUDENT) {
+        if ($student->account_type !== User::ACCOUNT_STUDENT) {
             abort(422, 'Tài khoản này không phải là sinh viên.');
         }
 
@@ -197,7 +170,7 @@ class ClassRosterService
     public function addStudents(User $actor, string $classId, array $studentIds): Collection
     {
         $this->classForManaging($actor, $classId);
-        $class = $this->classService->addStudents($classId, $studentIds, $this->ownerFilter($actor));
+        $class = $this->classService->addStudents($classId, $studentIds);
 
         return $class->students()->orderBy('name')->get();
     }
@@ -205,7 +178,7 @@ class ClassRosterService
     public function replaceStudents(User $actor, string $classId, array $studentIds): Collection
     {
         $this->classForManaging($actor, $classId);
-        $class = $this->classService->replaceStudents($classId, $studentIds, $this->ownerFilter($actor));
+        $class = $this->classService->replaceStudents($classId, $studentIds);
 
         return $class->students()->orderBy('name')->get();
     }
@@ -213,7 +186,7 @@ class ClassRosterService
     public function removeStudent(User $actor, string $classId, string $studentId): Collection
     {
         $this->classForManaging($actor, $classId);
-        $class = $this->classService->removeStudent($classId, $studentId, $this->ownerFilter($actor));
+        $class = $this->classService->removeStudent($classId, $studentId);
 
         return $class->students()->orderBy('name')->get();
     }
@@ -281,9 +254,9 @@ class ClassRosterService
             }
 
             $user = $candidates->first();
-            if ($user->role !== User::ROLE_STUDENT) {
+            if ($user->account_type !== User::ACCOUNT_STUDENT) {
                 $failed++;
-                $errors[] = ['email' => $label, 'error' => "Tài khoản ({$user->name}) không phải là sinh viên (vai trò: {$user->role})."];
+                $errors[] = ['email' => $label, 'error' => "Tài khoản ({$user->name}) không phải là sinh viên."];
                 continue;
             }
 
@@ -345,7 +318,9 @@ class ClassRosterService
 
     public function resetStudentPassword(User $actor, string $classId, string $studentId, string $password): void
     {
-        $class = $this->classService->getClass($classId, $actor->isAdmin() ? null : $actor->id);
+        abort_unless($this->access->can($actor, 'student.reset_password'), 403, 'Bạn không có quyền đặt lại mật khẩu sinh viên.');
+
+        $class = $this->classService->getClass($classId, $this->access->isSuperAdmin($actor) ? null : $actor->id);
 
         if (! $class->students()->where('users.id', $studentId)->exists()) {
             throw ValidationException::withMessages(['student_id' => ['The student is not enrolled in this class.']]);

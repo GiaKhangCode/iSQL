@@ -2,14 +2,15 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Models\User;
+use App\Services\ClassService;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Validate gán cùng lúc giảng viên lý thuyết và thực hành
- * (PUT /api/admin/classes/{id}/instructors). Cả hai phải là giảng viên đang Active.
- * Quyền admin đã được chặn ở route (middleware role:admin) nên ở đây luôn cho phép.
+ * (PUT /api/admin/classes/{id}/instructors và /api/teacher/classes/{id}/instructors).
+ * Cả hai phải là tài khoản Active có quyền class.teach (ClassService::canHoldAssignment).
+ * Quyền của người gọi (class.manage) đã được chặn ở route nên ở đây luôn cho phép.
  */
 class SyncClassInstructorsRequest extends FormRequest
 {
@@ -21,15 +22,19 @@ class SyncClassInstructorsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'theory_instructor_id'    => ['required', 'string', $this->activeInstructor()],
-            'practical_instructor_id' => ['required', 'string', $this->activeInstructor()],
+            'theory_instructor_id'    => ['required', 'string', $this->eligibleInstructor('theory')],
+            'practical_instructor_id' => ['required', 'string', $this->eligibleInstructor('practical')],
         ];
     }
 
-    private function activeInstructor()
+    /** Phân công mới cần class.teach; giữ nguyên người đang dạy đúng loại đó thì không (ClassService::canHoldAssignment). */
+    private function eligibleInstructor(string $assignmentType): Closure
     {
-        return Rule::exists('users', 'id')->where(fn ($query) => $query
-            ->whereIn('role', User::INSTRUCTOR_ROLES)
-            ->where('status', 'Active'));
+        return function (string $attribute, mixed $value, Closure $fail) use ($assignmentType): void {
+            $classId = (string) $this->route('id');
+            if (! app(ClassService::class)->canHoldAssignment($classId, $assignmentType, (string) $value)) {
+                $fail('The selected :attribute must be an active account allowed to teach classes.');
+            }
+        };
     }
 }

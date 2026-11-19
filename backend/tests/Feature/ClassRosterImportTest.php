@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 class ClassRosterImportTest extends TestCase
@@ -29,7 +30,7 @@ class ClassRosterImportTest extends TestCase
             'name'            => 'Admin Test',
             'email'           => 'admin_roster_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'admin',
+            ...AccountFixture::for('admin'),
             'status'          => 'Active',
             'initials'        => 'AT',
         ]);
@@ -39,7 +40,7 @@ class ClassRosterImportTest extends TestCase
             'name'            => 'Instructor Test',
             'email'           => 'inst_roster_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor_practical',
+            ...AccountFixture::for('instructor_practical'),
             'status'          => 'Active',
             'initials'        => 'IT',
         ]);
@@ -49,7 +50,7 @@ class ClassRosterImportTest extends TestCase
             'name'            => 'Student One',
             'email'           => 'student1_' . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'S1',
         ]);
@@ -58,20 +59,10 @@ class ClassRosterImportTest extends TestCase
             'name'            => 'Student Two',
             'email'           => 'student2_' . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'S2',
         ]);
-
-        $lecturerGroup = \Illuminate\Support\Facades\DB::table('role_groups')->where('name', 'Giảng viên')->first();
-        if ($lecturerGroup) {
-            \Illuminate\Support\Facades\DB::table('account_assign_role_group')->insert([
-                'account_id'    => $this->instructor->id,
-                'role_group_id' => $lecturerGroup->id,
-                'created_at'    => now(),
-                'updated_at'    => now(),
-            ]);
-        }
 
         $this->testClass = ClassModel::create([
             'course'        => 'CS101 · Introduction to Databases',
@@ -83,7 +74,7 @@ class ClassRosterImportTest extends TestCase
 
     public function test_assign_single_student_to_class(): void
     {
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->instructorToken)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
             ->postJson("/api/teacher/classes/{$this->testClass->id}/members", [
                 'student_id' => $this->student1->id,
             ]);
@@ -101,7 +92,7 @@ class ClassRosterImportTest extends TestCase
 
     public function test_assign_student_by_email(): void
     {
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->instructorToken)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
             ->postJson("/api/teacher/classes/{$this->testClass->id}/members", [
                 'student_id' => $this->student2->email,
             ]);
@@ -123,7 +114,7 @@ class ClassRosterImportTest extends TestCase
             'joined_at' => now(),
         ]);
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->instructorToken)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
             ->deleteJson("/api/teacher/classes/{$this->testClass->id}/members/{$this->student1->id}");
 
         $response->assertOk()
@@ -144,7 +135,7 @@ class ClassRosterImportTest extends TestCase
 
         $file = UploadedFile::fake()->createWithContent('students.csv', $csvContent);
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->instructorToken)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
             ->post("/api/teacher/classes/{$this->testClass->id}/members/import", [
                 'file' => $file,
             ]);
@@ -175,7 +166,7 @@ class ClassRosterImportTest extends TestCase
 
         $file = UploadedFile::fake()->createWithContent('students.txt', $txtContent);
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->instructorToken)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
             ->post("/api/teacher/classes/{$this->testClass->id}/members/import", [
                 'file' => $file,
             ]);
@@ -194,7 +185,7 @@ class ClassRosterImportTest extends TestCase
         $xlsxHeader = "PK\x03\x04" . str_repeat("\x00", 50);
         $file = UploadedFile::fake()->createWithContent('students.csv', $xlsxHeader);
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $this->instructorToken)
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->adminToken)
             ->post("/api/teacher/classes/{$this->testClass->id}/members/import", [
                 'file' => $file,
             ]);

@@ -9,6 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -49,24 +50,16 @@ class ClassRosterControllerTest extends TestCase
             'name'            => 'RC ' . $role . ' ' . $u,
             'email'           => "rc_{$u}@gm.uit.edu.vn",
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => 'Active',
             'initials'        => 'RC',
         ], $extra));
     }
 
-    /** Giảng viên đã được duyệt: có nhóm quyền "Giảng viên" (CLASS_MGMT:edit...). */
-    private function makeInstructor(string $role = 'instructor_practical', bool $withGroup = true): User
+    /** Giảng viên: vai trò mặc định "Giảng viên" (student.reset_password...) do User::created gán; không có class.manage. */
+    private function makeInstructor(string $role = 'instructor_practical'): User
     {
-        $user = $this->makeUser($role);
-        $group = DB::table('role_groups')->where('name', 'Giảng viên')->first();
-        if ($withGroup && $group) {
-            DB::table('account_assign_role_group')->insert([
-                'account_id' => $user->id, 'role_group_id' => $group->id, 'created_at' => now(), 'updated_at' => now(),
-            ]);
-        }
-
-        return $user;
+        return $this->makeUser($role);
     }
 
     private function makeClass(?User $practical = null): ClassModel
@@ -125,22 +118,23 @@ class ClassRosterControllerTest extends TestCase
         $this->postJson(self::T . "/{$this->class->id}/members", [])->assertStatus(401);
     }
 
-    public function test_role_without_class_permissions_is_blocked_by_middleware(): void
+    public function test_account_without_class_permissions_cannot_read_unrelated_rosters_or_write(): void
     {
         Sanctum::actingAs($this->makeUser('visitor'));
 
-        $this->getJson(self::T . "/{$this->class->id}/members")->assertStatus(403);
+        $this->getJson(self::T . "/{$this->class->id}/members")->assertStatus(404); // không dạy lớp nào
         $this->getJson(self::T . '/students')->assertStatus(403);
         $this->postJson(self::T . "/{$this->class->id}/members", ['student_id' => 'x'])->assertStatus(403);
     }
 
-    public function test_write_routes_require_class_edit_permission(): void
+    public function test_write_routes_require_class_manage_permission(): void
     {
         $student = $this->makeUser('student');
         $faculty = $this->makeUser('faculty_office');
-        $bare = $this->makeInstructor('instructor_practical', false); // chỉ có quyền mặc định (view)
+        $head = $this->makeUser('department_head');
 
-        foreach ([$student, $faculty, $bare] as $actor) {
+        // Kể cả giảng viên dạy chính lớp này cũng không được ghi danh sách lớp.
+        foreach ([$student, $faculty, $head, $this->owner] as $actor) {
             Sanctum::actingAs($actor);
             $id = $this->class->id;
             $this->postJson(self::T . "/{$id}/members", ['student_id' => $student->id])->assertStatus(403);
@@ -149,7 +143,7 @@ class ClassRosterControllerTest extends TestCase
             $this->postJson(self::T . "/{$id}/students", ['student_ids' => [$student->id]])->assertStatus(403);
             $this->putJson(self::T . "/{$id}/students", ['student_ids' => []])->assertStatus(403);
             $this->deleteJson(self::T . "/{$id}/students/{$student->id}")->assertStatus(403);
-            $this->postJson(self::T . "/{$id}/students/{$student->id}/reset-password", ['password' => 'abcdefgh'])->assertStatus(403);
+            $this->getJson(self::T . '/students')->assertStatus(403);
         }
         $this->assertSame([], $this->enrolledIds());
     }
@@ -194,35 +188,40 @@ class ClassRosterControllerTest extends TestCase
 
     // ───────────────────────── phạm vi lớp (khóa lại hành vi hiện tại) ─────────────────────────
 
-    public function test_instructor_with_edit_permission_cannot_write_to_a_class_they_do_not_teach(): void
+    public function test_instructor_cannot_change_the_roster_even_of_the_class_they_teach(): void
     {
-        // Quyền CLASS_MGMT:edit cho phép THAO TÁC, không mở rộng PHẠM VI lớp.
-        $other = $this->makeInstructor();
         $student = $this->makeUser('student');
         $enrolled = $this->makeUser('student');
         $this->enroll($enrolled);
-        Sanctum::actingAs($other);
+        Sanctum::actingAs($this->owner);
         $id = $this->class->id;
 
-        $this->postJson(self::T . "/{$id}/members", ['student_id' => $student->id])->assertStatus(404);
-        $this->deleteJson(self::T . "/{$id}/members/{$enrolled->id}")->assertStatus(404);
-        $this->postJson(self::T . "/{$id}/students", ['student_ids' => [$student->id]])->assertStatus(404);
-        $this->putJson(self::T . "/{$id}/students", ['student_ids' => []])->assertStatus(404);
-        $this->deleteJson(self::T . "/{$id}/students/{$enrolled->id}")->assertStatus(404);
-        $this->post(self::T . "/{$id}/members/import", ['file' => $this->csv('a.csv', $student->email)], ['Accept' => 'application/json'])->assertStatus(404);
+        $this->postJson(self::T . "/{$id}/members", ['student_id' => $student->id])->assertStatus(403);
+        $this->deleteJson(self::T . "/{$id}/members/{$enrolled->id}")->assertStatus(403);
+        $this->postJson(self::T . "/{$id}/students", ['student_ids' => [$student->id]])->assertStatus(403);
+        $this->putJson(self::T . "/{$id}/students", ['student_ids' => []])->assertStatus(403);
+        $this->deleteJson(self::T . "/{$id}/students/{$enrolled->id}")->assertStatus(403);
+        $this->post(self::T . "/{$id}/members/import", ['file' => $this->csv('a.csv', $student->email)], ['Accept' => 'application/json'])->assertStatus(403);
 
         $this->assertSame([$enrolled->id], $this->enrolledIds(), 'danh sách lớp không đổi');
+        // Nhưng vẫn đọc được lớp mình dạy.
+        $this->getJson(self::T . "/{$id}/members")->assertOk()->assertJsonPath('0.id', $enrolled->id);
     }
 
-    public function test_instructor_can_write_to_the_class_they_teach_as_practical(): void
+    public function test_an_account_with_class_manage_via_a_custom_role_can_write_even_if_users_role_is_student(): void
     {
+        $manager = $this->makeUser('student');
+        DB::table('user_access_roles')->where('user_id', $manager->id)->delete();
+        $role = \App\Models\AccessRole::create(['name' => 'QL lớp ' . uniqid(), 'is_super' => false]);
+        $role->syncPermissions(['class.manage']);
+        $manager->accessRoles()->attach($role->id);
+        app(\App\Services\Access\AccessControlService::class)->forget();
         $student = $this->makeUser('student');
-        Sanctum::actingAs($this->owner);
+        Sanctum::actingAs($manager);
 
         $this->postJson(self::T . "/{$this->class->id}/members", ['student_id' => $student->id])->assertStatus(201);
         $this->assertSame([$student->id], $this->enrolledIds());
-        $this->deleteJson(self::T . "/{$this->class->id}/members/{$student->id}")->assertOk();
-        $this->assertSame([], $this->enrolledIds());
+        $this->getJson(self::T . '/students')->assertOk();
     }
 
     public function test_theory_only_instructor_can_read_but_not_edit_the_roster(): void
@@ -237,7 +236,7 @@ class ClassRosterControllerTest extends TestCase
 
         $this->getJson(self::T . "/{$this->class->id}/members")->assertOk()->assertJsonPath('0.id', $student->id);
         $this->getJson(self::T . "/{$this->class->id}/students")->assertOk();
-        $this->deleteJson(self::T . "/{$this->class->id}/members/{$student->id}")->assertStatus(404);
+        $this->deleteJson(self::T . "/{$this->class->id}/members/{$student->id}")->assertStatus(403);
         $this->assertSame([$student->id], $this->enrolledIds());
     }
 
@@ -256,8 +255,8 @@ class ClassRosterControllerTest extends TestCase
         $this->enroll($classmate);
         $this->actingAsStudent();
 
-        $this->getJson(self::T . "/{$this->class->id}/members")->assertStatus(403);
-        $this->getJson(self::T . "/{$this->class->id}/students")->assertStatus(403);
+        $this->getJson(self::T . "/{$this->class->id}/members")->assertStatus(404); // sinh viên không dạy lớp nào
+        $this->getJson(self::T . "/{$this->class->id}/students")->assertStatus(404);
         $this->getJson(self::T . '/students')->assertStatus(403);
         $this->getJson(self::A . "/{$this->class->id}/members")->assertStatus(403);
     }
@@ -270,25 +269,31 @@ class ClassRosterControllerTest extends TestCase
         foreach ([$this->admin, $this->makeUser('department_head'), $this->makeUser('faculty_office')] as $actor) {
             Sanctum::actingAs($actor);
             $this->getJson(self::T . "/{$this->class->id}/members")->assertOk()->assertJsonPath('0.id', $classmate->id);
-            $this->getJson(self::T . '/students')->assertOk();
+            $this->getJson(self::T . "/{$this->class->id}/students")->assertOk();
         }
     }
 
-    public function test_department_head_can_manage_any_roster(): void
+    public function test_only_class_managers_see_the_student_directory(): void
     {
-        $student = $this->makeUser('student');
-        $head = $this->makeUser('department_head');
-        $group = DB::table('role_groups')->where('name', 'Giảng viên')->first();
-        DB::table('account_assign_role_group')->insert([
-            'account_id' => $head->id, 'role_group_id' => $group->id, 'created_at' => now(), 'updated_at' => now(),
-        ]);
-        Sanctum::actingAs($head);
+        $this->makeUser('student');
 
-        $this->postJson(self::T . "/{$this->class->id}/members", ['student_id' => $student->id])->assertStatus(201);
-        $this->assertSame([$student->id], $this->enrolledIds());
+        Sanctum::actingAs($this->admin);
+        $this->getJson(self::T . '/students')->assertOk();
+
+        foreach ([$this->makeUser('department_head'), $this->makeUser('faculty_office'), $this->owner] as $actor) {
+            Sanctum::actingAs($actor);
+            $this->getJson(self::T . '/students')->assertStatus(403);
+        }
     }
 
-    // ───────────────────────── getAllStudents ─────────────────────────
+    public function test_department_head_cannot_change_any_roster(): void
+    {
+        $student = $this->makeUser('student');
+        Sanctum::actingAs($this->makeUser('department_head'));
+
+        $this->postJson(self::T . "/{$this->class->id}/members", ['student_id' => $student->id])->assertStatus(403);
+        $this->assertSame([], $this->enrolledIds());
+    }
 
     public function test_all_students_lists_only_active_students_sorted_by_name_with_shape(): void
     {
@@ -631,7 +636,7 @@ class ClassRosterControllerTest extends TestCase
         $errors = collect($res->json('errors'));
         $this->assertSame('Sinh viên đã tham gia lớp học từ trước.', $errors->firstWhere('email', $already->email)['error']);
         $this->assertSame('Trùng lặp trong tệp tải lên.', $errors->firstWhere('email', strtoupper($ok->email))['error']);
-        $this->assertSame("Tài khoản ({$teacher->name}) không phải là sinh viên (vai trò: instructor_practical).", $errors->firstWhere('email', $teacher->email)['error']);
+        $this->assertSame("Tài khoản ({$teacher->name}) không phải là sinh viên.", $errors->firstWhere('email', $teacher->email)['error']);
         $this->assertSame('Không tìm thấy người dùng với thông tin: nguoi_la_rc@gm.uit.edu.vn.', $errors->firstWhere('email', 'nguoi_la_rc@gm.uit.edu.vn')['error']);
         $this->assertEqualsCanonicalizing([$already->id, $ok->id], $this->enrolledIds());
         $this->assertSame('Member', DB::table('class_enrollments')->where('student_id', $ok->id)->value('role'));
@@ -825,15 +830,19 @@ class ClassRosterControllerTest extends TestCase
         $this->assertTrue(Hash::check('password123', $theirs->refresh()->hashed_password));
     }
 
-    public function test_only_admin_and_practical_instructors_may_reset_passwords(): void
+    public function test_only_admin_and_practical_instructors_with_the_permission_may_reset_passwords(): void
     {
         $s = $this->makeUser('student');
         $this->enroll($s);
 
-        foreach (['instructor_theory', 'department_head', 'faculty_office'] as $role) {
-            Sanctum::actingAs($this->makeInstructor($role));
+        // Không có quyền student.reset_password: bị chặn ở route.
+        foreach (['department_head', 'faculty_office', 'student'] as $role) {
+            Sanctum::actingAs($this->makeUser($role));
             $this->postJson(self::T . "/{$this->class->id}/students/{$s->id}/reset-password", ['password' => 'MatKhauMoi1'])->assertStatus(403);
         }
+        // Có quyền nhưng không dạy lớp này (hoặc chỉ dạy lý thuyết): không thấy lớp.
+        Sanctum::actingAs($this->makeInstructor('instructor_theory'));
+        $this->postJson(self::T . "/{$this->class->id}/students/{$s->id}/reset-password", ['password' => 'MatKhauMoi1'])->assertStatus(404);
 
         $this->assertTrue(Hash::check('password123', $s->refresh()->hashed_password));
     }

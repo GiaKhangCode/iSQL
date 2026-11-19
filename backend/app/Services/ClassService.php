@@ -7,6 +7,7 @@ use App\Models\ClassEnrollment;
 use App\Models\AcademicTerm;
 use App\Models\Course;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,88 @@ use Illuminate\Validation\ValidationException;
 
 class ClassService
 {
+    public function __construct(private readonly AccessControlService $access)
+    {
+    }
+
+    /**
+     * Người xem được MỌI lớp: siêu quản trị, người quản lý lớp (class.manage), người xem kết quả mọi lớp
+     * (results.view_all) và người lập kỳ thi chọn lớp (examination.manage). Người còn lại chỉ thấy lớp mình dạy.
+     * Không đọc users.role.
+     */
+    public function seesEveryClass(User $user): bool
+    {
+        return $this->access->isSuperAdmin($user)
+            || $this->access->canAny($user, ['class.manage', 'results.view_all', 'examination.manage']);
+    }
+
+    /** Danh sách lớp người dùng được xem. */
+    public function visibleClasses(User $user): Collection
+    {
+        return $this->seesEveryClass($user) ? $this->getAllClasses() : $this->getInstructorClasses($user->id);
+    }
+
+    /** Một lớp người dùng được xem (404 nếu không thuộc phạm vi). */
+    public function visibleClass(User $user, string $classId): ClassModel
+    {
+        return $this->seesEveryClass($user)
+            ? $this->getClass($classId)
+            : $this->getClass($classId, $user->id);
+    }
+
+    /**
+     * Người được phân công dạy lớp: tài khoản Active có quyền class.teach (qua vai trò thường hoặc gán riêng).
+     * Không đọc users.role. Siêu quản trị không tự có class.teach (PermissionCatalog::NEVER_FOR_SUPER).
+     */
+    private function eligibleInstructorQuery(): Builder
+    {
+        return User::query()
+            ->where('status', 'Active')
+            ->whereIn('id', $this->access->holdersOf('class.teach'));
+    }
+
+    /** Danh sách để chọn giảng viên khi phân công (GET /api/admin/instructors), sắp theo tên. */
+    public function eligibleInstructors(): array
+    {
+        return $this->eligibleInstructorQuery()
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'department'])
+            ->map(fn (User $u) => [
+                'id'         => $u->id,
+                'name'       => $u->name,
+                'email'      => $u->email,
+                'department' => $u->department,
+            ])
+            ->all();
+    }
+
+    public function isEligibleInstructor(?string $userId): bool
+    {
+        return $userId !== null && $userId !== ''
+            && $this->eligibleInstructorQuery()->whereKey($userId)->exists();
+    }
+
+    /** Người này đang được phân công đúng loại này cho lớp này? */
+    public function isCurrentAssignment(string $classId, string $assignmentType, ?string $userId): bool
+    {
+        return $userId !== null && $userId !== ''
+            && DB::table('class_instructors')
+                ->where('class_id', $classId)
+                ->where('assignment_type', $assignmentType)
+                ->where('instructor_id', $userId)
+                ->exists();
+    }
+
+    /**
+     * Được đặt người này vào vị trí ($classId, $assignmentType)? Phân công mới cần class.teach; gửi lại đúng
+     * phân công đang có thì không (người mất quyền dạy vẫn giữ lớp đang dạy, và form sửa lớp luôn gửi lại giảng viên).
+     */
+    public function canHoldAssignment(string $classId, string $assignmentType, ?string $userId): bool
+    {
+        return $this->isCurrentAssignment($classId, $assignmentType, $userId)
+            || $this->isEligibleInstructor($userId);
+    }
+
     /**
      * Get all classes for Admin view
      */
@@ -145,7 +228,9 @@ class ClassService
             return $this->removeInstructorAssignment($classId, $assignmentType);
         }
 
-        $this->assertActiveInstructor($instructorId);
+        if (! $this->isCurrentAssignment($class->id, $assignmentType, $instructorId)) {
+            $this->assertActiveInstructor($instructorId);
+        }
 
         DB::transaction(function () use ($class, $assignmentType, $instructorId): void {
             DB::table('class_instructors')
@@ -167,8 +252,12 @@ class ClassService
     public function syncInstructorAssignments(string $classId, string $theoryInstructorId, string $practicalInstructorId): ClassModel
     {
         $class = ClassModel::findOrFail($classId);
-        $this->assertActiveInstructor($theoryInstructorId);
-        $this->assertActiveInstructor($practicalInstructorId);
+        if (! $this->isCurrentAssignment($class->id, 'theory', $theoryInstructorId)) {
+            $this->assertActiveInstructor($theoryInstructorId);
+        }
+        if (! $this->isCurrentAssignment($class->id, 'practical', $practicalInstructorId)) {
+            $this->assertActiveInstructor($practicalInstructorId);
+        }
 
         DB::transaction(function () use ($class, $theoryInstructorId, $practicalInstructorId): void {
             DB::table('class_instructors')->where('class_id', $class->id)->delete();
@@ -225,14 +314,9 @@ class ClassService
 
     private function assertActiveInstructor(string $instructorId): void
     {
-        $valid = User::whereKey($instructorId)
-            ->whereIn('role', User::INSTRUCTOR_ROLES)
-            ->where('status', 'Active')
-            ->exists();
-
-        if (! $valid) {
+        if (! $this->isEligibleInstructor($instructorId)) {
             throw ValidationException::withMessages([
-                'instructor_id' => ['The instructor must be an active practical or theory instructor.'],
+                'instructor_id' => ['The instructor must be an active account allowed to teach classes (class.teach).'],
             ]);
         }
     }
@@ -439,7 +523,7 @@ class ClassService
         }
 
         $uniqueIds = array_values(array_unique($studentIds));
-        $studentCount = User::whereIn('id', $uniqueIds)->where('role', User::ROLE_STUDENT)->count();
+        $studentCount = User::whereIn('id', $uniqueIds)->where('account_type', User::ACCOUNT_STUDENT)->count();
         if ($studentCount !== count($uniqueIds) || count($uniqueIds) !== count($studentIds)) {
             throw ValidationException::withMessages([
                 'student_ids' => ['Each student ID must identify a distinct student account.'],

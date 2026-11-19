@@ -12,6 +12,8 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\UsesDefaultRolePermissions;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -25,12 +27,15 @@ use Tests\TestCase;
 class AdminClassControllerTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
 
     private User $admin;
 
     protected function setUp(): void
     {
         parent::setUp();
+        // Giảng viên mặc định phải có class.teach như AccessRoleSeeder, bất kể DB dev đã được sửa hay chưa.
+        $this->useDefaultRolePermissions();
         $this->admin = $this->makeUser('admin');
         Sanctum::actingAs($this->admin);
     }
@@ -43,7 +48,7 @@ class AdminClassControllerTest extends TestCase
             'name'            => 'AC ' . $role . ' ' . uniqid(),
             'email'           => 'ac_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => $status,
             'initials'        => 'AC',
         ]);

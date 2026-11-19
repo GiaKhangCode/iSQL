@@ -8,11 +8,14 @@ use App\Models\AcademicTerm;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\UsesDefaultRolePermissions;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 class ClassInstructorAllocationTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
 
     protected User $adminUser;
     protected string $adminToken;
@@ -31,13 +34,15 @@ class ClassInstructorAllocationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Giảng viên mặc định phải có class.teach như AccessRoleSeeder, bất kể DB dev đã được sửa hay chưa.
+        $this->useDefaultRolePermissions();
 
         // 1. Admin
         $this->adminUser = User::create([
             'name'            => 'Admin Allocation Test',
             'email'           => 'admin_alloc_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'admin',
+            ...AccountFixture::for('admin'),
             'status'          => 'Active',
             'initials'        => 'AA',
         ]);
@@ -48,7 +53,7 @@ class ClassInstructorAllocationTest extends TestCase
             'name'            => 'Dr. Teacher Practical',
             'email'           => 'instructor1_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor_practical',
+            ...AccountFixture::for('instructor_practical'),
             'status'          => 'Active',
             'initials'        => 'TP',
             'department'      => 'Software Engineering',
@@ -60,7 +65,7 @@ class ClassInstructorAllocationTest extends TestCase
             'name'            => 'Dr. Teacher Theory',
             'email'           => 'instructor2_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor_theory',
+            ...AccountFixture::for('instructor_theory'),
             'status'          => 'Active',
             'initials'        => 'TT',
             'department'      => 'Computer Science',
@@ -72,7 +77,7 @@ class ClassInstructorAllocationTest extends TestCase
             'name'            => 'Student Test',
             'email'           => 'student_' . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'ST',
         ]);
@@ -246,29 +251,31 @@ class ClassInstructorAllocationTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_admin_can_create_user_with_lecturer_role_from_frontend_dialog(): void
+    public function test_admin_can_create_user_with_a_chosen_role_from_frontend_dialog(): void
     {
         $email = 'hungxm_' . uniqid() . '@uit.edu.vn';
+        $roleId = (string) \App\Models\AccessRole::where('slug', 'instructor')->value('id');
         $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
             ->postJson('/api/admin/users', [
-                'name'     => 'Mai Xuân Hùng',
-                'email'    => $email,
-                'password' => 'password123',
-                'role'     => 'Lecturer', // Frontend sends capitalized 'Lecturer'
+                'name'         => 'Mai Xuân Hùng',
+                'email'        => $email,
+                'password'     => 'password123',
+                'account_type' => 'staff',
+                'role_id'      => $roleId, // vai trò động chọn trong hộp thoại
             ]);
 
         $response->assertStatus(201)
             ->assertJsonPath('email', $email)
             ->assertJsonPath('name', 'Mai Xuân Hùng')
-            ->assertJsonPath('roleDisplay', 'Lecturer');
+            ->assertJsonPath('account_type', 'staff')
+            ->assertJsonPath('roles.0.id', $roleId)
+            ->assertJsonMissingPath('roleDisplay')
+            ->assertJsonMissingPath('technical_role');
 
-        $this->assertDatabaseHas('users', [
-            'email' => $email,
-            'role'  => 'instructor_practical',
-        ]);
+        $this->assertDatabaseHas('users', ['email' => $email, 'account_type' => 'staff']);
     }
 
-    public function test_admin_get_users_formats_instructor_role_for_frontend_dropdown(): void
+    public function test_admin_get_users_lists_account_type_and_roles_for_frontend(): void
     {
         $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
             ->getJson('/api/admin/users');
@@ -280,8 +287,10 @@ class ClassInstructorAllocationTest extends TestCase
         $instructor = $users->firstWhere('id', $this->instructor1->id);
 
         $this->assertNotNull($instructor);
-        $this->assertSame('Lecturer', $instructor['role']);
-        $this->assertSame('Lecturer', $instructor['roleDisplay']);
+        $this->assertSame('staff', $instructor['account_type']);
+        $this->assertArrayNotHasKey('role', $instructor);
+        $instructorRoleId = (string) \App\Models\AccessRole::where('slug', 'instructor')->value('id');
+        $this->assertContains($instructorRoleId, array_column($instructor['roles'], 'id'));
     }
 
     public function test_class_members_endpoints_work_for_frontend(): void

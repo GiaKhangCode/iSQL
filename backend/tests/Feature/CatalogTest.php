@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,7 @@ class CatalogTest extends TestCase
 
         $this->admin = $this->makeUser('admin', 'admin');
 
-        // Giảng viên có sẵn quyền CLASS_MGMT:view theo role (User::canDo), không cần nhóm quyền.
+        // Giảng viên nhận vai trò mặc định từ hook User::created (AccessRoleAssigner).
         $this->instructor = $this->makeUser('instructor', 'instructor');
 
         // Role lạ: không thuộc nhóm mặc định nào và không có nhóm quyền => không có quyền gì.
@@ -47,7 +48,7 @@ class CatalogTest extends TestCase
             'name'            => "Catalog {$tag}",
             'email'           => "catalog_{$tag}_" . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => 'Active',
             'initials'        => 'CT',
         ]);
