@@ -1266,7 +1266,9 @@ class ProblemWorkspaceService
             $activity = (in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true) && $context && $context !== 'Practice')
                 ? Assignment::find($context)
                 : null;
-            $scoreVisible = !$activity || (bool) $activity->show_scores_after_submit;
+            // `_forGrading`: bên chấm (ActivityAttemptGradingService) cần kết quả thật để tính điểm; việc che điểm
+            // với sinh viên do bên gọi/bên đọc lo. Không có cờ này thì ca thi ẩn điểm sẽ luôn bị chấm 0.
+            $scoreVisible = !empty($data['_forGrading']) || !$activity || (bool) $activity->show_scores_after_submit;
 
             return [
                 'id'              => $subId,
