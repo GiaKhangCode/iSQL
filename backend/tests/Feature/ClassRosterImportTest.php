@@ -8,11 +8,13 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Tests\Concerns\AccountFixture;
+use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 class ClassRosterImportTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
 
     protected User $adminUser;
     protected string $adminToken;
@@ -25,6 +27,7 @@ class ClassRosterImportTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->useDefaultRolePermissions();
 
         $this->adminUser = User::create([
             'name'            => 'Admin Test',

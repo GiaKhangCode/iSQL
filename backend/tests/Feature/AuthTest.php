@@ -8,11 +8,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Tests\Concerns\AccountFixture;
+use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->useDefaultRolePermissions();
+    }
 
     public function test_login_validation(): void
     {
