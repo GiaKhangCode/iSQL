@@ -2,22 +2,23 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\ExamLoginProctorController;
 use App\Models\Assignment;
 use App\Models\ExamAccessState;
 use App\Models\ExamAdmission;
 use App\Models\StudentIdentity;
 use App\Models\User;
 use App\Services\ExamAdmissionService;
+use App\Services\ExamLoginService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\Concerns\AccountFixture;
+use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 /**
  * Test đặc tả cho POST /api/auth/login khi dùng tài khoản/mật khẩu TẠM của ca thi
- * (Auth\AuthController::login gọi sang ExamLoginProctorController).
+ * (Auth\AuthController::login gọi sang ExamLoginService).
  *
  * Có hai cách vào ca thi:
  *   A. Gõ tên tài khoản ca thi (K7_...) + mật khẩu tạm.
@@ -29,6 +30,7 @@ use Tests\TestCase;
 class ExamAdmissionLoginTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
 
     private const TEMP_PASSWORD = 'Tmp-Pass-9z';
     private const REAL_PASSWORD = 'real-pass-123';
@@ -42,6 +44,7 @@ class ExamAdmissionLoginTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->useDefaultRolePermissions();
 
         $this->instructor = $this->makeUser('instructor', 'Active', 'teacher');
         $this->student = $this->makeUser('student', 'Active', 'student');
@@ -117,7 +120,7 @@ class ExamAdmissionLoginTest extends TestCase
 
         // Hai cookie: xác nhận ca thi và định danh trình duyệt.
         $res->assertCookie(ExamAdmissionService::COOKIE_NAME);
-        $res->assertCookie(ExamLoginProctorController::BROWSER_COOKIE);
+        $res->assertCookie(ExamLoginService::BROWSER_COOKIE);
     }
 
     public function test_exam_token_is_scoped_to_the_exam_session(): void

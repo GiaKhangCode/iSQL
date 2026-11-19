@@ -10,6 +10,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterLecturerRequest;
 use App\Services\ExamAdmissionService;
+use App\Services\ExamLoginService;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,10 +23,13 @@ class AuthController extends Controller
 
     protected ExamAdmissionService $examAdmissionService;
 
-    public function __construct(UserService $userService, ExamAdmissionService $examAdmissionService)
+    protected ExamLoginService $examLoginService;
+
+    public function __construct(UserService $userService, ExamAdmissionService $examAdmissionService, ExamLoginService $examLoginService)
     {
         $this->userService = $userService;
         $this->examAdmissionService = $examAdmissionService;
+        $this->examLoginService = $examLoginService;
     }
 
     public function register(RegisterRequest $request): JsonResponse
@@ -78,14 +82,13 @@ class AuthController extends Controller
         }
 
         // 2. Check if this is a temporary exam credential (ExamAdmission)
-        /** @var \App\Http\Controllers\ExamLoginProctorController $proctorController */
-        $proctorController = app(\App\Http\Controllers\ExamLoginProctorController::class);
-
         // Case A: Temporary exam username (exact, case-insensitive, or visually normalized)
-        $admission = $proctorController->findAdmission($accountInput);
+        $admission = $this->examLoginService->findAdmission($accountInput);
         if ($admission) {
             try {
-                return $proctorController->loginWithAdmission($request, $admission, $password);
+                return $this->examLoginService->toResponse(
+                    $this->examLoginService->loginWithAdmission($request, $admission, $password)
+                );
             } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
                 return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
             } catch (\Throwable $e) {
@@ -98,7 +101,9 @@ class AuthController extends Controller
         $candidateAdmission = $this->examAdmissionService->findAdmissionByStudentCredentials($accountInput, $password);
         if ($candidateAdmission) {
             try {
-                return $proctorController->loginWithAdmission($request, $candidateAdmission, $password);
+                return $this->examLoginService->toResponse(
+                    $this->examLoginService->loginWithAdmission($request, $candidateAdmission, $password)
+                );
             } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
                 return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
             } catch (\Throwable $e) {
