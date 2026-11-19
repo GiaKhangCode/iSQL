@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -37,7 +38,7 @@ class AccessControlTest extends TestCase
             'name'            => 'Access User',
             'email'           => 'access_' . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $legacyRole,
+            ...AccountFixture::for($legacyRole),
             'status'          => $status,
             'initials'        => 'AU',
         ]);
@@ -68,14 +69,15 @@ class AccessControlTest extends TestCase
 
     // ───────────────────────── seed ─────────────────────────
 
-    public function test_seeds_the_five_default_roles_with_areas(): void
+    public function test_seeds_the_five_default_roles_with_derived_areas(): void
     {
         $expected = [
-            'student' => 'student', 'instructor' => 'teacher', 'faculty_office' => 'office',
-            'admin' => 'admin', 'department_head' => 'teacher',
+            'student' => ['student'], 'instructor' => ['teacher'], 'faculty_office' => ['office'],
+            'admin' => ['admin', 'office', 'teacher'], 'department_head' => ['office', 'teacher'],
         ];
-        foreach ($expected as $slug => $area) {
-            $this->assertSame($area, $this->role($slug)->area, $slug);
+        foreach ($expected as $slug => $areas) {
+            $user = $this->give($this->makeUser(), $slug);
+            $this->assertSame($areas, $this->access->areasOf($user), $slug);
         }
         $this->assertTrue($this->role('admin')->is_super);
         $this->assertFalse($this->role('instructor')->is_super);
@@ -105,34 +107,60 @@ class AccessControlTest extends TestCase
         $this->assertSame('Giảng viên (đã sửa)', $role->name);
     }
 
-    public function test_seeder_assigns_existing_users_from_the_legacy_role_column(): void
+    public function test_seeder_gives_the_student_role_to_student_accounts_without_roles_and_nothing_to_staff(): void
     {
-        $map = [
-            'student' => 'student', 'instructor' => 'instructor', 'instructor_practical' => 'instructor',
-            'instructor_theory' => 'instructor', 'department_head' => 'department_head',
-            'faculty_office' => 'faculty_office', 'admin' => 'admin',
-        ];
-        $users = [];
-        foreach ($map as $legacy => $slug) {
-            $users[$legacy] = $this->makeUser($legacy);
+        $student = $this->makeUser('student');
+        $staff = [];
+        foreach (['instructor', 'department_head', 'faculty_office', 'admin', 'visitor'] as $kind) {
+            $staff[$kind] = $this->makeUser($kind);
         }
-        $stranger = $this->makeUser('visitor');
+        // Tài khoản mới đã được gán tự động; bỏ đi để kiểm tra đúng việc seeder gán cho người chưa có vai trò.
+        $all = array_merge([$student], array_values($staff));
+        DB::table('user_access_roles')->whereIn('user_id', array_map(fn (User $u) => $u->id, $all))->delete();
 
         $this->seed(AccessRoleSeeder::class);
 
-        foreach ($map as $legacy => $slug) {
-            $this->assertSame(
-                [$this->role($slug)->id],
-                $users[$legacy]->accessRoles()->pluck('access_roles.id')->all(),
-                $legacy
-            );
+        $this->assertSame([$this->role('student')->id], $student->accessRoles()->pluck('access_roles.id')->all());
+        foreach ($staff as $kind => $user) {
+            $this->assertSame(0, $user->accessRoles()->count(), "nhân sự {$kind} không được gán vai trò suy diễn");
         }
-        $this->assertSame(0, $stranger->accessRoles()->count(), 'role lạ không được gán vai trò nào');
+    }
+
+    public function test_initial_role_is_assigned_at_creation_by_id_or_slug_and_unknown_gives_none(): void
+    {
+        $byId = User::create([
+            'name' => 'IR1', 'email' => 'ir1_' . uniqid() . '@uit.edu.vn', 'hashed_password' => 'x', 'initials' => 'IR',
+            'account_type' => 'staff', 'initial_role' => (string) $this->role('faculty_office')->id, 'status' => 'Active',
+        ]);
+        $bySlug = User::create([
+            'name' => 'IR2', 'email' => 'ir2_' . uniqid() . '@uit.edu.vn', 'hashed_password' => 'x', 'initials' => 'IR',
+            'account_type' => 'staff', 'initial_role' => 'instructor', 'status' => 'Active',
+        ]);
+        $unknown = User::create([
+            'name' => 'IR3', 'email' => 'ir3_' . uniqid() . '@uit.edu.vn', 'hashed_password' => 'x', 'initials' => 'IR',
+            'account_type' => 'student', 'initial_role' => 'khong-co-vai-tro-nay', 'status' => 'Active',
+        ]);
+        $plainStudent = User::create([
+            'name' => 'IR4', 'email' => 'ir4_' . uniqid() . '@uit.edu.vn', 'hashed_password' => 'x', 'initials' => 'IR',
+            'account_type' => 'student', 'status' => 'Active',
+        ]);
+        $plainStaff = User::create([
+            'name' => 'IR5', 'email' => 'ir5_' . uniqid() . '@uit.edu.vn', 'hashed_password' => 'x', 'initials' => 'IR',
+            'account_type' => 'staff', 'status' => 'Active',
+        ]);
+
+        $this->assertSame([$this->role('faculty_office')->id], $byId->accessRoles()->pluck('access_roles.id')->all());
+        $this->assertSame([$this->role('instructor')->id], $bySlug->accessRoles()->pluck('access_roles.id')->all());
+        $this->assertSame(0, $unknown->accessRoles()->count(), 'vai trò khởi tạo không tồn tại thì không rơi về mặc định');
+        $this->assertSame([$this->role('student')->id], $plainStudent->accessRoles()->pluck('access_roles.id')->all());
+        $this->assertSame(0, $plainStaff->accessRoles()->count());
+        $this->assertArrayNotHasKey('initial_role', $byId->fresh()->getAttributes(), 'không lưu thành cột');
     }
 
     public function test_seeder_does_not_touch_users_who_already_have_a_role(): void
     {
         $user = $this->makeUser('student');
+        DB::table('user_access_roles')->where('user_id', $user->id)->delete(); // bỏ vai trò gán tự động
         $this->give($user, 'faculty_office');
 
         $this->seed(AccessRoleSeeder::class);
@@ -168,7 +196,24 @@ class AccessControlTest extends TestCase
 
         $this->assertTrue($this->access->can($user, 'practice.solve'));
         $this->assertTrue($this->access->can($user, 'examination.manage'));
-        $this->assertSame(['office', 'student'], $this->access->areasOf($user));
+        $this->assertSame(['office'], $this->access->areasOf($user));
+    }
+
+    public function test_areas_are_derived_from_permissions(): void
+    {
+        $cases = [
+            [[], []],
+            [['practice.solve'], ['student']],
+            [['practice.solve', 'results.grade'], ['teacher']],
+            [['assignment.create'], ['teacher']],
+            [['exam.credentials'], ['office']],
+            [['examination.manage', 'problem.create'], ['office', 'teacher']],
+            [['class.manage', 'practice.solve'], ['admin']],
+            [['access.manage', 'examination.manage', 'problem.share'], ['admin', 'office', 'teacher']],
+        ];
+        foreach ($cases as [$permissions, $expected]) {
+            $this->assertSame($expected, PermissionCatalog::areasFor($permissions), json_encode($permissions));
+        }
     }
 
     public function test_direct_permissions_are_added_on_top_of_roles(): void
@@ -190,11 +235,28 @@ class AccessControlTest extends TestCase
         $this->assertSame($this->sortedSuperCodes(), $this->access->permissionsOf($admin));
         $this->assertFalse($this->access->can($admin, 'results.grade'));
         $this->assertTrue($this->access->can($admin, 'access.manage'));
-        $this->assertSame(['admin'], $this->access->areasOf($admin));
+        $this->assertSame(['admin', 'office', 'teacher'], $this->access->areasOf($admin));
 
         DB::table('user_permissions')->insert(['user_id' => $admin->id, 'permission' => 'results.grade']);
         $this->access->forget($admin->id);
-        $this->assertFalse($this->access->can($admin, 'results.grade'), 'quyền riêng cũng không cho admin chấm bài');
+        $this->assertTrue($this->access->can($admin, 'results.grade'), 'quyền do chính tài khoản được cấp riêng thì được giữ (cộng gộp)');
+    }
+
+    public function test_admin_role_never_grants_grading_but_does_not_remove_it_from_other_roles(): void
+    {
+        $both = $this->give($this->makeUser(), 'admin', 'instructor');
+
+        $this->assertTrue($this->access->isSuperAdmin($both));
+        $this->assertTrue($this->access->can($both, 'results.grade'), 'vai trò Giảng viên cấp quyền chấm');
+        $this->assertTrue($this->access->can($both, 'access.manage'), 'vai trò Admin cấp quyền quản trị');
+
+        // Gộp đủ: mỗi quyền của từng vai trò đều có mặt trong kết quả.
+        $expected = array_unique(array_merge(PermissionCatalog::superCodes(), $this->role('instructor')->permissionCodes()));
+        sort($expected);
+        $this->assertSame($expected, $this->access->permissionsOf($both));
+
+        $adminOnly = $this->give($this->makeUser(), 'admin');
+        $this->assertFalse($this->access->can($adminOnly, 'results.grade'));
     }
 
     public function test_super_role_ignores_stored_permission_rows(): void

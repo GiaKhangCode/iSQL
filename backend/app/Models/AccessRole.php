@@ -14,16 +14,9 @@ class AccessRole extends Model
 {
     use HasUuid;
 
-    public const AREA_STUDENT = 'student';
-    public const AREA_TEACHER = 'teacher';
-    public const AREA_OFFICE  = 'office';
-    public const AREA_ADMIN   = 'admin';
-
-    public const AREAS = [self::AREA_STUDENT, self::AREA_TEACHER, self::AREA_OFFICE, self::AREA_ADMIN];
-
     protected $table = 'access_roles';
 
-    protected $fillable = ['slug', 'name', 'area', 'is_super'];
+    protected $fillable = ['slug', 'name', 'is_super'];
 
     protected $casts = ['is_super' => 'boolean'];
 
