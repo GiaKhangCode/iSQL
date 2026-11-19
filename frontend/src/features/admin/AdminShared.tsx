@@ -1,9 +1,9 @@
 import {Select} from "@/shared/ui/Select";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { useLanguage } from "@/shared/context/LanguageContext";
-import React, { useState, useRef, type FormEvent, type ReactNode } from "react";
+import React, { useEffect, useState, useRef, type FormEvent, type ReactNode } from "react";
 import { Dialog } from "@/shared/ui/ui";
-import { adminService, type AdminUser } from "@/features/admin/adminService";
+import { adminService, type AdminUser, type RoleOption } from "@/features/admin/adminService";
 import { teacherService } from "@/shared/api/teacherService";
 
 export function PageIntro({ title, sub, children, compact = false }: { title: string; sub?: string; children?: ReactNode; compact?: boolean }) {
@@ -29,10 +29,18 @@ export function AddUserDialog({ onClose, onAdd }: { onClose: () => void; onAdd: 
   const { t: tr } = useLanguage("admin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<AdminUser["role"]>("Student");
+  const [accountType, setAccountType] = useState<AdminUser["account_type"]>("student");
+  const [roleId, setRoleId] = useState("");
+  const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    adminService.getRoleOptions().then((options) => { if (active) setRoleOptions(options); }).catch(() => { if (active) setRoleOptions([]); });
+    return () => { active = false; };
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -40,7 +48,7 @@ export function AddUserDialog({ onClose, onAdd }: { onClose: () => void; onAdd: 
     setLoading(true);
     setError("");
     try {
-      const newUser = await adminService.createUser({ name: name.trim(), email: email.trim(), role, password });
+      const newUser = await adminService.createUser({ name: name.trim(), email: email.trim(), account_type: accountType, role_id: roleId || undefined, password });
       onAdd(newUser);
     } catch (err: any) {
       setError(err.message || "Failed to create user");
@@ -53,7 +61,8 @@ export function AddUserDialog({ onClose, onAdd }: { onClose: () => void; onAdd: 
     <Field label={tr("NAME")}><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={tr("Full name")} required /></Field>
     <Field label={tr("EMAIL")}><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.edu" required /></Field>
     <Field label={tr("PASSWORD")}><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={tr("Password")} required minLength={8} /></Field>
-    <Field label={tr("ROLE")}><Select value={role} onChange={(e) => setRole(e.target.value as AdminUser["role"])}><option value="Student">{tr("Student")}</option><option value="Lecturer">{tr("Lecturer")}</option><option value="Faculty office">{tr("Faculty office")}</option><option value="Admin">{tr("Admin")}</option></Select></Field>
+    <Field label={tr("ACCOUNT TYPE")}><Select value={accountType} onChange={(e) => setAccountType(e.target.value as AdminUser["account_type"])}><option value="student">{tr("Student")}</option><option value="staff">{tr("Staff")}</option></Select></Field>
+    <Field label={tr("ROLE")}><Select value={roleId} onChange={(e) => setRoleId(e.target.value)}><option value="">{tr(accountType === "student" ? "Default role (Student)" : "No role yet")}</option>{roleOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</Select></Field>
     {error && <p className="admin-warning" style={{ margin: 0 }}><TranslatedText>{tr(error)}</TranslatedText></p>}
     <div className="admin-dialog-actions"><button type="button" className="button" onClick={onClose} disabled={loading}><TranslatedText>{tr("Cancel")}</TranslatedText></button><button className="button primary" disabled={loading}><TranslatedText>{loading ? tr("Adding...") : tr("Add user")}</TranslatedText></button></div>
   </form></Dialog>;
@@ -100,7 +109,7 @@ export function BulkImportDialog({ onClose, onSuccess }: { onClose: () => void; 
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = "name,email,role,password\nNguyễn Văn A,nva@example.com,Student,12354678";
+    const csvContent = "name,email,account_type,role,password\nNguyễn Văn A,nva@example.com,student,,12354678";
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);

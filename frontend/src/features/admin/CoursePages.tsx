@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Dialog, ErrorState, Loading, Status } from "@/shared/ui/ui";
 import { type AdminClass } from "@/data/adminPolicy";
-import { adminService } from "@/features/admin/adminService";
+import { adminService, lecturerOptionsFor, type InstructorOption } from "@/features/admin/adminService";
 import { teacherService } from "@/shared/api/teacherService";
 import type { TeacherClassMember } from "@/data/teacherTypes";
 import { academicTerms, formatAcademicTerm } from "@/shared/lib/datetime/academicTerms";
@@ -397,7 +397,7 @@ export function AdminEditClassPage() {
   const [lecturer, setLecturer] = useState("Unassigned");
   const [status, setStatus] = useState<AdminClass["status"]>("Draft");
   const [notice, setNotice] = useState("");
-  const [lecturers, setLecturers] = useState<{name: string, id: string}[]>([]);
+  const [lecturers, setLecturers] = useState<InstructorOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [members, setMembers] = useState<TeacherClassMember[]>([]);
   const [students, setStudents] = useState<TeacherClassMember[]>([]);
@@ -412,8 +412,8 @@ export function AdminEditClassPage() {
   useEffect(() => {
     Promise.all([
       adminService.getClasses(),
-      adminService.getUsers()
-    ]).then(([classes, users]) => {
+      adminService.getInstructors()
+    ]).then(([classes, instructors]) => {
       const cls = classes.find(c => c.id === classId);
       if (cls) {
         setRecord(cls);
@@ -424,7 +424,7 @@ export function AdminEditClassPage() {
         setLecturer(cls.lecturerId || "Unassigned");
         setStatus(cls.status as AdminClass["status"]);
       }
-      setLecturers(users.filter((user: any) => user.role.toLowerCase() === "lecturer" || user.role === "instructor").map((user: any) => ({ name: user.name, id: user.id })));
+      setLecturers(lecturerOptionsFor(instructors, cls));
       setLoading(false);
     }).catch((error) => { setLoadError(error instanceof Error ? error.message : "Could not load class details."); setLoading(false); });
   }, [classId]);

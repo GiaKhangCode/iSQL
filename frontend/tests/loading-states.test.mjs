@@ -28,7 +28,7 @@ const result = await build({
     builder.onResolve({filter:/^(react|react-dom|react-router-dom)(\/.*)?$/},args=>({path:require.resolve(args.path),external:true}));
     builder.onLoad({filter:/[\\/]studentApi\.ts$/},()=>({contents:'export const studentApi={getSubmissions:()=>globalThis.__pending,getProblems:async()=>[]};',loader:'js'}));
     builder.onLoad({filter:/[\\/]teacherService\.ts$/},()=>({contents:'export const teacherService={getAssignments:()=>globalThis.__pending};',loader:'js'}));
-    builder.onLoad({filter:/[\\/]adminService\.ts$/},()=>({contents:'export const adminService={getUsers:()=>globalThis.__pending,getLecturerRequests:async()=>[]};',loader:'js'}));
+    builder.onLoad({filter:/[\\/]adminService\.ts$/},()=>({contents:'export const adminService={getUsers:()=>globalThis.__pending,getInstructors:async()=>[],getRoleOptions:async()=>[],getLecturerRequests:async()=>[]};export const lecturerOptionsFor=(eligible)=>eligible;export const userRoleNames=(user)=>user.account_type||'';',loader:'js'}));
     builder.onLoad({filter:/[\\/]LanguageContext\.tsx$/},()=>({contents:`export const useLanguage=()=>({locale:'vi-VN',language:'en',t:(text,values={})=>typeof text==='string'?text.replace(/\{(\w+)\}/g,(_,key)=>values[key]??''):text});`,loader:'js'}));
     builder.onLoad({filter:/[\\/]TranslatedText\.tsx$/},()=>({contents:'export function TranslatedText({children}){return <>{children}</>;}',loader:'jsx'}));
     builder.onLoad({filter:/[\\/]LanguageSwitch\.tsx$/},()=>({contents:'export function LanguageText({text}){return <>{text}</>;}',loader:'jsx'}));

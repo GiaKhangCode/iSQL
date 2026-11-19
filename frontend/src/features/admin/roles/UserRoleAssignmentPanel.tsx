@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { AdminUser } from "@/features/admin/adminService";
+import { userRoleNames, type AdminUser } from "@/features/admin/adminService";
 import { Field } from "@/features/admin/AdminShared";
 import { EffectivePermissionsPreview } from "./EffectivePermissionsPreview";
 import { PermissionPicker } from "./PermissionPicker";
@@ -20,11 +20,10 @@ export interface UserRoleAssignmentPanelProps {
   busy?: boolean;
 }
 
+/** Loại tài khoản (danh tính), không phải vai trò: vai trò hiển thị riêng theo tên. */
 const ACTOR_LABELS: Record<string, string> = {
   student: "Sinh viên",
-  instructor: "Giảng viên",
-  faculty_office: "Giáo vụ khoa",
-  admin: "Quản trị viên",
+  staff: "Nhân sự",
 };
 
 const initialsOf = (name?: string) => (name || "?").trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join("").toUpperCase();
@@ -51,15 +50,16 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
     const q = normalize(search.trim());
     return users.filter((user) => {
       if (!user.id) return false;
-      if (actorFilter !== "all" && (user.role || "").toLowerCase() !== actorFilter) return false;
+      if (actorFilter !== "all" && user.account_type !== actorFilter) return false;
       return !q || normalize(`${user.name || ""} ${user.email || ""}`).includes(q);
     });
   }, [users, search, actorFilter]);
 
   const selectedUser = users.find((user) => user.id === selectedUserId);
-  const actor = assignment?.actor || (selectedUser?.role || "").toLowerCase();
-  const actorRole = systemRoles.find((role) => role.id === `actor:${actor}`) || null;
-  const isAdmin = actor === "admin";
+  const actor = assignment?.actor || selectedUser?.account_type || "";
+  const allRoles = useMemo(() => [...systemRoles, ...customRoles], [systemRoles, customRoles]);
+  // Super-admin role: always holds everything, so direct grants add nothing.
+  const isSuper = allRoles.some((role) => role.readOnly && assigned.includes(role.id));
   const savedRoleIds = assignment?.roleGroupIds || [];
   const savedDirect = assignment?.directPermissions || [];
   const dirty = Boolean(assignment) && (!sameSet(assigned, savedRoleIds) || !sameSet(direct, savedDirect));
@@ -67,23 +67,22 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
   // Preview follows the checkboxes, so the admin sees the result before saving.
   const rolesInEffect = useMemo(
     () => [
-      ...(actorRole ? [actorRole] : []),
-      ...customRoles.filter((role) => assigned.includes(role.id)),
+      ...allRoles.filter((role) => assigned.includes(role.id)),
       ...(direct.length ? [{ id: "direct", name: "Quyền riêng", permissions: direct }] : []),
     ],
-    [actorRole, customRoles, assigned, direct],
+    [allRoles, assigned, direct],
   );
   const sources = useMemo(() => permissionSources(rolesInEffect), [rolesInEffect]);
   // Saved state shows what the server reports (inactive accounts hold nothing); unsaved state previews the new roles.
   const granted = useMemo(
-    () => (isAdmin ? groups.flatMap((g) => g.permissions.map((p) => p.code)) : dirty ? [...sources.keys()] : assignment?.effectivePermissions || []),
-    [isAdmin, groups, dirty, sources, assignment],
+    () => (dirty ? [...sources.keys()] : assignment?.effectivePermissions || []),
+    [dirty, sources, assignment],
   );
 
   const shownRoles = useMemo(() => {
     const q = normalize(roleQuery.trim());
-    return customRoles.filter((role) => !q || normalize(role.name).includes(q));
-  }, [customRoles, roleQuery]);
+    return allRoles.filter((role) => !q || normalize(role.name).includes(q));
+  }, [allRoles, roleQuery]);
 
   const toggleRole = (id: string) => {
     if (busy) return;
@@ -92,8 +91,8 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
 
   const addedDirect = direct.filter((code) => !savedDirect.includes(code)).length;
   const removedDirect = savedDirect.filter((code) => !direct.includes(code)).length;
-  const added = assigned.filter((id) => !savedRoleIds.includes(id)).map((id) => customRoles.find((r) => r.id === id)?.name).filter(Boolean);
-  const removed = savedRoleIds.filter((id) => !assigned.includes(id)).map((id) => customRoles.find((r) => r.id === id)?.name).filter(Boolean);
+  const added = assigned.filter((id) => !savedRoleIds.includes(id)).map((id) => allRoles.find((r) => r.id === id)?.name).filter(Boolean);
+  const removed = savedRoleIds.filter((id) => !assigned.includes(id)).map((id) => allRoles.find((r) => r.id === id)?.name).filter(Boolean);
 
   return (
     <div className="user-assignment-layout">
@@ -136,7 +135,7 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
                   <span className="user-item-name">{user.name}</span>
                   <span className="user-item-email">{user.email}</span>
                 </div>
-                <span className="user-item-actor">{ACTOR_LABELS[(user.role || "").toLowerCase()] || user.role || "User"}</span>
+                <span className="user-item-actor">{userRoleNames(user) === "Student" || userRoleNames(user) === "Staff" ? ACTOR_LABELS[user.account_type] : userRoleNames(user)}</span>
               </button>
             ))
           )}
@@ -177,20 +176,11 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
                 <span className="assigned-roles-hint">Một người có thể giữ nhiều vai trò; quyền được cộng dồn.</span>
               </div>
 
-              {customRoles.length > 6 && (
+              {allRoles.length > 6 && (
                 <input type="search" className="user-search-input" value={roleQuery} placeholder="Tìm vai trò…" aria-label="Tìm vai trò" onChange={(event) => setRoleQuery(event.target.value)} />
               )}
               <div className="assigned-roles-grid">
-                {/* The role that comes with the account type is always on; the others are toggled. */}
-                <label className="assigned-role-card is-on is-locked" title="Vai trò theo loại tài khoản, luôn được áp dụng">
-                  <input type="checkbox" className="permission-checkbox" checked disabled readOnly />
-                  <span className="assigned-role-body">
-                    <span className="assigned-role-name">{ACTOR_LABELS[actor] || actor} <em>Mặc định</em></span>
-                    <span className="assigned-role-meta">{isAdmin ? "Toàn quyền" : `${actorRole?.permissions.length ?? 0} quyền`}</span>
-                  </span>
-                  {actorRole && !isAdmin && <button type="button" className="role-link" onClick={(event) => { event.preventDefault(); onOpenRole(actorRole.id); }}>Xem quyền</button>}
-                </label>
-                {!isAdmin && shownRoles.map((role) => {
+                {shownRoles.map((role) => {
                   const on = assigned.includes(role.id);
                   return (
                     <label key={role.id} className={`assigned-role-card${on ? " is-on" : ""}`}>
@@ -204,10 +194,10 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
                   );
                 })}
               </div>
-              {isAdmin && <p className="assigned-role-empty">Quản trị viên đã có toàn bộ quyền nên không cần gán thêm vai trò.</p>}
-              {!isAdmin && customRoles.length === 0 && <p className="assigned-role-empty">Chưa có vai trò nào khác. Hãy tạo ở tab “Vai trò”.</p>}
+              {isSuper && <p className="assigned-role-empty">Vai trò Quản trị đã có toàn bộ quyền (trừ chấm bài) nên không cần gán thêm quyền riêng.</p>}
+              {allRoles.length === 0 && <p className="assigned-role-empty">Chưa có vai trò nào. Hãy tạo ở tab “Vai trò”.</p>}
 
-              {!isAdmin && (
+              {!isSuper && (
                 <details className="direct-permissions" open={direct.length > 0 || undefined}>
                   <summary>
                     <span className="direct-permissions-title">Quyền riêng cho tài khoản này</span>
@@ -218,7 +208,7 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
                 </details>
               )}
 
-              {!isAdmin && (
+              {(
                 <div className="assigned-save-bar">
                   <span className="assigned-save-summary" role="status">
                     {dirty
@@ -240,7 +230,6 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
                 groups={groups}
                 granted={granted}
                 sources={sources}
-                fullAccess={isAdmin}
                 title={dirty ? "Quyền hiệu lực sau khi lưu" : "Quyền hiệu lực"}
               />
             )}

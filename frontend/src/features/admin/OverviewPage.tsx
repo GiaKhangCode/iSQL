@@ -5,7 +5,7 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useState } from "react";
 import { Loading } from "@/shared/ui/ui";
 import { type AdminClass, type AdminLecturerRequest } from "@/data/adminPolicy";
-import { adminService, type AdminUser } from "@/features/admin/adminService";
+import { adminService, userRoleNames, type AdminUser } from "@/features/admin/adminService";
 import { localTime, parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
 
 import { PageIntro, Split, Field, Notice, AddUserDialog, BulkImportDialog, BulkImportMembersDialog, AdminListPagination } from "@/features/admin/AdminShared";
@@ -342,7 +342,7 @@ function OverviewActivityPanel({ activity, onClose }: { activity: any; onClose: 
       </>}
       {actor && <>
         <div className="admin-detail-divider" /><h3 className="admin-subheading"><TranslatedText>{tr("Current account information")}</TranslatedText></h3>
-        <dl className="teacher-list-detail-facts"><div><dt><TranslatedText>{tr("Email")}</TranslatedText></dt><dd>{actor.email}</dd></div><div><dt><TranslatedText>{tr("Role")}</TranslatedText></dt><dd><TranslatedText>{tr(actor.role)}</TranslatedText></dd></div><div><dt><TranslatedText>{tr("Status")}</TranslatedText></dt><dd><TranslatedText>{tr(actor.status)}</TranslatedText></dd></div><div><dt><TranslatedText>{tr("Joined")}</TranslatedText></dt><dd>{actor.joined}</dd></div>{actor.detail && <div><dt><TranslatedText>{tr("Department")}</TranslatedText></dt><dd>{actor.detail}</dd></div>}</dl>
+        <dl className="teacher-list-detail-facts"><div><dt><TranslatedText>{tr("Email")}</TranslatedText></dt><dd>{actor.email}</dd></div><div><dt><TranslatedText>{tr("Role")}</TranslatedText></dt><dd>{userRoleNames(actor)}</dd></div><div><dt><TranslatedText>{tr("Status")}</TranslatedText></dt><dd><TranslatedText>{tr(actor.status)}</TranslatedText></dd></div><div><dt><TranslatedText>{tr("Joined")}</TranslatedText></dt><dd>{actor.joined}</dd></div>{actor.detail && <div><dt><TranslatedText>{tr("Department")}</TranslatedText></dt><dd>{actor.detail}</dd></div>}</dl>
       </>}
     </>}
     <details className="admin-overview-record-reference"><summary><TranslatedText>{tr("Record reference")}</TranslatedText></summary><p className="admin-muted">{activity.id}</p></details>

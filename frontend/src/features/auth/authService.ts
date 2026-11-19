@@ -6,14 +6,12 @@ export type StudentSession = {
   name: string;
   initials: string;
   email: string;
-  role: "student" | "instructor" | "faculty_office" | "admin";
-  technical_role?: string;
+  /** Loại danh tính (không phải quyền): quyền và khu vực lấy từ /api/auth/permissions. */
+  account_type: "student" | "staff";
+  /** Tên các vai trò đang giữ, chỉ để hiển thị. */
+  roles?: { id: string; name: string }[];
   examSessionId?: string | null;
 };
-
-export function homeForRole(role?: StudentSession["role"]) {
-  return role === "faculty_office" ? "/office/examinations" : role === "instructor" ? "/teacher/problems" : role === "admin" ? "/admin/overview" : "/dashboard";
-}
 
 export const SESSION_KEY = "sql-practice:session:v1";
 export const TOKEN_KEY = "sql-practice:access-token";
