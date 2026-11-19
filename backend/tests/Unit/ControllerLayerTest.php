@@ -30,10 +30,7 @@ class ControllerLayerTest extends TestCase
     private const LEGACY = [
         // Giai đoạn 1: CRUD nhỏ
         // Giai đoạn 2: mức vừa
-        'PermissionController.php'              => 10,
-        'Teacher/DatabaseLibraryController.php' => 5,
         // Giai đoạn 3: controller lớn
-        'ContentSharingController.php'          => 24,
         'RegradeAssignmentController.php'       => 38,
         'Student/ActivityAttemptController.php' => 18,
         'ExamLoginProctorController.php'        => 59,
