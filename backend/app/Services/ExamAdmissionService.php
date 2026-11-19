@@ -407,7 +407,7 @@ class ExamAdmissionService
         }
 
         return User::whereIn('id', $ids)
-            ->where('role', User::ROLE_STUDENT)
+            ->where('account_type', User::ACCOUNT_STUDENT)
             ->where('status', 'Active')
             ->orderBy('name')
             ->orderBy('email')
@@ -427,7 +427,7 @@ class ExamAdmissionService
         }
 
         return User::whereIn('id', $ids)
-            ->where('role', User::ROLE_STUDENT)
+            ->where('account_type', User::ACCOUNT_STUDENT)
             ->where('status', 'Active')
             ->orderBy('name')
             ->orderBy('email')
@@ -451,7 +451,7 @@ class ExamAdmissionService
         }
 
         return User::whereIn('id', $directIds)
-            ->where('role', User::ROLE_STUDENT)
+            ->where('account_type', User::ACCOUNT_STUDENT)
             ->where('status', 'Active')
             ->orderBy('name')
             ->orderBy('email')

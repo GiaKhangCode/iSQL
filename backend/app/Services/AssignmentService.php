@@ -10,6 +10,7 @@ use App\Models\ClassModel;
 use App\Models\Problem;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,7 +20,25 @@ class AssignmentService
 {
     public function __construct(
         protected NotificationService $notificationService,
+        protected AccessControlService $access,
+        protected ClassService $classService,
     ) {
+    }
+
+    /**
+     * Xem và quản lý MỌI bài tập/ca thi: siêu quản trị, người xem kết quả mọi lớp (results.view_all) và người
+     * lập kỳ thi (examination.manage). Không đọc users.role.
+     */
+    protected function seesEveryAssignment(User $user): bool
+    {
+        return $this->access->isSuperAdmin($user)
+            || $this->access->canAny($user, ['results.view_all', 'examination.manage']);
+    }
+
+    /** Góc nhìn giảng viên: người soạn bài tập, người chấm bài hoặc người coi thi. Người còn lại là sinh viên. */
+    protected function hasInstructorView(User $user): bool
+    {
+        return $this->access->canAny($user, ['assignment.create', 'results.grade', 'exam.proctor']);
     }
 
     /**
@@ -27,12 +46,8 @@ class AssignmentService
      */
     public function getAllAssignments(User $user, ?string $scope = null): array
     {
-        $isAdmin = $user->isAdmin()
-            || $user->isFacultyOffice()
-            || $user->role === User::ROLE_ADMIN
-            || $user->role === 'admin'
-            || $user->role === User::ROLE_DEPARTMENT_HEAD;
-        $isInstructor = $user->isInstructor() || $user->canDo('ASSIGNMENT_MGMT', 'view');
+        $isAdmin = $this->seesEveryAssignment($user);
+        $isInstructor = $this->hasInstructorView($user);
 
         $query = Assignment::with(['classes', 'selectedStudents', 'assignmentProblems.problem']);
 
@@ -83,9 +98,9 @@ class AssignmentService
     {
         $assignment = Assignment::with(['classes', 'selectedStudents', 'assignmentProblems.problem'])->findOrFail($id);
 
-        $isAdmin = $user->isAdmin() || $user->isFacultyOffice() || $user->role === User::ROLE_ADMIN || $user->role === 'admin';
-        $isDeptHead = $user->role === User::ROLE_DEPARTMENT_HEAD;
-        $isInstructor = $user->isInstructor() || $user->canDo('ASSIGNMENT_MGMT', 'view');
+        $isAdmin = $this->seesEveryAssignment($user);
+        $isDeptHead = false; // đã gộp vào seesEveryAssignment (results.view_all / examination.manage)
+        $isInstructor = $this->hasInstructorView($user);
 
         $isExamActivity = (bool) ($assignment->examination_id || $assignment->exam_mode);
 
@@ -139,7 +154,7 @@ class AssignmentService
 
     protected function canAccessAllClasses(User $user): bool
     {
-        return $user->isAdmin() || $user->isFacultyOffice() || $user->role === User::ROLE_DEPARTMENT_HEAD;
+        return $this->classService->seesEveryClass($user);
     }
 
     /**
@@ -153,7 +168,7 @@ class AssignmentService
             $classIds = array_values(array_intersect($classIds, $this->taughtClassIdsForUser($user)));
         }
 
-        $studentsQuery = User::where('role', User::ROLE_STUDENT)->where('status', 'Active');
+        $studentsQuery = User::where('account_type', User::ACCOUNT_STUDENT)->where('status', 'Active');
 
         if ($term !== '') {
             $studentsQuery->where(function ($q) use ($term) {
@@ -219,7 +234,7 @@ class AssignmentService
             $enrolledStudentIds = DB::table('class_enrollments')
                 ->join('users', 'class_enrollments.student_id', '=', 'users.id')
                 ->whereIn('class_enrollments.class_id', $classIds)
-                ->where('users.role', User::ROLE_STUDENT)
+                ->where('users.account_type', User::ACCOUNT_STUDENT)
                 ->where('users.status', 'Active')
                 ->pluck('users.id')
                 ->unique()
@@ -288,7 +303,7 @@ class AssignmentService
 
         $numbers = array_filter($normalized, fn($id) => ctype_digit($id) && strlen($id) >= 6 && strlen($id) <= 12);
 
-        $matched = User::where('role', User::ROLE_STUDENT)
+        $matched = User::where('account_type', User::ACCOUNT_STUDENT)
             ->where('status', 'Active')
             ->where(function ($q) use ($normalized, $numbers) {
                 $q->whereIn('email', $normalized)
@@ -347,7 +362,7 @@ class AssignmentService
             $classIds = $data['class_ids'] ?? [];
             if (!empty($classIds)) {
                 $user = User::find($instructorId);
-                if ($user && !$user->isAdmin() && !$user->isFacultyOffice() && $user->role !== User::ROLE_DEPARTMENT_HEAD) {
+                if ($user && !$this->canAccessAllClasses($user)) {
                     $taughtClassIds = ClassModel::where(function ($query) use ($user): void {
                         $query->where('instructor_id', $user->id)
                             ->orWhere('practice_instructor_id', $user->id)
@@ -391,7 +406,7 @@ class AssignmentService
         }
 
         return DB::transaction(function () use ($assignment, $data, $user) {
-            if (!$user->isAdmin() && !$user->isFacultyOffice() && $user->role !== User::ROLE_DEPARTMENT_HEAD) {
+            if (!$this->seesEveryAssignment($user)) {
                 if ($assignment->instructor_id !== $user->id) {
                     abort(403, 'Bạn không có quyền chỉnh sửa bài tập của giảng viên khác.');
                 }
@@ -486,7 +501,7 @@ class AssignmentService
                 abort(422, 'Không thể xóa trực tiếp ca thi thuộc kỳ thi.');
             }
 
-            if (!$user->isAdmin() && !$user->isFacultyOffice() && $user->role !== User::ROLE_DEPARTMENT_HEAD && $assignment->instructor_id !== $user->id) {
+            if (!$this->seesEveryAssignment($user) && $assignment->instructor_id !== $user->id) {
                 abort(403, 'Bạn không có quyền xóa bài tập của giảng viên khác.');
             }
 
@@ -504,11 +519,7 @@ class AssignmentService
     {
         $assignment = Assignment::with(['classes', 'selectedStudents', 'assignmentProblems.problem'])->findOrFail($assignmentId);
 
-        $isPrivileged = $user->isAdmin()
-            || $user->isFacultyOffice()
-            || $user->role === User::ROLE_ADMIN
-            || $user->role === 'admin'
-            || $user->role === User::ROLE_DEPARTMENT_HEAD;
+        $isPrivileged = $this->seesEveryAssignment($user);
 
         $isExamActivity = (bool) ($assignment->examination_id || $assignment->exam_mode);
         $allowedPracticalStudentIds = null;
@@ -963,7 +974,7 @@ class AssignmentService
             $studentIds = DB::table('class_enrollments')
                 ->join('users', 'class_enrollments.student_id', '=', 'users.id')
                 ->whereIn('class_enrollments.class_id', $classIds)
-                ->where('users.role', User::ROLE_STUDENT)
+                ->where('users.account_type', User::ACCOUNT_STUDENT)
                 ->where('users.status', 'Active')
                 ->pluck('users.id')
                 ->all();
@@ -1174,7 +1185,7 @@ class AssignmentService
      */
     public function getStudentAssignments(User $currentUser): array
     {
-        if ($currentUser->role !== User::ROLE_STUDENT && $currentUser->role !== 'student' && !$currentUser->isAdmin()) {
+        if (!$this->access->can($currentUser, 'practice.solve')) {
             abort(403, 'Only active students can view assigned activities.');
         }
 

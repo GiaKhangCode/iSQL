@@ -19,8 +19,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/{id}', [AssignmentController::class, 'show']);
     Route::get('/{id}/submissions', [AssignmentController::class, 'submissions']);
 
-    // Teacher CRUD
-    Route::post('/', [AssignmentController::class, 'store']);
-    Route::put('/{id}', [AssignmentController::class, 'update']);
-    Route::delete('/{id}', [AssignmentController::class, 'destroy']);
+    // Soạn bài tập: quyền assignment.create (bài của mình; người xem mọi bài thì mọi bài).
+    Route::middleware('capability:assignment.create')->group(function () {
+        Route::post('/', [AssignmentController::class, 'store']);
+        Route::put('/{id}', [AssignmentController::class, 'update']);
+        Route::delete('/{id}', [AssignmentController::class, 'destroy']);
+    });
 });

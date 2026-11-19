@@ -9,7 +9,8 @@ use App\Http\Controllers\Student\ClassController as StudentClassController;
 use App\Http\Controllers\Student\ActivityAttemptController;
 use App\Http\Controllers\SubmissionController;
 
-Route::middleware(['auth:sanctum', 'active', 'permission:PRACTICE_MGMT,view'])->group(function () {
+// Khu vực sinh viên: quyền practice.solve. Phạm vi (lớp, bài được giao) do service quyết định.
+Route::middleware(['auth:sanctum', 'active', 'capability:practice.solve'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/assignments', [AssignmentController::class, 'index']);
     Route::get('/profile', [SubmissionController::class, 'studentProfile']);
@@ -24,6 +25,7 @@ Route::middleware(['auth:sanctum', 'active', 'permission:PRACTICE_MGMT,view'])->
     Route::post('/activity-attempts/{activityId}/{action}', [ActivityAttemptController::class, 'updateAction']);
 });
 
-Route::middleware(['auth:sanctum', 'active', 'permission:CLASS_MGMT,view'])->group(function () {
+// Lớp mình đang học: chỉ trả các lớp có ghi danh của chính người dùng.
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/classes', [StudentClassController::class, 'index']);
 });

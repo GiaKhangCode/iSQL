@@ -15,6 +15,7 @@ use App\Models\SubmissionAppeal;
 use App\Models\SubmissionRegradeAssignment;
 use App\Models\TestCase;
 use App\Models\User;
+use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
 use App\Services\ExaminationService;
 use App\Services\NotificationService;
@@ -31,7 +32,8 @@ class SubmissionController extends Controller
         protected readonly ExaminationService $examinationService,
         protected readonly ProblemWorkspaceService $workspaceService,
         protected readonly SubmissionReviewService $reviewService,
-        protected readonly NotificationService $notificationService
+        protected readonly NotificationService $notificationService,
+        protected readonly StaffAccess $staff,
     ) {
     }
 
@@ -114,7 +116,7 @@ class SubmissionController extends Controller
     {
         $user = $request->user();
         $sub = Submission::findOrFail($id);
-        if ($user->role === User::ROLE_STUDENT) {
+        if (!$this->staff->isStaff($user)) {
             abort_unless($sub->user_id === $user->id, 403, 'Bạn không có quyền xem bài nộp này.');
         } else {
             abort_unless($this->canGradeSubmission($user, $sub, null, true), 403, 'Bạn không có quyền xem bài nộp này.');
@@ -125,14 +127,10 @@ class SubmissionController extends Controller
     public function studentWork(Request $request, string $activityId, string $studentId, string $problemId): JsonResponse
     {
         $user = $request->user();
-        abort_unless(
-            $user->isAdmin() || $user->isFacultyOffice() || $user->isInstructor() || $user->role === User::ROLE_DEPARTMENT_HEAD,
-            403,
-            'Only instructors can view student work.'
-        );
+        abort_unless($this->staff->isStaff($user), 403, 'Only instructors can view student work.');
 
         $activity = Assignment::findOrFail($activityId);
-        $isPrivileged = $user->isAdmin() || $user->isFacultyOffice() || $user->role === User::ROLE_DEPARTMENT_HEAD;
+        $isPrivileged = $this->staff->seesEverything($user);
         if (!$isPrivileged && $this->isExamActivity($activity)) {
             abort_unless(
                 $this->isPracticalClassInstructorForStudent($user, $studentId, $activity),
@@ -222,11 +220,11 @@ class SubmissionController extends Controller
     {
         $user = $request->user();
         $sub = Submission::findOrFail($id);
-        abort_if($user->isFacultyOffice(), 403, 'Giáo vụ khoa chỉ có quyền xem điểm, không có quyền chấm bài.');
+        abort_unless($this->staff->canGrade($user), 403, 'Bạn không có quyền chấm bài.');
         abort_unless($this->canGradeSubmission($user, $sub), 403, 'Bạn không có quyền chấm bài nộp này.');
 
         $regrade = SubmissionRegradeAssignment::find($sub->id);
-        if ($regrade && $regrade->assigned_instructor_id !== $user->id && !$user->isAdmin()) {
+        if ($regrade && $regrade->assigned_instructor_id !== $user->id) {
             abort(
                 403,
                 $regrade->completed_at === null
@@ -236,7 +234,7 @@ class SubmissionController extends Controller
         }
 
         $appeal = SubmissionAppeal::find($sub->id);
-        if ($appeal && !$appeal->resolved_at && !$regrade && !$user->isAdmin()) {
+        if ($appeal && !$appeal->resolved_at && !$regrade) {
             abort(403, 'Đơn phúc khảo chưa được Giáo vụ khoa phân công giảng viên chấm lại.');
         }
 
@@ -295,7 +293,7 @@ class SubmissionController extends Controller
             }
         }
 
-        $isRegradeAction = ($regrade && ($regrade->assigned_instructor_id === $user->id || $user->isAdmin())) || ($appeal !== null);
+        $isRegradeAction = ($regrade && $regrade->assigned_instructor_id === $user->id) || ($appeal !== null);
         $prob = Problem::find($sub->problem_id);
         $scoresVisible = !$activity || (bool) $activity->show_scores_after_submit;
 
@@ -343,7 +341,7 @@ class SubmissionController extends Controller
                 $appeal->save();
             }
 
-            if ($regrade && ($regrade->assigned_instructor_id === $user->id || $user->isAdmin())) {
+            if ($regrade && $regrade->assigned_instructor_id === $user->id) {
                 if ($regrade->completed_at === null && $regrade->previous_evaluated_score === null) {
                     $regrade->previous_evaluated_score = $previousScore;
                     $regrade->previous_feedback = $previousFeedback;
@@ -366,9 +364,7 @@ class SubmissionController extends Controller
             if ($regrade && $regrade->assigned_by_id && $regrade->assigned_by_id !== $user->id) {
                 $assigner = User::find($regrade->assigned_by_id);
                 if ($assigner) {
-                    $assignerLink = $assigner->isAdmin()
-                        ? "/admin/results/review/{$sub->id}"
-                        : ($assigner->isFacultyOffice() ? "/office/results/review/{$sub->id}" : "/teacher/results/review/{$sub->id}");
+                    $assignerLink = $this->staff->reviewAreaPrefix($assigner) . "/results/review/{$sub->id}";
                     $student = User::find($sub->user_id);
                     $this->notificationService->create(
                         $assigner->id,
@@ -501,14 +497,10 @@ class SubmissionController extends Controller
     public function publishResults(Request $request, string $activityId): JsonResponse
     {
         $user = $request->user();
-        abort_unless(
-            $user->isAdmin() || $user->isFacultyOffice() || $user->isInstructor() || $user->role === User::ROLE_DEPARTMENT_HEAD,
-            403,
-            'Bạn không có quyền công bố điểm.'
-        );
+        abort_unless($this->staff->isStaff($user), 403, 'Bạn không có quyền công bố điểm.');
 
         $activity = Assignment::findOrFail($activityId);
-        if (!$user->isAdmin() && !$user->isFacultyOffice() && $user->role !== User::ROLE_DEPARTMENT_HEAD) {
+        if (!$this->staff->seesEverything($user)) {
             abort_unless($activity->instructor_id === $user->id, 403, 'Bạn không có quyền công bố điểm của hoạt động này.');
         }
         $published = $request->has('published')
@@ -776,10 +768,10 @@ class SubmissionController extends Controller
 
     protected function canAccessActivityForGrading(User $viewer, Assignment $activity): bool
     {
-        if ($viewer->isAdmin() || $viewer->isFacultyOffice() || $viewer->role === User::ROLE_DEPARTMENT_HEAD) {
+        if ($this->staff->seesEverything($viewer)) {
             return true;
         }
-        if ($viewer->role === User::ROLE_STUDENT || $viewer->role === 'student') {
+        if (!$this->staff->isStaff($viewer)) {
             return false;
         }
         if ($this->isExamActivity($activity)) {
@@ -820,10 +812,10 @@ class SubmissionController extends Controller
 
     protected function canGradeSubmission(User $viewer, Submission $sub, ?Assignment $activity = null, bool $allowSiblingAttemptRead = false): bool
     {
-        if ($viewer->isAdmin() || $viewer->isFacultyOffice() || $viewer->role === User::ROLE_DEPARTMENT_HEAD) {
+        if ($this->staff->seesEverything($viewer)) {
             return true;
         }
-        if ($viewer->role === User::ROLE_STUDENT || $viewer->role === 'student') {
+        if (!$this->staff->isStaff($viewer)) {
             return false;
         }
 
@@ -880,7 +872,7 @@ class SubmissionController extends Controller
         $regrade = SubmissionRegradeAssignment::find($sub->id);
         $regradeReviewer = $regrade ? User::find($regrade->assigned_instructor_id) : null;
 
-        $isStaff = $viewer->role !== User::ROLE_STUDENT && $viewer->role !== 'student';
+        $isStaff = $this->staff->isStaff($viewer);
         $scoresVisible = $isStaff || !$activity || (bool) $activity->show_scores_after_submit;
 
         $refSol = ($isStaff && $problem && $student)
@@ -967,9 +959,9 @@ class SubmissionController extends Controller
             'isExam'            => $activity ? (bool) ($activity->examination_id || $activity->exam_mode) : ($sub->source === 'ExamSession'),
             'examinationId'     => $activity && $activity->examination_id ? (string) $activity->examination_id : null,
             'canEditReview'     => $isStaff
-                && !$viewer->isFacultyOffice()
+                && $this->staff->canGrade($viewer)
                 && $this->canGradeSubmission($viewer, $sub, $activity)
-                && (!$regrade || $regrade->assigned_instructor_id === $viewer->id || $viewer->isAdmin()),
+                && (!$regrade || $regrade->assigned_instructor_id === $viewer->id),
             'regradeAssignment' => $regrade ? [
                 'reviewerId'             => (string) $regrade->assigned_instructor_id,
                 'reviewerName'           => $regradeReviewer ? (string) $regradeReviewer->name : '',

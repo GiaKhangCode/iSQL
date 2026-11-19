@@ -14,6 +14,7 @@ use App\Models\ExamClassProctor;
 use App\Models\StudentIdentity;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
 use App\Services\ExamAdmissionService;
 use App\Services\ExaminationService;
@@ -30,7 +31,8 @@ class ExamLoginProctorController extends Controller
 
     public function __construct(
         protected readonly ExaminationService $examinationService,
-        protected readonly ExamAdmissionService $examAdmissionService
+        protected readonly ExamAdmissionService $examAdmissionService,
+        protected readonly StaffAccess $staff,
     ) {
     }
 
@@ -94,7 +96,7 @@ class ExamLoginProctorController extends Controller
         }
 
         $student = User::where('id', $row->student_id)
-            ->where('role', User::ROLE_STUDENT)
+            ->where('account_type', User::ACCOUNT_STUDENT)
             ->first();
 
         if (!$student || $student->status !== 'Active') {
@@ -269,7 +271,7 @@ class ExamLoginProctorController extends Controller
         $items = [];
         foreach ($sessions as $s) {
             $sClasses = $s->classes;
-            $isAdminOrOwner = $user->isAdmin() || $user->isFacultyOffice() || $user->role === User::ROLE_DEPARTMENT_HEAD || $s->instructor_id === $user->id;
+            $isAdminOrOwner = $this->staff->canManageExaminations($user) || $s->instructor_id === $user->id;
             $proctorNames = is_array($s->proctors) ? array_map('mb_strtolower', $s->proctors) : [];
             $namedProctor = in_array(mb_strtolower((string) $user->name), $proctorNames, true)
                 || in_array(mb_strtolower((string) $user->email), $proctorNames, true);
@@ -345,7 +347,7 @@ class ExamLoginProctorController extends Controller
 
         $students = !empty($studentIds)
             ? User::whereIn('id', $studentIds)
-                ->where('role', User::ROLE_STUDENT)
+                ->where('account_type', User::ACCOUNT_STUDENT)
                 ->where('status', 'Active')
                 ->orderBy('name')
                 ->orderBy('email')
@@ -757,8 +759,7 @@ class ExamLoginProctorController extends Controller
 
     protected function assertStaff(User $user): void
     {
-        $ok = $user->isAdmin() || $user->isFacultyOffice() || $user->isInstructor() || $user->role === User::ROLE_DEPARTMENT_HEAD;
-        abort_unless($ok, 403, 'Chỉ giảng viên, giáo vụ khoa hoặc quản trị viên mới có quyền coi thi.');
+        abort_unless($this->staff->canProctor($user), 403, 'Bạn không có quyền coi thi.');
     }
 
     protected function requireProctorAccess(string $sessionId, User $user, ?string $roomId = null): Assignment
@@ -768,7 +769,7 @@ class ExamLoginProctorController extends Controller
             ->whereNotNull('examination_id')
             ->firstOrFail();
 
-        if ($user->isAdmin() || $user->isFacultyOffice() || $user->role === User::ROLE_DEPARTMENT_HEAD || $session->instructor_id === $user->id) {
+        if ($this->staff->canManageExaminations($user) || $session->instructor_id === $user->id) {
             return $session;
         }
 
@@ -814,13 +815,13 @@ class ExamLoginProctorController extends Controller
 
         $identity = StudentIdentity::whereRaw('LOWER(student_code) = ?', [$code])->first();
         if ($identity) {
-            $st = User::where('id', $identity->user_id)->where('role', User::ROLE_STUDENT)->where('status', 'Active')->first();
+            $st = User::where('id', $identity->user_id)->where('account_type', User::ACCOUNT_STUDENT)->where('status', 'Active')->first();
             if ($st) {
                 return $st;
             }
         }
 
-        $st = User::where('role', User::ROLE_STUDENT)
+        $st = User::where('account_type', User::ACCOUNT_STUDENT)
             ->where('status', 'Active')
             ->where(function ($q) use ($code) {
                 $q->whereRaw('LOWER(email) = ?', [$code])

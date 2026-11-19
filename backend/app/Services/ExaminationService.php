@@ -16,6 +16,7 @@ use App\Models\ProblemStageExercise;
 use App\Models\StudentIdentity;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -27,27 +28,23 @@ class ExaminationService
     private const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
     public function __construct(
-        protected readonly AssignmentService $assignmentService
+        protected readonly AssignmentService $assignmentService,
+        protected readonly AccessControlService $access,
     ) {
     }
 
     public function assertCanManageExaminations(User $user): void
     {
-        $allowed = $user->isAdmin()
-            || $user->isFacultyOffice()
-            || $user->isInstructor()
-            || $user->canDo('ASSIGNMENT_MGMT', 'view')
-            || $user->canDo('ASSIGNMENT_MGMT', 'add');
-
-        abort_unless($allowed, 403, 'Chỉ giảng viên, giáo vụ khoa hoặc quản trị viên mới có quyền quản lý kỳ thi.');
+        abort_unless(
+            $this->access->canAny($user, ['examination.manage', 'exam.credentials']),
+            403,
+            'Bạn không có quyền quản lý kỳ thi.'
+        );
     }
 
     public function canAccessExamination(Examination $exam, User $user): bool
     {
-        return $user->isAdmin()
-            || $user->isFacultyOffice()
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $exam->owner_id === $user->id;
+        return $this->access->can($user, 'examination.manage') || $exam->owner_id === $user->id;
     }
 
     public function listExaminations(User $user): array
@@ -55,7 +52,7 @@ class ExaminationService
         $this->assertCanManageExaminations($user);
 
         $query = Examination::query()->orderByDesc('created_at')->orderByDesc('id');
-        if (!$user->isAdmin() && !$user->isFacultyOffice() && $user->role !== User::ROLE_DEPARTMENT_HEAD) {
+        if (!$this->access->can($user, 'examination.manage')) {
             $query->where('owner_id', $user->id);
         }
 
@@ -370,7 +367,7 @@ class ExaminationService
 
         $students = !empty($allStudentIds)
             ? User::whereIn('id', $allStudentIds)
-                ->where('role', User::ROLE_STUDENT)
+                ->where('account_type', User::ACCOUNT_STUDENT)
                 ->where('status', 'Active')
                 ->orderBy('name')
                 ->orderBy('email')

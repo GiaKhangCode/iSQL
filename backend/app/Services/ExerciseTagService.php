@@ -14,8 +14,8 @@ class ExerciseTagService
      */
     protected function assertAdmin(User $user): void
     {
-        if (strtolower($user->role) !== 'admin' && $user->role !== User::ROLE_ADMIN) {
-            throw new HttpException(403, 'Only administrators can manage exercise tags.');
+        if (! app(\App\Services\Access\AccessControlService::class)->can($user, 'class.manage')) {
+            throw new HttpException(403, 'Bạn không có quyền quản lý thẻ bài tập.');
         }
     }
 

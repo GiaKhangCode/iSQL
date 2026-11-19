@@ -9,19 +9,22 @@ use App\Models\Examination;
 use App\Models\ExamSessionPlan;
 use App\Models\StudentIdentity;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
 use Illuminate\Support\Facades\DB;
 
 class ExamSessionService
 {
     public function __construct(
-        protected readonly ExaminationService $examinationService
+        protected readonly ExaminationService $examinationService,
+        protected readonly AccessControlService $access,
     ) {
     }
 
     public function listProctors(User $user): array
     {
         $this->examinationService->assertCanManageExaminations($user);
-        $rows = User::whereIn('role', array_merge(User::INSTRUCTOR_ROLES, [User::ROLE_DEPARTMENT_HEAD]))
+        // Người coi thi: tài khoản Active đang giữ quyền exam.proctor.
+        $rows = User::whereIn('id', $this->access->holdersOf('exam.proctor'))
             ->where('status', 'Active')
             ->orderBy('name')
             ->orderBy('email')
@@ -116,7 +119,7 @@ class ExamSessionService
         }
 
         $students = User::whereIn('id', $wantedIds)
-            ->where('role', User::ROLE_STUDENT)
+            ->where('account_type', User::ACCOUNT_STUDENT)
             ->where('status', 'Active')
             ->get();
 
@@ -178,7 +181,7 @@ class ExamSessionService
         $allStudentIds = array_keys($studentClasses);
         $students = !empty($allStudentIds)
             ? User::whereIn('id', $allStudentIds)
-                ->where('role', User::ROLE_STUDENT)
+                ->where('account_type', User::ACCOUNT_STUDENT)
                 ->where('status', 'Active')
                 ->orderBy('name')
                 ->orderBy('email')

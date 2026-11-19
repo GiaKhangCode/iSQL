@@ -8,14 +8,8 @@ class AssignmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $user = $this->user();
-        return $user && (
-            $user->isAdmin()
-            || $user->isFacultyOffice()
-            || $user->isInstructor()
-            || $user->canDo('ASSIGNMENT_MGMT', 'add')
-            || $user->canDo('ASSIGNMENT_MGMT', 'edit')
-        );
+        // Quyền assignment.create được chặn ở route; phạm vi (bài của mình / mọi bài) do AssignmentService quyết định.
+        return $this->user() !== null;
     }
 
     protected function prepareForValidation(): void

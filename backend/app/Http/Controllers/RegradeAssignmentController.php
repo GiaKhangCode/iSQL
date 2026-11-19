@@ -12,6 +12,8 @@ use App\Models\Submission;
 use App\Models\SubmissionAppeal;
 use App\Models\SubmissionRegradeAssignment;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
+use App\Services\Access\StaffAccess;
 use App\Services\ExaminationService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -25,13 +27,14 @@ class RegradeAssignmentController extends Controller
     public function __construct(
         protected ExaminationService $examinationService,
         protected NotificationService $notificationService,
+        protected StaffAccess $staff,
+        protected AccessControlService $access,
     ) {
     }
 
     protected function requireAssigner(User $user): void
     {
-        $ok = $user->isAdmin() || $user->isFacultyOffice() || $user->role === User::ROLE_DEPARTMENT_HEAD;
-        abort_unless($ok, 403, 'Chỉ giáo vụ khoa hoặc quản trị viên mới được phân công chấm phúc khảo.');
+        abort_unless($this->staff->canManageExaminations($user), 403, 'Bạn không có quyền phân công chấm phúc khảo.');
     }
 
     /**
@@ -346,7 +349,8 @@ class RegradeAssignmentController extends Controller
             }
         }
 
-        $query = User::whereIn('role', array_merge(User::INSTRUCTOR_ROLES, [User::ROLE_DEPARTMENT_HEAD]))
+        // Người chấm phúc khảo: tài khoản Active đang giữ quyền results.grade (Admin không tự có quyền này).
+        $query = User::whereIn('id', $this->access->holdersOf('results.grade'))
             ->where('status', 'Active');
 
         if (!empty($excludedIds)) {
@@ -389,7 +393,7 @@ class RegradeAssignmentController extends Controller
         $note = trim((string) ($request->input('note') ?? '')) ?: null;
 
         $reviewer = User::where('id', $instructorId)
-            ->whereIn('role', array_merge(User::INSTRUCTOR_ROLES, [User::ROLE_DEPARTMENT_HEAD]))
+            ->whereIn('id', $this->access->holdersOf('results.grade'))
             ->where('status', 'Active')
             ->first();
 
@@ -480,11 +484,7 @@ class RegradeAssignmentController extends Controller
     public function mine(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless(
-            $user->isAdmin() || $user->isFacultyOffice() || $user->isInstructor() || $user->role === User::ROLE_DEPARTMENT_HEAD,
-            403,
-            'Chỉ giảng viên hoặc giáo vụ khoa mới xem được danh sách chấm phúc khảo.'
-        );
+        abort_unless($this->staff->canGrade($user), 403, 'Bạn không có quyền xem danh sách chấm phúc khảo.');
 
         $rows = SubmissionRegradeAssignment::where('assigned_instructor_id', $user->id)
             ->orderByDesc('assigned_at')

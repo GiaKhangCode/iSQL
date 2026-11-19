@@ -11,6 +11,7 @@ use App\Models\Submission;
 use App\Models\TestCase;
 use App\Models\TestCaseScript;
 use App\Models\User;
+use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
 use App\Services\SqlServer\QueryRewriter;
 use App\Services\SqlServer\SandboxService;
@@ -1374,7 +1375,7 @@ class ProblemWorkspaceService
         if (!$activity) {
             return;
         }
-        $isStudent = $user->role === User::ROLE_STUDENT || $user->role === 'student';
+        $isStudent = !app(StaffAccess::class)->isStaff($user);
         if (!$isStudent) {
             return;
         }
@@ -1476,7 +1477,7 @@ class ProblemWorkspaceService
         $activity = (in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true) && $context && $context !== 'Practice')
             ? Assignment::find($context)
             : null;
-        if ($activity && $activity->exam_mode && ($user->role === User::ROLE_STUDENT || $user->role === 'student')) {
+        if ($activity && $activity->exam_mode && !app(StaffAccess::class)->isStaff($user)) {
             abort(403, 'Use Submit & Exit to submit the complete exam.');
         }
         $this->assertActivitySubmissionWindow($activity, $user);
@@ -1672,7 +1673,7 @@ class ProblemWorkspaceService
             ? AssignmentProblem::where('assignment_id', $activity->id)->where('problem_id', $problem->id)->first()
             : null;
 
-        if ($activity && $activity->exam_mode && ($user->role === User::ROLE_STUDENT || $user->role === 'student')) {
+        if ($activity && $activity->exam_mode && !app(StaffAccess::class)->isStaff($user)) {
             abort(403, 'Use Submit & Exit to submit the complete exam.');
         }
         $this->assertActivitySubmissionWindow($activity, $user);

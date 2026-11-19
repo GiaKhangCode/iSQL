@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ExerciseTagRequest extends FormRequest
@@ -12,15 +11,8 @@ class ExerciseTagRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $user = $this->user();
-        if (!$user) {
-            return false;
-        }
-
-        return $user->role === User::ROLE_ADMIN
-            || strtolower($user->role) === 'admin'
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || in_array($user->role, User::INSTRUCTOR_ROLES);
+        // Quyền class.manage được chặn ở route admin và kiểm tiếp trong ExerciseTagService.
+        return $this->user() !== null;
     }
 
     /**

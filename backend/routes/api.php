@@ -37,11 +37,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/exam-auth/status', [ExamLoginProctorController::class, 'status']);
 
     // Role-based Analytics Dashboards (Lecturer & Faculty Office only)
-    Route::get('/teacher/statistics', [StatisticsController::class, 'teacher']);
-    Route::get('/office/statistics', [StatisticsController::class, 'office']);
+    Route::get('/teacher/statistics', [StatisticsController::class, 'teacher'])
+        ->middleware('capability:results.grade,results.view_all,examination.manage,exam.proctor,assignment.create');
+    Route::get('/office/statistics', [StatisticsController::class, 'office'])
+        ->middleware('capability:results.view_all,examination.manage');
 
     // Examinations Management & Credentials
-    Route::prefix('examinations')->group(function () {
+    Route::prefix('examinations')->middleware('capability:examination.manage,exam.credentials')->group(function () {
         Route::get('/', [ExaminationController::class, 'index']);
         Route::post('/preview', [ExaminationController::class, 'preview']);
         Route::post('/', [ExaminationController::class, 'store']);
@@ -62,7 +64,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/exam-admission/{activityId}/unlock', [ExamAdmissionController::class, 'unlockAdmission']);
 
     // Exam Sessions Planning
-    Route::prefix('exam-sessions')->group(function () {
+    Route::prefix('exam-sessions')->middleware('capability:examination.manage,exam.credentials')->group(function () {
         Route::get('/proctors', [ExamSessionController::class, 'proctors']);
         Route::get('/{sessionId}/plan', [ExamSessionController::class, 'plan']);
         Route::post('/{sessionId}/confirm', [ExamSessionController::class, 'confirm']);
@@ -71,7 +73,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     });
 
     // Proctoring
-    Route::prefix('proctor')->group(function () {
+    Route::prefix('proctor')->middleware('capability:exam.proctor,examination.manage')->group(function () {
         Route::get('/sessions', [ExamLoginProctorController::class, 'proctorSessions']);
         Route::get('/sessions/{sessionId}', [ExamLoginProctorController::class, 'roomStatus']);
         Route::get('/sessions/{sessionId}/notices', [ExamLoginProctorController::class, 'sessionNotices']);
@@ -86,10 +88,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Regrade Assignments
     Route::prefix('regrade-assignments')->group(function () {
-        Route::get('/candidates', [RegradeAssignmentController::class, 'candidates']);
-        Route::get('/reviewers', [RegradeAssignmentController::class, 'reviewers']);
-        Route::get('/mine', [RegradeAssignmentController::class, 'mine']);
-        Route::put('/{submissionId}', [RegradeAssignmentController::class, 'assign']);
-        Route::delete('/{submissionId}', [RegradeAssignmentController::class, 'unassign']);
+        Route::get('/mine', [RegradeAssignmentController::class, 'mine'])->middleware('capability:results.grade');
+        Route::middleware('capability:examination.manage')->group(function () {
+            Route::get('/candidates', [RegradeAssignmentController::class, 'candidates']);
+            Route::get('/reviewers', [RegradeAssignmentController::class, 'reviewers']);
+            Route::put('/{submissionId}', [RegradeAssignmentController::class, 'assign']);
+            Route::delete('/{submissionId}', [RegradeAssignmentController::class, 'unassign']);
+        });
     });
 });

@@ -13,6 +13,7 @@ use App\Models\Submission;
 use App\Models\SubmissionAppeal;
 use App\Models\SubmissionRegradeAssignment;
 use App\Models\User;
+use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -45,7 +46,7 @@ class StatisticsService
 
         // 1. Resolve classes in role scope
         $baseClassesQuery = ClassModel::query();
-        if (!$isOffice && !$user->isAdmin() && !$user->isFacultyOffice()) {
+        if (!$isOffice && !app(StaffAccess::class)->seesEverything($user)) {
             $baseClassesQuery->where(function ($q) use ($user) {
                 $q->where('instructor_id', $user->id)
                     ->orWhere('practice_instructor_id', $user->id)
@@ -89,7 +90,7 @@ class StatisticsService
         }
 
         $candidateActivities = $activitiesQuery->orderByDesc('created_at')->get();
-        if (!$isOffice && !$user->isAdmin() && !$user->isFacultyOffice()) {
+        if (!$isOffice && !app(StaffAccess::class)->seesEverything($user)) {
             $ownedClassSet = array_flip($allScopedClasses->pluck('id')->all());
             $candidateActivities = $candidateActivities->filter(function (Assignment $a) use ($user, $ownedClassSet) {
                 if ((string) $a->instructor_id === (string) $user->id) {

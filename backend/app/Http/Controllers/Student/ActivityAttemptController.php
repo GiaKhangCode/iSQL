@@ -173,10 +173,6 @@ class ActivityAttemptController extends Controller
 
     protected function resolveActivity(Request $request, string $activityId, string $source, User $user, bool $allowClosed = false): Assignment
     {
-        if ($user->role !== User::ROLE_STUDENT && $user->role !== 'student' && !$user->isAdmin()) {
-            abort(403, 'Only students can record activity attempts.');
-        }
-
         $activity = Assignment::findOrFail($activityId);
         if (!$activity->published) {
             abort(403, 'This activity is not available.');
