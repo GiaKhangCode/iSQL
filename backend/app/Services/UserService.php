@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Mail\ResetPasswordOtpMail;
+use App\Services\Access\AccessControlService;
+use App\Models\AccessRole;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -14,26 +17,32 @@ use Carbon\Carbon;
 
 class UserService
 {
+    public function __construct(private readonly AccessControlService $access)
+    {
+    }
+
+    /** Không được để hệ thống không còn siêu quản trị Active nào. */
+    private function assertNotLastSuperAdmin(User $user, string $field, string $message): void
+    {
+        if ($this->access->isLastActiveSuperAdmin($user)) {
+            throw ValidationException::withMessages([$field => [$message]]);
+        }
+    }
+
     public function registerStudent(array $data): User
     {
         $hashedPassword = Hash::make($data['password']);
         $initials = mb_strtoupper(mb_substr(trim($data['name']), 0, 2, 'UTF-8'), 'UTF-8');
 
-        $user = User::create([
+        // Vai trò "Sinh viên" mặc định được gán bởi hook User::created (AccessRoleAssigner).
+        return User::create([
             'name'            => $data['name'],
             'email'           => $data['email'],
             'hashed_password' => $hashedPassword,
             'initials'        => $initials,
-            'role'            => 'student',
+            'account_type'    => User::ACCOUNT_STUDENT,
             'status'          => 'Active',
         ]);
-
-        $studentGroup = \App\Models\RoleGroup::where('name', 'like', '%Sinh viên%')->first();
-        if ($studentGroup) {
-            $user->roleGroups()->syncWithoutDetaching([$studentGroup->id]);
-        }
-
-        return $user;
     }
 
     public function registerLecturer(array $data): User
@@ -46,7 +55,8 @@ class UserService
             'email'           => $data['email'],
             'hashed_password' => $hashedPassword,
             'initials'        => $initials,
-            'role'            => 'instructor',
+            'account_type'    => User::ACCOUNT_STAFF,
+            'initial_role'    => 'instructor',
             'status'          => 'Pending',
             'department'      => $data['department'],
         ]);
@@ -129,19 +139,33 @@ class UserService
      */
     public function getAllUsers(): Collection
     {
-        return User::with(['roleGroups', 'directRoles'])->orderBy('created_at', 'desc')->get();
+        return User::with('accessRoles')->orderBy('created_at', 'desc')->get();
     }
 
     /**
-     * Create a user account from validated administrator input
+     * Vai trò chọn được khi tạo tài khoản (danh sách vai trò động), sắp theo tên.
+     *
+     * @return array<int, array{id: string, name: string, isSuper: bool}>
      */
-    public function createUser(array $data): User
+    public function assignableRoles(): array
     {
-        $role = $data['role'];
-        if ($role === 'lecturer' || $role === 'instructor') {
-            $role = User::ROLE_INSTRUCTOR_PRACTICAL;
-        } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
-            $role = User::ROLE_FACULTY_OFFICE;
+        return AccessRole::orderBy('name')->get(['id', 'name', 'is_super'])
+            ->map(fn (AccessRole $role) => ['id' => (string) $role->id, 'name' => $role->name, 'isSuper' => (bool) $role->is_super])
+            ->all();
+    }
+
+    /**
+     * Create a user account from validated administrator input.
+     *
+     * $data['account_type'] là loại danh tính (student|staff); $data['role_id'] (hoặc $data['role']: id, slug
+     * hoặc tên vai trò, dùng cho file CSV) là vai trò khởi tạo, không lưu thành cột. Không chọn vai trò thì tài
+     * khoản sinh viên nhận vai trò "Sinh viên", tài khoản nhân sự chưa có vai trò nào.
+     */
+    public function createUser(array $data, ?User $actor = null): User
+    {
+        $role = $this->resolveInitialRole($data['role_id'] ?? $data['role'] ?? null);
+        if ($role !== null) {
+            $this->assertMayGrantRole($role, $actor);
         }
 
         $initials = $data['initials'] ?? null;
@@ -149,36 +173,49 @@ class UserService
             $initials = mb_strtoupper(mb_substr(trim($data['name']), 0, 2, 'UTF-8'), 'UTF-8');
         }
 
-        $user = User::create([
+        // Vai trò khởi tạo được gán khi tạo (User::created → AccessRoleAssigner);
+        // quyền chỉ có hiệu lực khi tài khoản Active.
+        return User::create([
             'email'           => $data['email'],
             'hashed_password' => Hash::make($data['password']),
             'name'            => $data['name'],
             'initials'        => $initials ?: 'US',
-            'role'            => $role,
+            'account_type'    => $data['account_type'],
+            'initial_role'    => $role ? (string) $role->id : null,
             'status'          => $data['status'] ?? 'Active',
             'department'      => $data['department'] ?? null,
         ]);
+    }
 
-        if ($user->status === 'Active') {
-            if ($user->role === User::ROLE_STUDENT) {
-                $studentGroup = \App\Models\RoleGroup::where('name', 'like', '%Sinh viên%')->first();
-                if ($studentGroup) {
-                    $user->roleGroups()->syncWithoutDetaching([$studentGroup->id]);
-                }
-            } elseif (in_array($user->role, User::INSTRUCTOR_ROLES, true)) {
-                $lecturerGroup = \App\Models\RoleGroup::where('name', 'like', '%Giảng viên%')->first();
-                if ($lecturerGroup) {
-                    $user->roleGroups()->syncWithoutDetaching([$lecturerGroup->id]);
-                }
-            } elseif ($user->isFacultyOffice()) {
-                $officeGroup = \App\Models\RoleGroup::where('name', 'like', '%Giáo vụ%')->first();
-                if ($officeGroup) {
-                    $user->roleGroups()->syncWithoutDetaching([$officeGroup->id]);
-                }
-            }
+    /** Tìm vai trò theo id, slug hoặc tên (không phân biệt hoa thường); null nếu không nhập. */
+    private function resolveInitialRole(mixed $key): ?AccessRole
+    {
+        if ($key === null || trim((string) $key) === '') {
+            return null;
         }
 
-        return $user;
+        $key = trim((string) $key);
+        $role = AccessRole::where('id', $key)->orWhere('slug', $key)->first()
+            ?? AccessRole::whereRaw('LOWER(name) = ?', [mb_strtolower($key)])->first();
+
+        if ($role === null) {
+            throw ValidationException::withMessages(['role_id' => ["Vai trò '{$key}' không tồn tại."]]);
+        }
+
+        return $role;
+    }
+
+    /** Vai trò siêu quản trị hoặc có access.manage chỉ người có access.manage mới được cấp. */
+    private function assertMayGrantRole(AccessRole $role, ?User $actor): void
+    {
+        if ($actor === null) {
+            return;
+        }
+
+        $sensitive = $role->is_super || in_array('access.manage', $role->permissionCodes(), true);
+        if ($sensitive && ! $this->access->can($actor, 'access.manage')) {
+            throw new HttpException(403, 'Chỉ người có quyền quản lý vai trò mới được cấp vai trò này.');
+        }
     }
 
     /**
@@ -197,22 +234,8 @@ class UserService
         $user = $this->getUser($idOrEmail);
         $credentialsChanged = false;
 
-        if (isset($data['role'])) {
-            $role = strtolower((string) $data['role']);
-            if ($role === 'lecturer' || $role === 'instructor') {
-                $role = User::ROLE_INSTRUCTOR_PRACTICAL;
-            } elseif ($role === 'student') {
-                $role = User::ROLE_STUDENT;
-            } elseif ($role === 'admin') {
-                $role = User::ROLE_ADMIN;
-            } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
-                $role = User::ROLE_FACULTY_OFFICE;
-            }
-            $data['role'] = $role;
-
-            if ($data['role'] !== $user->role) {
-                $this->assertRoleChangeAllowed($user, $data['role']);
-            }
+        if (isset($data['status']) && $data['status'] !== 'Active') {
+            $this->assertNotLastSuperAdmin($user, 'status', 'Không thể khóa quản trị viên đang hoạt động cuối cùng.');
         }
 
         if (array_key_exists('initials', $data) && $data['initials'] === null) {
@@ -242,20 +265,6 @@ class UserService
      */
     public function formatUserResponse(User $user): array
     {
-        $roleDisplay = 'Student';
-        $frontendRole = 'Student';
-
-        if (in_array($user->role, User::INSTRUCTOR_ROLES, true) || str_contains(strtolower((string) $user->role), 'instructor')) {
-            $roleDisplay = 'Lecturer';
-            $frontendRole = 'Lecturer';
-        } elseif ($user->role === User::ROLE_ADMIN || $user->role === 'admin') {
-            $roleDisplay = 'Admin';
-            $frontendRole = 'Admin';
-        } elseif ($user->isFacultyOffice() || $user->role === User::ROLE_FACULTY_OFFICE || $user->role === 'faculty_office' || strtolower((string)$user->role) === 'faculty office') {
-            $roleDisplay = 'Faculty office';
-            $frontendRole = 'Faculty office';
-        }
-
         $joined = $user->created_at ? $user->created_at->format('M d, Y') : 'Unknown';
         $lastActive = $user->last_active ? $user->last_active->format('M d, Y') : ($user->updated_at ? $user->updated_at->format('M d, Y') : 'Unknown');
 
@@ -263,9 +272,8 @@ class UserService
             'id'             => $user->id,
             'name'           => $user->name,
             'email'          => $user->email,
-            'role'           => $frontendRole,
-            'technical_role' => $user->role,
-            'roleDisplay'    => $roleDisplay,
+            'account_type'   => $user->account_type,
+            'roles'          => $user->roleSummaries(),
             'status'         => $user->status ?? 'Active',
             'lastActive'     => $lastActive,
             'last_active'    => $lastActive,
@@ -280,24 +288,17 @@ class UserService
     public function updateStatus(string $id, string $status): User
     {
         $user = User::findOrFail($id);
+        if ($status !== 'Active') {
+            $this->assertNotLastSuperAdmin($user, 'status', 'Không thể khóa quản trị viên đang hoạt động cuối cùng.');
+        }
         $user->status = $status;
         $user->save();
 
         if ($status !== 'Active') {
             $user->tokens()->delete();
-        } else {
-            if ($user->role === User::ROLE_STUDENT) {
-                $studentGroup = \App\Models\RoleGroup::where('name', 'like', '%Sinh viên%')->first();
-                if ($studentGroup) {
-                    $user->roleGroups()->syncWithoutDetaching([$studentGroup->id]);
-                }
-            } elseif (in_array($user->role, User::INSTRUCTOR_ROLES, true)) {
-                $lecturerGroup = \App\Models\RoleGroup::where('name', 'like', '%Giảng viên%')->first();
-                if ($lecturerGroup) {
-                    $user->roleGroups()->syncWithoutDetaching([$lecturerGroup->id]);
-                }
-            }
         }
+        // Vai trò đã được gán từ lúc tạo tài khoản; chuyển sang Active là quyền có hiệu lực (không cần gán lại).
+        $this->access->forget($user->id);
 
         return $user;
     }
@@ -308,6 +309,7 @@ class UserService
     public function deleteUser(string $id): void
     {
         $user = User::findOrFail($id);
+        $this->assertNotLastSuperAdmin($user, 'user_id', 'Không thể xóa quản trị viên đang hoạt động cuối cùng.');
         $user->delete();
     }
 
@@ -315,7 +317,7 @@ class UserService
     {
         $user = User::findOrFail($id);
 
-        if ($user->role !== User::ROLE_STUDENT) {
+        if (! $user->isStudentAccount()) {
             throw ValidationException::withMessages([
                 'user_id' => ['Only student passwords can be reset through this endpoint.'],
             ]);
@@ -328,26 +330,15 @@ class UserService
         return $user->refresh();
     }
 
-    public function importCsvRows(array $rows): array
+    public function importCsvRows(array $rows, ?User $actor = null): array
     {
-        return DB::transaction(function () use ($rows): array {
+        return DB::transaction(function () use ($rows, $actor): array {
             $users = [];
             foreach ($rows as $row) {
-                $users[] = $this->createUser($row);
+                $users[] = $this->createUser($row, $actor);
             }
 
             return $users;
         });
-    }
-
-    private function assertRoleChangeAllowed(User $user, string $role): void
-    {
-        if (in_array($user->role, User::INSTRUCTOR_ROLES, true)
-            && ! in_array($role, User::INSTRUCTOR_ROLES, true)
-            && ($user->taughtClasses()->exists() || $user->assignedClasses()->exists())) {
-            throw ValidationException::withMessages([
-                'role' => ['Unassign this user from all classes before changing their role to a non-instructor role.'],
-            ]);
-        }
     }
 }

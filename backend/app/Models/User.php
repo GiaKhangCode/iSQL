@@ -12,32 +12,17 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasUuid;
 
-    public const ROLE_STUDENT = 'student';
-    public const ROLE_INSTRUCTOR_PRACTICAL = 'instructor_practical';
-    public const ROLE_INSTRUCTOR_THEORY = 'instructor_theory';
-    public const ROLE_DEPARTMENT_HEAD = 'department_head';
-    public const ROLE_FACULTY_OFFICE = 'faculty_office';
-    public const ROLE_ADMIN = 'admin';
+    /**
+     * Loại danh tính của tài khoản (KHÔNG phải phân quyền): `student` là người học (được thêm vào lớp, có
+     * tài khoản thi, đặt lại mật khẩu...), `staff` là nhân sự. Quyền nằm ở vai trò (user_access_roles).
+     */
+    public const ACCOUNT_STUDENT = 'student';
+    public const ACCOUNT_STAFF = 'staff';
 
-    /** Accepted role values for account creation and role changes. */
-    public const ROLES = [
-        self::ROLE_STUDENT,
-        self::ROLE_INSTRUCTOR_PRACTICAL,
-        self::ROLE_INSTRUCTOR_THEORY,
-        self::ROLE_DEPARTMENT_HEAD,
-        self::ROLE_FACULTY_OFFICE,
-        self::ROLE_ADMIN,
-        self::LEGACY_INSTRUCTOR_ROLE,
-    ];
+    public const ACCOUNT_TYPES = [self::ACCOUNT_STUDENT, self::ACCOUNT_STAFF];
 
-    /** `instructor` is retained for accounts created before the role split. */
-    public const LEGACY_INSTRUCTOR_ROLE = 'instructor';
-
-    public const INSTRUCTOR_ROLES = [
-        self::ROLE_INSTRUCTOR_PRACTICAL,
-        self::ROLE_INSTRUCTOR_THEORY,
-        self::LEGACY_INSTRUCTOR_ROLE,
-    ];
+    /** Vai trò khởi tạo (id hoặc slug) cho tài khoản đang được tạo; không phải cột, xem setInitialRoleAttribute. */
+    private ?string $pendingInitialRole = null;
 
     protected $table = 'users';
 
@@ -47,7 +32,8 @@ class User extends Authenticatable
         'hashed_password',
         'name',
         'initials',
-        'role',
+        'account_type',
+        'initial_role',
         'status',
         'department',
         'last_active',
@@ -66,127 +52,63 @@ class User extends Authenticatable
         return 'hashed_password';
     }
 
-    public function roleGroups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    protected static function booted(): void
     {
-        return $this->belongsToMany(RoleGroup::class, 'account_assign_role_group', 'account_id', 'role_group_id')
-                    ->withTimestamps();
+        // Tài khoản mới nhận vai trò khởi tạo (initial_role); không có thì sinh viên nhận vai trò "Sinh viên".
+        static::created(fn (User $user) => app(\App\Services\Access\AccessRoleAssigner::class)->assignInitial($user, $user->pendingInitialRole()));
     }
 
-    /** Vai trò phân quyền kiểu capability (AccessRole), khác roleGroups() của ma trận cũ. */
+    /** Vai trò phân quyền kiểu capability (AccessRole). */
     public function accessRoles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(AccessRole::class, 'user_access_roles', 'user_id', 'access_role_id')
                     ->withTimestamps();
     }
 
-    public function directRoles():\Illuminate\Database\Eloquent\Relations\BelongsToMany
+    /**
+     * `User::create([... 'initial_role' => 'instructor'])`: vai trò gán lúc tạo (id hoặc slug của AccessRole).
+     * Chỉ để khởi tạo, không được lưu thành cột; xem User::booted và AccessRoleAssigner::assignInitial.
+     */
+    public function setInitialRoleAttribute(?string $value): void
     {
-        return $this->belongsToMany(Role::class, 'account_assign_role', 'account_id', 'role_id')
-                    ->withTimestamps();
+        $this->pendingInitialRole = $value;
     }
 
-    public function isInstructor(): bool
+    public function pendingInitialRole(): ?string
     {
-        return in_array($this->role, self::INSTRUCTOR_ROLES, true)
-            || str_contains(strtolower((string) $this->role), 'instructor')
-            || $this->role === self::ROLE_DEPARTMENT_HEAD
-            || str_contains(strtolower((string) $this->role), 'lecturer');
+        return $this->pendingInitialRole;
     }
 
-    public function isFacultyOffice(): bool
+    public function isStudentAccount(): bool
     {
-        $r = strtolower((string) $this->role);
-        return $this->role === self::ROLE_FACULTY_OFFICE
-            || $r === 'faculty_office'
-            || $r === 'faculty office'
-            || $r === 'giáo vụ khoa';
-    }
-
-    public function isAdmin(): bool
-    {
-        return $this->role === self::ROLE_ADMIN || $this->role === 'admin';
-    }
-
-    public function getFrontendRole(): string
-    {
-        if ($this->isAdmin()) {
-            return 'admin';
-        }
-        if ($this->isFacultyOffice()) {
-            return 'faculty_office';
-        }
-        if ($this->isInstructor()) {
-            return 'instructor';
-        }
-        return 'student';
-    }
-
-    public function toAuthArray(): array
-    {
-        return array_merge($this->toArray(), [
-            'id'             => (string) $this->id,
-            'name'           => $this->name,
-            'email'          => $this->email,
-            'initials'       => $this->initials ?? mb_strtoupper(mb_substr(trim($this->name ?: ''), 0, 2, 'UTF-8'), 'UTF-8'),
-            'role'           => $this->getFrontendRole(),
-            'technical_role' => $this->role,
-            'status'         => $this->status,
-        ]);
+        return $this->account_type === self::ACCOUNT_STUDENT;
     }
 
     /**
-     * Kiểm tra quyền hạn theo ma trận Function & Action (view, add, edit, delete, download)
+     * Hồ sơ trả cho frontend khi đăng nhập / /me. Không có `role`: quyền và khu vực lấy từ
+     * GET /api/auth/permissions; `roles` chỉ để hiển thị.
      */
-    public function canDo(string $functionCode, string $action = 'view'): bool
+    public function toAuthArray(): array
     {
-        if ($this->isAdmin()) {
-            return true;
-        }
+        return array_merge($this->toArray(), [
+            'id'           => (string) $this->id,
+            'name'         => $this->name,
+            'email'        => $this->email,
+            'initials'     => $this->initials ?? mb_strtoupper(mb_substr(trim($this->name ?: ''), 0, 2, 'UTF-8'), 'UTF-8'),
+            'account_type' => $this->account_type,
+            'roles'        => $this->roleSummaries(),
+            'status'       => $this->status,
+        ]);
+    }
 
-        // Student default permissions
-        if ($this->role === self::ROLE_STUDENT || $this->role === 'student') {
-            if ($functionCode === 'PRACTICE_MGMT' && in_array($action, ['view', 'add'])) {
-                return true;
-            }
-            if ($functionCode === 'CLASS_MGMT' && $action === 'view') {
-                return true;
-            }
-        }
-
-        // Faculty office default permissions
-        if ($this->isFacultyOffice()) {
-            if ($functionCode === 'ASSIGNMENT_MGMT') {
-                return true;
-            }
-            if ($functionCode === 'CLASS_MGMT' && in_array($action, ['view', 'download'])) {
-                return true;
-            }
-            if ($functionCode === 'PROBLEM_MGMT' && in_array($action, ['view', 'download'])) {
-                return true;
-            }
-            if ($functionCode === 'PRACTICE_MGMT' && $action === 'view') {
-                return true;
-            }
-            if ($functionCode === 'SUBMISSION_MGMT') {
-                return true;
-            }
-        }
-
-        // Instructor default permissions
-        if ($this->isInstructor()) {
-            if ($functionCode === 'CLASS_MGMT' && $action === 'view') {
-                return true;
-            }
-            if ($functionCode === 'PROBLEM_MGMT') {
-                return true;
-            }
-            if ($functionCode === 'ASSIGNMENT_MGMT') {
-                return true;
-            }
-        }
-
-        $permissions = app(\App\Services\PermissionService::class)->getUserPermission($this->id);
-        return !empty($permissions[$functionCode][$action]);
+    /** @return array<int, array{id: string, name: string}> */
+    public function roleSummaries(): array
+    {
+        return $this->accessRoles
+            ->map(fn (AccessRole $role) => ['id' => (string) $role->id, 'name' => $role->name])
+            ->sortBy('name')
+            ->values()
+            ->all();
     }
 
     public function notifications()

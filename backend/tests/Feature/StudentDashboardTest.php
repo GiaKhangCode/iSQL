@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -40,7 +41,7 @@ class StudentDashboardTest extends TestCase
             'name'            => "Dashboard {$tag}",
             'email'           => "dash_{$tag}_" . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => 'Active',
             'initials'        => 'DB',
         ], $extra));

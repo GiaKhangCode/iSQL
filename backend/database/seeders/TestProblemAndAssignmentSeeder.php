@@ -26,7 +26,8 @@ class TestProblemAndAssignmentSeeder extends Seeder
                 'name'            => 'Mai Xuân Hùng',
                 'initials'        => 'MH',
                 'hashed_password' => Hash::make('password123'),
-                'role'            => 'instructor_practical',
+                'account_type'    => 'staff',
+                'initial_role'    => 'instructor',
                 'status'          => 'Active',
                 'department'      => 'Hệ thống Thông tin',
             ]
@@ -48,7 +49,7 @@ class TestProblemAndAssignmentSeeder extends Seeder
                     'name'            => $st['name'],
                     'initials'        => $st['initials'],
                     'hashed_password' => Hash::make('password123'),
-                    'role'            => 'student',
+                    'account_type'    => 'student',
                     'status'          => 'Active',
                     'department'      => 'Hệ thống Thông tin',
                 ]

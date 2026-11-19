@@ -17,26 +17,6 @@ class StoreUserRequest extends FormRequest
     }
 
     /**
-     * Prepare the data for validation.
-     */
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('role')) {
-            $role = strtolower(trim((string) $this->input('role')));
-            if ($role === 'lecturer' || $role === 'instructor') {
-                $role = User::ROLE_INSTRUCTOR_PRACTICAL;
-            } elseif ($role === 'student') {
-                $role = User::ROLE_STUDENT;
-            } elseif ($role === 'admin') {
-                $role = User::ROLE_ADMIN;
-            } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
-                $role = User::ROLE_FACULTY_OFFICE;
-            }
-            $this->merge(['role' => $role]);
-        }
-    }
-
-    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -48,7 +28,9 @@ class StoreUserRequest extends FormRequest
             'password'   => 'required|string|min:8',
             'name'       => 'required|string|max:255',
             'initials'   => 'nullable|string|max:10',
-            'role'       => ['required', Rule::in(array_merge(User::ROLES, ['lecturer', 'instructor', 'student', 'admin', 'faculty office', 'faculty_office', 'giáo vụ khoa']))],
+            // Loại danh tính (student|staff) và vai trò khởi tạo (id của vai trò động; bỏ trống thì theo loại tài khoản).
+            'account_type' => ['required', Rule::in(User::ACCOUNT_TYPES)],
+            'role_id'    => ['nullable', 'string', Rule::exists('access_roles', 'id')],
             'status'     => 'sometimes|in:Active,Inactive,Pending',
             'department' => 'nullable|string|max:255',
         ];

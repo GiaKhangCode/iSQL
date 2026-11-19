@@ -12,6 +12,7 @@ use App\Services\ExamAdmissionService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -58,7 +59,7 @@ class ExamAdmissionLoginTest extends TestCase
             'name'            => "ExamLogin {$tag}",
             'email'           => "examlogin_{$tag}_" . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make(self::REAL_PASSWORD),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => $status,
             'initials'        => 'EL',
         ]);

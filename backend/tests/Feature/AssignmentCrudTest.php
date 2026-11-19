@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 class AssignmentCrudTest extends TestCase
@@ -31,7 +32,7 @@ class AssignmentCrudTest extends TestCase
             'name'            => 'Teacher Assignment Test',
             'email'           => 'teacher_assign_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor',
+            ...AccountFixture::for('instructor'),
             'status'          => 'Active',
             'initials'        => 'TA',
         ]);
@@ -40,7 +41,7 @@ class AssignmentCrudTest extends TestCase
             'name'            => 'Student Test',
             'email'           => 'student_assign_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'ST',
         ]);
@@ -301,7 +302,7 @@ class AssignmentCrudTest extends TestCase
             'name'            => 'Instructor B',
             'email'           => 'instructor_b_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor_practical',
+            ...AccountFixture::for('instructor_practical'),
             'status'          => 'Active',
             'initials'        => 'IB',
         ]);
@@ -346,7 +347,7 @@ class AssignmentCrudTest extends TestCase
             'name'            => 'Instructor B Oper',
             'email'           => 'instructor_b_oper_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor_theory',
+            ...AccountFixture::for('instructor_theory'),
             'status'          => 'Active',
             'initials'        => 'IB',
         ]);

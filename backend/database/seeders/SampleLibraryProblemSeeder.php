@@ -16,7 +16,7 @@ class SampleLibraryProblemSeeder extends Seeder
         $owner = User::where('email', 'phuongtv@uit.edu.vn')->first()
             ?? User::where('email', 'teacher@uit.edu.vn')->first()
             ?? User::where('email', 'gvk@uit.edu.vn')->first()
-            ?? User::where('role', User::ROLE_ADMIN)->first();
+            ?? User::whereIn('id', app(\App\Services\Access\AccessControlService::class)->superAdminIds())->first();
 
         if (!$owner) {
             echo "Owner user not found!\n";

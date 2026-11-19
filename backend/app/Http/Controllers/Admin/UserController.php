@@ -29,9 +29,15 @@ class UserController extends Controller
         return response()->json($formatted);
     }
 
+    /** GET /api/admin/users/role-options: vai trò chọn được khi tạo tài khoản. */
+    public function roleOptions(): JsonResponse
+    {
+        return response()->json($this->userService->assignableRoles());
+    }
+
     public function store(StoreUserRequest $request): JsonResponse
     {
-        $user = $this->userService->createUser($request->validated());
+        $user = $this->userService->createUser($request->validated(), $request->user());
 
         return response()->json($this->userService->formatUserResponse($user), 201);
     }
@@ -60,8 +66,8 @@ class UserController extends Controller
     public function approve(string $id): JsonResponse
     {
         $user = $this->userService->getUser($id);
-        if (! in_array($user->role, User::INSTRUCTOR_ROLES, true)) {
-            throw ValidationException::withMessages(['user_id' => ['Only instructor accounts can be approved.']]);
+        if ($user->account_type !== User::ACCOUNT_STAFF) {
+            throw ValidationException::withMessages(['user_id' => ['Only staff accounts can be approved.']]);
         }
         if ($user->status !== 'Pending') {
             throw ValidationException::withMessages(['status' => ['Only pending accounts can be approved.']]);
@@ -102,10 +108,10 @@ class UserController extends Controller
             }
             $headers = array_map(static fn ($header) => trim((string) $header), $headers);
             $headers[0] = preg_replace('/^\\xEF\\xBB\\xBF/', '', $headers[0] ?? '');
-            $requiredHeaders = ['email', 'password', 'name', 'role'];
+            $requiredHeaders = ['email', 'password', 'name', 'account_type'];
             if (array_diff($requiredHeaders, $headers) !== []) {
                 throw ValidationException::withMessages([
-                    'file' => ['CSV header must include email,password,name,role. Optional columns: initials,status,department.'],
+                    'file' => ['CSV header must include email,password,name,account_type (student|staff). Optional columns: role (role name or slug), initials,status,department.'],
                 ]);
             }
 
@@ -138,7 +144,8 @@ class UserController extends Controller
                     'password' => ['required', 'string', 'min:8'],
                     'name' => ['required', 'string', 'max:255'],
                     'initials' => ['nullable', 'string', 'max:10'],
-                    'role' => ['required', Rule::in(User::ROLES)],
+                    'account_type' => ['required', Rule::in(User::ACCOUNT_TYPES)],
+                    'role' => ['nullable', 'string', 'max:100'],
                     'status' => ['nullable', Rule::in(['Active', 'Inactive', 'Pending'])],
                     'department' => ['nullable', 'string', 'max:255'],
                 ]);
@@ -169,7 +176,7 @@ class UserController extends Controller
             throw ValidationException::withMessages(['file' => ['The CSV file contains no user rows.']]);
         }
 
-        $users = $this->userService->importCsvRows($rows);
+        $users = $this->userService->importCsvRows($rows, $request->user());
 
         return response()->json([
             'message' => 'Users imported successfully',
@@ -177,7 +184,7 @@ class UserController extends Controller
             'users' => array_map(static fn (User $user) => [
                 'id' => $user->id,
                 'email' => $user->email,
-                'role' => $user->role,
+                'account_type' => $user->account_type,
                 'status' => $user->status,
             ], $users),
         ], 201);

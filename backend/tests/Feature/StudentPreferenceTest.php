@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -41,7 +42,7 @@ class StudentPreferenceTest extends TestCase
             'name'            => "Preference {$tag}",
             'email'           => "pref_{$tag}_" . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => 'Active',
             'initials'        => 'PF',
         ]);

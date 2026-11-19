@@ -23,7 +23,7 @@ class CompleteExamDataSeeder extends Seeder
     public function run(): void
     {
         // 1. Ensure StudentIdentities exist for students
-        $students = User::where('role', User::ROLE_STUDENT)->get();
+        $students = User::where('account_type', User::ACCOUNT_STUDENT)->get();
         foreach ($students as $st) {
             $local = strtolower(trim(explode('@', (string) $st->email)[0] ?? ''));
             if ($local !== '') {
@@ -39,7 +39,7 @@ class CompleteExamDataSeeder extends Seeder
 
         // 3. Find Owner (Faculty Office or Admin)
         $owner = User::where('email', 'gvk@uit.edu.vn')->first()
-            ?? User::where('role', User::ROLE_ADMIN)->first();
+            ?? User::whereIn('id', app(\App\Services\Access\AccessControlService::class)->superAdminIds())->first();
         if (!$owner) {
             echo "Owner user not found!\n";
             return;
@@ -243,7 +243,7 @@ class CompleteExamDataSeeder extends Seeder
         $existingExam = Examination::where('title', $examTitle)->first();
         $examService = app(ExaminationService::class);
 
-        $instructors = User::whereIn('role', User::INSTRUCTOR_ROLES)->where('status', 'Active')->get();
+        $instructors = User::whereIn('id', app(\App\Services\Access\AccessControlService::class)->holdersOf('class.teach'))->where('status', 'Active')->get();
         $proctorIds = $instructors->pluck('id')->take(2)->values()->all();
         $proctorNames = $instructors->pluck('name')->take(2)->values()->all();
         $proctor1 = !empty($proctorNames[0]) ? [$proctorNames[0]] : ['Giảng Viên Giám Thị 1'];

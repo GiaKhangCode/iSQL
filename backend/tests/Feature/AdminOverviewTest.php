@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
+use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 /**
@@ -22,6 +24,7 @@ use Tests\TestCase;
 class AdminOverviewTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
 
     private const KEYS = [
         'total_users',
@@ -37,6 +40,7 @@ class AdminOverviewTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->useDefaultRolePermissions();
 
         $this->admin = $this->makeUser('admin');
     }
@@ -47,7 +51,7 @@ class AdminOverviewTest extends TestCase
             'name'            => "Overview {$role}",
             'email'           => "overview_{$role}_" . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => $status,
             'initials'        => 'OV',
         ]);
@@ -136,7 +140,7 @@ class AdminOverviewTest extends TestCase
 
         $this->assertSame(5, $after['total_users'] - $before['total_users'], 'mọi role, mọi trạng thái đều được tính vào tổng');
         $this->assertSame(2, $after['total_students'] - $before['total_students'], 'sinh viên Pending vẫn được đếm');
-        $this->assertSame(1, $after['total_instructors'] - $before['total_instructors'], 'giảng viên Inactive vẫn được đếm');
+        $this->assertSame(2, $after['total_instructors'] - $before['total_instructors'], 'giảng viên Inactive vẫn được đếm; giáo vụ thì không');
         $this->assertSame(1, $after['total_problems'] - $before['total_problems']);
         $this->assertSame(1, $after['total_submissions'] - $before['total_submissions']);
         $this->assertSame(2, $after['total_classes'] - $before['total_classes']);
@@ -154,20 +158,31 @@ class AdminOverviewTest extends TestCase
         $data = $this->overview();
 
         $this->assertSame(DB::table('users')->count(), $data['total_users']);
-        $this->assertSame(DB::table('users')->where('role', 'student')->count(), $data['total_students']);
-        $this->assertSame(DB::table('users')->where('role', 'instructor')->count(), $data['total_instructors']);
+        $this->assertSame(DB::table('users')->where('account_type', 'student')->count(), $data['total_students']);
+        $this->assertSame($this->teachingHoldersFromTables(), $data['total_instructors']);
         $this->assertSame(DB::table('problems')->count(), $data['total_problems']);
         $this->assertSame(DB::table('submissions')->count(), $data['total_submissions']);
         $this->assertSame(DB::table('classes')->count(), $data['total_classes']);
     }
 
+    /** Số người giữ class.teach tính thẳng từ bảng: qua vai trò thường hoặc quyền gán riêng, không trùng. */
+    private function teachingHoldersFromTables(): int
+    {
+        $viaRole = DB::table('user_access_roles as uar')
+            ->join('access_role_permissions as arp', 'arp.access_role_id', '=', 'uar.access_role_id')
+            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
+            ->where('ar.is_super', false)->where('arp.permission', 'class.teach')
+            ->pluck('uar.user_id');
+        $direct = DB::table('user_permissions')->where('permission', 'class.teach')->pluck('user_id');
+
+        return $viaRole->merge($direct)->unique()->count();
+    }
+
     /**
-     * Khóa hành vi hiện tại: total_instructors chỉ đếm role đúng bằng 'instructor'
-     * (role cũ). Các role giảng viên mới (instructor_practical, instructor_theory) và
-     * trưởng khoa KHÔNG được đếm. Nếu sau này muốn đếm cả nhóm giảng viên thì đây là
-     * quyết định nghiệp vụ riêng, và test này cần được cập nhật có chủ ý.
+     * total_instructors đếm người giữ quyền class.teach (được phân công dạy lớp), không đếm theo loại tài khoản:
+     * mọi biến thể giảng viên mặc định tính, trưởng bộ môn và giáo vụ thì không (vai trò mặc định không có quyền này).
      */
-    public function test_total_instructors_only_counts_the_legacy_instructor_role(): void
+    public function test_total_instructors_counts_class_teach_holders(): void
     {
         $before = $this->overview();
 
@@ -178,7 +193,7 @@ class AdminOverviewTest extends TestCase
 
         $after = $this->overview();
 
-        $this->assertSame(1, $after['total_instructors'] - $before['total_instructors']);
+        $this->assertSame(3, $after['total_instructors'] - $before['total_instructors']);
         $this->assertSame(4, $after['total_users'] - $before['total_users']);
     }
 }

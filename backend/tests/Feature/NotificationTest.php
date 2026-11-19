@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 class NotificationTest extends TestCase
@@ -32,7 +33,7 @@ class NotificationTest extends TestCase
             'name'            => "Notification User {$tag}",
             'email'           => 'notif_' . strtolower($tag) . '_' . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => "N{$tag}",
         ]);

@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -34,13 +35,18 @@ class AuthTest extends TestCase
                  ->assertJsonStructure([
                      'access_token',
                      'token_type',
-                     'user' => ['id', 'email', 'name', 'role', 'status'],
-                 ]);
+                     'user' => ['id', 'email', 'name', 'account_type', 'roles', 'status'],
+                 ])
+                 ->assertJsonMissingPath('user.role')
+                 ->assertJsonMissingPath('user.technical_role')
+                 ->assertJsonPath('user.account_type', 'student');
 
         $this->assertDatabaseHas('users', [
-            'email' => $payload['email'],
-            'role'  => 'student',
+            'email'        => $payload['email'],
+            'account_type' => 'student',
         ]);
+        $user = User::where('email', $payload['email'])->firstOrFail();
+        $this->assertSame(['student'], $user->accessRoles()->pluck('slug')->all(), 'nhận vai trò Sinh viên lúc đăng ký');
     }
 
     public function test_register_fails_with_duplicate_email(): void
@@ -50,7 +56,7 @@ class AuthTest extends TestCase
             'name'            => 'First User',
             'email'           => $email,
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'FU',
         ]);
@@ -80,14 +86,18 @@ class AuthTest extends TestCase
                  ->assertJsonStructure([
                      'access_token',
                      'token_type',
-                     'user' => ['id', 'email', 'name', 'role', 'department'],
-                 ]);
+                     'user' => ['id', 'email', 'name', 'account_type', 'roles', 'department'],
+                 ])
+                 ->assertJsonPath('user.account_type', 'staff');
 
         $this->assertDatabaseHas('users', [
-            'email'      => $payload['email'],
-            'role'       => 'instructor',
-            'department' => 'Software Engineering',
+            'email'        => $payload['email'],
+            'account_type' => 'staff',
+            'status'       => 'Pending',
+            'department'   => 'Software Engineering',
         ]);
+        $user = User::where('email', $payload['email'])->firstOrFail();
+        $this->assertSame(['instructor'], $user->accessRoles()->pluck('slug')->all(), 'nhận vai trò Giảng viên, hiệu lực sau khi duyệt');
     }
 
     public function test_login_success_with_valid_credentials(): void
@@ -97,7 +107,7 @@ class AuthTest extends TestCase
             'name'            => 'Active User',
             'email'           => $email,
             'hashed_password' => Hash::make('secret123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'AU',
         ]);
@@ -122,7 +132,7 @@ class AuthTest extends TestCase
             'name'            => 'Wrong Pass User',
             'email'           => $email,
             'hashed_password' => Hash::make('correct_password'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'WP',
         ]);
@@ -142,7 +152,7 @@ class AuthTest extends TestCase
             'name'            => 'Current User',
             'email'           => 'current_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'admin',
+            ...AccountFixture::for('admin'),
             'status'          => 'Active',
             'initials'        => 'CU',
         ]);
@@ -166,7 +176,7 @@ class AuthTest extends TestCase
             'name'            => 'Profile Before',
             'email'           => 'before_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'PB',
         ]);
@@ -201,7 +211,7 @@ class AuthTest extends TestCase
             'name'            => 'Reset User',
             'email'           => $email,
             'hashed_password' => Hash::make('old_pass_123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'RU',
         ]);

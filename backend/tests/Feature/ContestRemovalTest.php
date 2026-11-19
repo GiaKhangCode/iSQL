@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -60,7 +61,7 @@ class ContestRemovalTest extends TestCase
             'name'            => 'CR ' . $role . ' ' . uniqid(),
             'email'           => 'cr_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => 'Active',
             'initials'        => 'CR',
         ]);

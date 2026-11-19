@@ -19,7 +19,7 @@ class ExaminationSeeder extends Seeder
     public function run(): void
     {
         // 1. Ensure StudentIdentity rows exist for all students
-        $students = User::where('role', User::ROLE_STUDENT)->get();
+        $students = User::where('account_type', User::ACCOUNT_STUDENT)->get();
         foreach ($students as $st) {
             $local = strtolower(trim(explode('@', (string) $st->email)[0] ?? ''));
             if ($local !== '') {
@@ -38,7 +38,7 @@ class ExaminationSeeder extends Seeder
 
         // 3. Find owner (Faculty Office or Admin) & Problem QLGV01
         $owner = User::where('email', 'gvk@uit.edu.vn')->first()
-            ?? User::where('role', User::ROLE_ADMIN)->first();
+            ?? User::whereIn('id', app(\App\Services\Access\AccessControlService::class)->superAdminIds())->first();
         if (!$owner) {
             return;
         }
@@ -99,7 +99,7 @@ class ExaminationSeeder extends Seeder
             'databaseDescriptionVisible' => true,
         ]];
 
-        $instructors = User::whereIn('role', User::INSTRUCTOR_ROLES)->where('status', 'Active')->get();
+        $instructors = User::whereIn('id', app(\App\Services\Access\AccessControlService::class)->holdersOf('class.teach'))->where('status', 'Active')->get();
         $proctorIds = $instructors->pluck('id')->take(2)->values()->all();
         $proctorNames = $instructors->pluck('name')->take(2)->values()->all();
         $proctor1 = !empty($proctorNames[0]) ? [$proctorNames[0]] : ['Giảng Viên Ca 1'];

@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
@@ -55,7 +56,7 @@ class ExamAdmissionUnlockTest extends TestCase
             'name'            => "Unlock {$role}",
             'email'           => "unlock_{$role}_" . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => 'Active',
             'initials'        => 'UL',
         ]);

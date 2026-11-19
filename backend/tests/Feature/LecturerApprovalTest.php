@@ -2,33 +2,30 @@
 
 namespace Tests\Feature;
 
-use App\Models\RoleGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 /**
  * Test đặc tả cho POST /api/admin/users/{id}/approve (Admin\UserController::approve).
  *
- * Khóa các quy tắc duyệt tài khoản giảng viên trước khi bỏ đoạn truy vấn RoleGroup
- * khỏi controller (lộ trình 1.5).
+ * Khóa các quy tắc duyệt tài khoản giảng viên (vai trò mặc định gán lúc tạo, quyền hiệu lực
+ * sau khi duyệt, không nhân đôi vai trò/quyền trực tiếp).
  */
 class LecturerApprovalTest extends TestCase
 {
     use DatabaseTransactions;
 
     protected User $admin;
-    protected ?RoleGroup $lecturerGroup;
-
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->admin = $this->makeUser('admin', 'Active');
-        $this->lecturerGroup = RoleGroup::where('name', 'like', '%Giảng viên%')->first();
     }
 
     private function makeUser(string $role, string $status, string $password = 'password123'): User
@@ -37,19 +34,10 @@ class LecturerApprovalTest extends TestCase
             'name'            => "Approval {$role}",
             'email'           => "approval_{$role}_" . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make($password),
-            'role'            => $role,
+            ...AccountFixture::for($role),
             'status'          => $status,
             'initials'        => 'AP',
         ]);
-    }
-
-    private function requireLecturerGroup(): RoleGroup
-    {
-        if (!$this->lecturerGroup) {
-            $this->markTestSkipped('Chưa seed nhóm quyền Giảng viên (chạy PermissionSeeder).');
-        }
-
-        return $this->lecturerGroup;
     }
 
     // ── Phân quyền ──────────────────────────────────────────────────────────
@@ -71,9 +59,8 @@ class LecturerApprovalTest extends TestCase
 
     // ── Duyệt thành công ────────────────────────────────────────────────────
 
-    public function test_approve_activates_a_pending_lecturer_and_assigns_the_lecturer_group(): void
+    public function test_approve_activates_a_pending_lecturer_and_enables_the_lecturer_permissions(): void
     {
-        $group = $this->requireLecturerGroup();
         $pending = $this->makeUser('instructor_practical', 'Pending');
 
         Sanctum::actingAs($this->admin);
@@ -85,17 +72,18 @@ class LecturerApprovalTest extends TestCase
 
         $pending->refresh();
         $this->assertSame('Active', $pending->status);
-        $this->assertTrue($pending->roleGroups()->where('role_groups.id', $group->id)->exists());
-        $this->assertTrue($pending->canDo('CLASS_MGMT', 'add'));
+        $access = app(\App\Services\Access\AccessControlService::class);
+        $access->forget($pending->id);
+        $this->assertTrue($access->can($pending, 'problem.create'));
+        $this->assertTrue($access->can($pending, 'results.grade'));
+        $this->assertFalse($access->can($pending, 'class.manage'));
     }
 
-    public function test_approve_accepts_every_instructor_role(): void
+    public function test_approve_accepts_every_staff_account(): void
     {
-        $this->requireLecturerGroup();
-
         Sanctum::actingAs($this->admin);
 
-        foreach (User::INSTRUCTOR_ROLES as $role) {
+        foreach (['instructor', 'instructor_practical', 'instructor_theory', 'department_head', 'faculty_office'] as $role) {
             $pending = $this->makeUser($role, 'Pending');
 
             $this->postJson("/api/admin/users/{$pending->id}/approve")
@@ -104,25 +92,20 @@ class LecturerApprovalTest extends TestCase
         }
     }
 
-    public function test_approve_adds_the_group_without_removing_existing_groups_or_duplicating(): void
+    public function test_approve_keeps_existing_roles_and_direct_permissions_without_duplicating(): void
     {
-        $group = $this->requireLecturerGroup();
-        $otherGroup = RoleGroup::where('id', '!=', $group->id)->first();
-        if (!$otherGroup) {
-            $this->markTestSkipped('Cần ít nhất hai nhóm quyền trong DB.');
-        }
-
         $pending = $this->makeUser('instructor_theory', 'Pending');
-        // Đã thuộc nhóm Giảng viên và một nhóm khác từ trước.
-        $pending->roleGroups()->sync([$group->id, $otherGroup->id]);
+        $before = \Illuminate\Support\Facades\DB::table('user_access_roles')->where('user_id', $pending->id)->pluck('access_role_id')->all();
+        $this->assertNotEmpty($before, 'vai trò mặc định đã được gán từ lúc tạo tài khoản');
+        \Illuminate\Support\Facades\DB::table('user_permissions')->insert(['user_id' => $pending->id, 'permission' => 'library.manage']);
 
         Sanctum::actingAs($this->admin);
 
         $this->postJson("/api/admin/users/{$pending->id}/approve")->assertOk();
 
-        $ids = $pending->roleGroups()->pluck('role_groups.id')->all();
-        $this->assertCount(2, $ids, 'không được trùng lặp hay mất nhóm cũ');
-        $this->assertEqualsCanonicalizing([$group->id, $otherGroup->id], $ids);
+        $after = \Illuminate\Support\Facades\DB::table('user_access_roles')->where('user_id', $pending->id)->pluck('access_role_id')->all();
+        $this->assertEqualsCanonicalizing($before, $after, 'không đổi, không trùng lặp');
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('user_permissions')->where('user_id', $pending->id)->count());
     }
 
     public function test_pending_lecturer_can_log_in_only_after_approval(): void
@@ -144,11 +127,11 @@ class LecturerApprovalTest extends TestCase
 
     // ── Từ chối ─────────────────────────────────────────────────────────────
 
-    public function test_approve_rejects_non_instructor_accounts(): void
+    public function test_approve_rejects_student_accounts(): void
     {
         Sanctum::actingAs($this->admin);
 
-        foreach (['student', 'department_head', 'faculty_office', 'admin'] as $role) {
+        foreach (['student'] as $role) {
             $user = $this->makeUser($role, 'Pending');
 
             $this->postJson("/api/admin/users/{$user->id}/approve")

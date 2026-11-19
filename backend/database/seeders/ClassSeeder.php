@@ -13,8 +13,9 @@ class ClassSeeder extends Seeder
 {
     public function run(): void
     {
-        $instructors = User::whereIn('role', User::INSTRUCTOR_ROLES)->where('status', 'Active')->get();
-        $inst1 = $instructors->get(0) ?? User::where('role', 'admin')->first();
+        $access = app(\App\Services\Access\AccessControlService::class);
+        $instructors = User::whereIn('id', $access->holdersOf('class.teach'))->where('status', 'Active')->get();
+        $inst1 = $instructors->get(0) ?? User::whereIn('id', $access->superAdminIds())->first();
         $inst2 = $instructors->get(1) ?? $inst1;
         $inst3 = $instructors->get(2) ?? $inst1;
 
@@ -175,7 +176,7 @@ class ClassSeeder extends Seeder
         ClassModel::whereNotIn('id', $validIds)->delete();
 
         // 3. Phân bổ sinh viên vào các lớp thực hành
-        $students = User::where('role', User::ROLE_STUDENT)->orderBy('email')->get();
+        $students = User::where('account_type', User::ACCOUNT_STUDENT)->orderBy('email')->get();
         $classCount = count($validIds);
 
         foreach ($students as $index => $student) {
