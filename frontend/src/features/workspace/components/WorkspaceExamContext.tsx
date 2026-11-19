@@ -30,7 +30,7 @@ export function WorkspaceExamProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const source = params.get("source") || "Practice";
   const activity = params.get("context") || "";
-  const eligible = session?.role === "student" && ["Assignments", "ExamSession"].includes(source) && Boolean(activity);
+  const eligible = session?.account_type === "student" && ["Assignments", "ExamSession"].includes(source) && Boolean(activity);
   const endpoint = `/api/student/activity-attempts/${encodeURIComponent(activity)}`;
   const out = session?.examSessionId ? "/examinations" : source === "ExamSession" ? "/examinations" : `/assignments/work/${encodeURIComponent(activity)}`;
   const [attempt, setAttempt] = useState<Attempt | null>(null);

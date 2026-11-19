@@ -86,12 +86,12 @@ type ProctorNotice = {
 };
 
 export function ProctorPage() {
-  const {session} = useAuth();
+  const {session, preferredArea} = useAuth();
   if (!session) return <Navigate to="/login" replace />;
-  if (session.role === 'instructor') return <Navigate to="/teacher/exams" replace />;
+  if (preferredArea === 'teacher') return <Navigate to="/teacher/exams" replace />;
   return (
     <>
-      <RoleHeader role={session.role === 'faculty_office' ? 'office' : session.role === 'admin' ? 'admin' : 'student'} />
+      <RoleHeader role={preferredArea === 'office' ? 'office' : preferredArea === 'admin' ? 'admin' : 'student'} />
       <ProctorRoomsView />
     </>
   );
@@ -116,11 +116,10 @@ export function ProctorRoomsView({onBack}: {onBack?: () => void}) {
   const [error, setError] = useState("");
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
 
+  // Khớp backend: coi thi cần exam.proctor hoặc examination.manage (siêu quản trị có examination.manage).
   const canProctor = Boolean(
     permissions?.includes('exam.proctor') ||
-    session?.role === 'instructor' ||
-    session?.role === 'faculty_office' ||
-    session?.role === 'admin'
+    permissions?.includes('examination.manage')
   );
 
   useEffect(() => {

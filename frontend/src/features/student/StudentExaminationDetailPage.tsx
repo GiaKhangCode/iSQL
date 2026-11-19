@@ -12,7 +12,7 @@ import { toast } from "@/shared/ui/StackingToasts";
 
 export function StudentExaminationDetailPage() {
   const { session } = useAuth();
-  if (session && !session.examSessionId && session.role === "student") {
+  if (session && !session.examSessionId && session.account_type === "student") {
     return <Navigate to="/dashboard" replace />;
   }
   const { t: tr } = useLanguage("student");

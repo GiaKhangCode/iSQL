@@ -121,7 +121,9 @@ export function ManualReviewPage() {
 
   const { t: tr, locale } = useLanguage("teacher");
 
-  const { session } = useAuth();
+  const { session, permissions } = useAuth();
+  // Chỉ người giữ results.grade mới sửa được điểm; còn lại (giáo vụ, trưởng bộ môn, admin) chỉ xem.
+  const canGrade = Boolean(permissions?.includes("results.grade"));
 
   const { submissionId, activityId, studentId, problemId } = useParams();
 
@@ -222,11 +224,10 @@ export function ManualReviewPage() {
   const history = submission.attemptHistory || [];
 
   const isReadOnlyReviewer =
-    session?.role === "faculty_office" ||
+    !canGrade ||
     root === "/office" ||
     submission.canEditReview === false ||
     (Boolean(submission.regradeAssignment?.completedAt) &&
-      session?.role !== "admin" &&
       session?.id !== submission.regradeAssignment?.reviewerId);
 
   const dirty = finalScore !== (submission.finalScore == null ? "" : String(submission.finalScore)) || feedback !== (submission.feedback || "");
@@ -312,7 +313,7 @@ export function ManualReviewPage() {
         {saveError && <p role="alert" className="teacher-state-error"><TranslatedText>{tr(saveError)}</TranslatedText></p>}
 
         {isReadOnlyReviewer ? (
-          <p className="muted tiny">{root === "/office" || session?.role === "faculty_office" ? "Giáo vụ khoa chỉ có quyền xem điểm đã chấm hoặc điểm sau khi phúc khảo." : submission.canEditReview === false && !submission.regradeAssignment ? "Lần nộp này chỉ được xem để đối chiếu (không thuộc bài được phân công chấm phúc khảo)." : submission.regradeAssignment && !submission.regradeAssignment.completedAt ? "Bài nộp này đang được phân công chấm phúc khảo cho giảng viên khác." : "Bài nộp đã được chấm phúc khảo xong, không thể ghi đè."}</p>
+          <p className="muted tiny">{root === "/office" ? "Giáo vụ khoa chỉ có quyền xem điểm đã chấm hoặc điểm sau khi phúc khảo." : !canGrade ? "Tài khoản của bạn chỉ có quyền xem điểm đã chấm hoặc điểm sau khi phúc khảo." : submission.canEditReview === false && !submission.regradeAssignment ? "Lần nộp này chỉ được xem để đối chiếu (không thuộc bài được phân công chấm phúc khảo)." : submission.regradeAssignment && !submission.regradeAssignment.completedAt ? "Bài nộp này đang được phân công chấm phúc khảo cho giảng viên khác." : "Bài nộp đã được chấm phúc khảo xong, không thể ghi đè."}</p>
         ) : (
           <>
             <button type="button" className="button primary review-save-button" onClick={() => void saveReview()} disabled={submission.isSubmitted === false || isSaving || !finalScore.trim() || (!dirty && submission.finalScore != null && submission.status !== "Awaiting regrade" && !(Boolean(submission.regradeAssignment) && !submission.regradeAssignment?.completedAt))}><Save size={15} /><TranslatedText>{tr(isSaving ? "Saving..." : "Save review")}</TranslatedText></button>

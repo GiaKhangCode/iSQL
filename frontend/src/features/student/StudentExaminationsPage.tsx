@@ -26,7 +26,7 @@ const EXAM_PAGE_SIZE = 10;
 
 export function StudentExaminationsPage() {
   const { session } = useAuth();
-  if (session && !session.examSessionId && session.role === "student") {
+  if (session && !session.examSessionId && session.account_type === "student") {
     return <Navigate to="/dashboard" replace />;
   }
   const { t: tr, locale: uiLocale } = useLanguage("student");
