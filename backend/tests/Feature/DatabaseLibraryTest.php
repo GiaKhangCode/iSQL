@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
 use Tests\TestCase;
 
 class DatabaseLibraryTest extends TestCase
@@ -27,7 +28,7 @@ class DatabaseLibraryTest extends TestCase
             'name'            => 'Admin Lib Test',
             'email'           => 'admin_lib_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'admin',
+            ...AccountFixture::for('admin'),
             'status'          => 'Active',
             'initials'        => 'AL',
         ]);
@@ -36,7 +37,7 @@ class DatabaseLibraryTest extends TestCase
             'name'            => 'Instructor One',
             'email'           => 'inst1_lib_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor',
+            ...AccountFixture::for('instructor'),
             'status'          => 'Active',
             'initials'        => 'I1',
         ]);
@@ -45,7 +46,7 @@ class DatabaseLibraryTest extends TestCase
             'name'            => 'Instructor Two',
             'email'           => 'inst2_lib_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor',
+            ...AccountFixture::for('instructor'),
             'status'          => 'Active',
             'initials'        => 'I2',
         ]);
@@ -54,7 +55,7 @@ class DatabaseLibraryTest extends TestCase
             'name'            => 'Student Lib Test',
             'email'           => 'student_lib_' . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'SL',
         ]);
@@ -253,5 +254,195 @@ class DatabaseLibraryTest extends TestCase
         $pageRes->assertJsonStructure(['data', 'total', 'currentPage', 'lastPage', 'perPage']);
         $this->assertCount(2, $pageRes->json('data'));
     }
-}
 
+    private function makeEntry(?User $owner, string $title, array $extra = []): DatabaseLibraryEntry
+    {
+        return DatabaseLibraryEntry::create($extra + [
+            'id'               => (string) Str::uuid(),
+            'instructor_id'    => $owner?->id,
+            'title'            => $title,
+            'create_table_sql' => 'CREATE TABLE T (id INT);',
+            'revision'         => 1,
+        ]);
+    }
+
+    public function test_scope_all_shows_own_and_system_but_not_others(): void
+    {
+        $mine = $this->makeEntry($this->instructor1, 'Scope Mine ' . uniqid());
+        $system = $this->makeEntry(null, 'Scope System ' . uniqid());
+        $others = $this->makeEntry($this->instructor2, 'Scope Others ' . uniqid());
+
+        Sanctum::actingAs($this->instructor1);
+        $ids = collect($this->getJson('/api/teacher/database-library')->assertOk()->json())->pluck('id');
+        $this->assertTrue($ids->contains($mine->id));
+        $this->assertTrue($ids->contains($system->id));
+        $this->assertFalse($ids->contains($others->id));
+
+        Sanctum::actingAs($this->adminUser);
+        $ids = collect($this->getJson('/api/teacher/database-library')->assertOk()->json())->pluck('id');
+        $this->assertTrue($ids->contains($mine->id));
+        $this->assertTrue($ids->contains($others->id));
+    }
+
+    public function test_instructor_can_view_but_not_edit_or_delete_system_entry(): void
+    {
+        $system = $this->makeEntry(null, 'System Template');
+
+        Sanctum::actingAs($this->instructor1);
+        $this->getJson("/api/teacher/database-library/{$system->id}")->assertOk();
+        $this->putJson("/api/teacher/database-library/{$system->id}", ['title' => 'X'])->assertStatus(403);
+        $this->deleteJson("/api/teacher/database-library/{$system->id}")->assertStatus(403);
+        $this->assertDatabaseHas('database_library_entries', ['id' => $system->id, 'title' => 'System Template']);
+    }
+
+    public function test_show_update_destroy_return_404_for_unknown_id(): void
+    {
+        Sanctum::actingAs($this->instructor1);
+        $id = (string) Str::uuid();
+        $this->getJson("/api/teacher/database-library/{$id}")->assertStatus(404);
+        $this->putJson("/api/teacher/database-library/{$id}", ['title' => 'X'])->assertStatus(404);
+        $this->deleteJson("/api/teacher/database-library/{$id}")->assertStatus(404);
+    }
+
+    public function test_store_requires_title_and_sets_revision_one_and_owner(): void
+    {
+        Sanctum::actingAs($this->instructor1);
+        $this->postJson('/api/teacher/database-library', [])->assertStatus(422)->assertJsonValidationErrors(['title']);
+
+        $res = $this->postJson('/api/teacher/database-library', [
+            'title'               => '  Padded Title  ',
+            'create_table_sql'    => 'CREATE TABLE A (id INT);',
+            'insert_into_sql'     => 'INSERT INTO A VALUES (1);',
+            'insertIntoFileName'  => 'a.sql',
+        ])->assertStatus(201);
+
+        $this->assertSame('Padded Title', $res->json('title'));
+        $this->assertSame(1, $res->json('revision'));
+        $this->assertSame('CREATE TABLE A (id INT);', $res->json('createTableSql'));
+        // Không gửi datasets: dựng từ insert_into_*.
+        $this->assertSame([['fileName' => 'a.sql', 'sql' => 'INSERT INTO A VALUES (1);']], $res->json('datasets'));
+        $this->assertDatabaseHas('database_library_entries', [
+            'id' => $res->json('id'), 'instructor_id' => $this->instructor1->id,
+        ]);
+    }
+
+    public function test_update_is_partial_and_bumps_revision(): void
+    {
+        $entry = $this->makeEntry($this->instructor1, 'Original', [
+            'database_file_name' => 'orig.sql',
+            'create_table_sql'   => 'CREATE TABLE Keep (id INT);',
+        ]);
+
+        Sanctum::actingAs($this->instructor1);
+        $res = $this->putJson("/api/teacher/database-library/{$entry->id}", ['title' => ' Renamed '])->assertOk();
+
+        $this->assertSame('Renamed', $res->json('title'));
+        $this->assertSame('orig.sql', $res->json('databaseFileName'));
+        $this->assertSame('CREATE TABLE Keep (id INT);', $res->json('createTableSql'));
+        $this->assertSame(2, $res->json('revision'));
+    }
+
+    public function test_update_datasets_drive_insert_into_fields(): void
+    {
+        $entry = $this->makeEntry($this->instructor1, 'DS');
+
+        Sanctum::actingAs($this->instructor1);
+        $res = $this->putJson("/api/teacher/database-library/{$entry->id}", [
+            'datasets' => [['fileName' => 'one.sql', 'sql' => 'INSERT INTO T VALUES (1);']],
+        ])->assertOk();
+
+        $this->assertSame('one.sql', $res->json('insertIntoFileName'));
+        $this->assertSame('INSERT INTO T VALUES (1);', $res->json('insertIntoSql'));
+    }
+
+    public function test_update_with_stale_expected_revision_returns_409_and_changes_nothing(): void
+    {
+        $entry = $this->makeEntry($this->instructor1, 'Locked');
+
+        Sanctum::actingAs($this->instructor1);
+        $res = $this->putJson("/api/teacher/database-library/{$entry->id}", [
+            'title' => 'Stale', 'expectedRevision' => 5,
+        ])->assertStatus(409);
+        $this->assertNotEmpty($res->json('detail'));
+        $this->assertSame('Locked', $entry->fresh()->title);
+        $this->assertSame(1, $entry->fresh()->revision);
+
+        $this->putJson("/api/teacher/database-library/{$entry->id}", [
+            'title' => 'Fresh', 'expected_revision' => 1,
+        ])->assertOk();
+        $this->assertSame(2, $entry->fresh()->revision);
+    }
+
+    public function test_bundle_is_only_replaced_when_sent(): void
+    {
+        $entry = $this->makeEntry($this->instructor1, 'Bundle', ['bundle_json' => ['k' => 'v']]);
+
+        Sanctum::actingAs($this->instructor1);
+        $this->putJson("/api/teacher/database-library/{$entry->id}", ['title' => 'B2'])->assertOk();
+        $this->assertSame(['k' => 'v'], $entry->fresh()->bundle_json);
+
+        $this->putJson("/api/teacher/database-library/{$entry->id}", ['bundle' => ['k' => 'w']])->assertOk();
+        $this->assertSame(['k' => 'w'], $entry->fresh()->bundle_json);
+    }
+
+    // ───────────────────────── quyền theo vai trò mới (capability), không theo loại tài khoản ─────────────────────────
+
+    /** Thay toàn bộ vai trò của người dùng bằng một vai trò tùy chỉnh chỉ có các quyền cho trước. */
+    private function onlyPermissions(User $user, array $permissions): User
+    {
+        \Illuminate\Support\Facades\DB::table('user_access_roles')->where('user_id', $user->id)->delete();
+        $role = \App\Models\AccessRole::create(['name' => 'Test ' . uniqid(), 'is_super' => false]);
+        $role->syncPermissions($permissions);
+        $user->accessRoles()->attach($role->id);
+        app(\App\Services\Access\AccessControlService::class)->forget();
+
+        return $user;
+    }
+
+    public function test_a_student_account_with_library_manage_role_can_use_the_library(): void
+    {
+        $user = $this->onlyPermissions($this->studentUser, ['library.manage']);
+        $this->assertSame('student', $user->account_type, 'loại tài khoản không đổi, quyền đến từ vai trò');
+
+        Sanctum::actingAs($user);
+        $this->postJson('/api/teacher/database-library', ['title' => 'Từ vai trò mới'])->assertStatus(201);
+        $this->getJson('/api/teacher/database-library')->assertOk();
+    }
+
+    public function test_an_instructor_account_without_library_permissions_is_denied(): void
+    {
+        $user = $this->onlyPermissions($this->instructor1, ['practice.solve']);
+        $this->assertSame('staff', $user->account_type);
+
+        Sanctum::actingAs($user);
+        $this->getJson('/api/teacher/database-library')->assertStatus(403);
+        $this->postJson('/api/teacher/database-library', ['title' => 'X'])->assertStatus(403);
+        $this->postJson('/api/teacher/database-library/test-run', ['createTableSql' => 'CREATE TABLE A (id INT);'])->assertStatus(403);
+    }
+
+    public function test_problem_create_alone_can_read_but_not_change_the_library(): void
+    {
+        $entry = $this->makeEntry(null, 'Mẫu hệ thống để đọc');
+        $user = $this->onlyPermissions($this->instructor2, ['problem.create']);
+
+        Sanctum::actingAs($user);
+        $ids = collect($this->getJson('/api/teacher/database-library')->assertOk()->json())->pluck('id');
+        $this->assertTrue($ids->contains($entry->id));
+        $this->getJson("/api/teacher/database-library/{$entry->id}")->assertOk();
+        $this->postJson('/api/teacher/database-library', ['title' => 'X'])->assertStatus(403);
+        $this->putJson("/api/teacher/database-library/{$entry->id}", ['title' => 'X'])->assertStatus(403);
+        $this->deleteJson("/api/teacher/database-library/{$entry->id}")->assertStatus(403);
+    }
+
+    public function test_super_admin_scope_comes_from_the_admin_role_and_can_edit_system_entries(): void
+    {
+        $system = $this->makeEntry(null, 'Mẫu hệ thống sửa bởi admin');
+
+        Sanctum::actingAs($this->adminUser);
+        $this->putJson("/api/teacher/database-library/{$system->id}", ['title' => 'Đã sửa'])->assertOk();
+
+        // Người có library.manage nhưng không phải siêu quản trị không sửa được mẫu hệ thống.
+        Sanctum::actingAs($this->instructor1);
+        $this->putJson("/api/teacher/database-library/{$system->id}", ['title' => 'Không được'])->assertStatus(403);
+    }
+}
