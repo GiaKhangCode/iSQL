@@ -67,11 +67,11 @@ export const RoleEditor: React.FC<RoleEditorProps> = ({ role, groups, template, 
           )}
           <p className="role-editor-sub">
             {readOnly
-              ? "Quản trị viên luôn có toàn bộ quyền và không thể chỉnh sửa."
+              ? "Vai trò Quản trị luôn có toàn bộ quyền (trừ chấm bài) và không thể chỉnh sửa."
               : isSystem
                 ? "Vai trò có sẵn: áp dụng cho mọi tài khoản cùng loại, cộng với các vai trò khác được gán thêm."
                 : role
-                  ? "Người được gán vai trò này nhận thêm các quyền được bật bên dưới."
+                  ? "Người được gán vai trò này nhận các quyền được bật bên dưới; một người có thể giữ nhiều vai trò."
                   : "Đặt tên, rồi bật những việc vai trò này được phép làm."}
           </p>
         </div>
@@ -94,7 +94,7 @@ export const RoleEditor: React.FC<RoleEditorProps> = ({ role, groups, template, 
       <PermissionPicker groups={groups} value={permissions} onChange={setPermissions} readOnly={readOnly || busy} />
 
       <p className="role-footnote">
-        Quản lý người dùng, lớp học và duyệt giảng viên hiện chỉ dành cho Quản trị viên nên chưa thể cấp qua vai trò.
+        Quyền ở đây quyết định menu và chức năng hiển thị; việc áp dụng ở từng API đang được chuyển dần sang cơ chế này. Người giữ vai trò tự vào đúng khu vực (Quản trị, Giáo vụ, Giảng viên hoặc Sinh viên) theo các quyền được bật, không cần chọn riêng.
       </p>
 
       <div className="role-editor-actions" role="group" aria-label="Thao tác vai trò">

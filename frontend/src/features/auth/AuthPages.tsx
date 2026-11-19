@@ -23,13 +23,13 @@ export function LoginPage() {
     intended && /^\/teacher(?:\/|\?|#|$)/.test(intended) ? intended : null;
   const adminDestination =
     intended && /^\/admin(?:\/|\?|#|$)/.test(intended) ? intended : null;
-  const destination =
+  const intendedStudentPath =
     intended &&
     /^\/(dashboard|practice|workspace|assignments|submissions)(\/|\?|#|$)/.test(
       intended,
     )
       ? intended
-      : "/dashboard";
+      : null;
   async function signIn() {
     if (busy) return;
     setErrors({});
@@ -50,16 +50,9 @@ export function LoginPage() {
         navigate("/examinations", { replace: true });
         return;
       }
-      navigate(
-        user.role === "faculty_office"
-          ? "/office/examinations"
-          : user.role === "admin"
-          ? adminDestination || "/admin/overview"
-          : user.role === "instructor"
-            ? teacherDestination || "/teacher/problems"
-            : destination,
-        { replace: true },
-      );
+      // Khu vực của người dùng do vai trò quyết định (tải sau đăng nhập): nếu đích mong muốn không thuộc
+      // khu vực họ được vào, route guard sẽ chuyển về trang chủ của khu vực ưu tiên.
+      navigate(teacherDestination || adminDestination || intendedStudentPath || "/", { replace: true });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Sign-in failed. Try again.");
     } finally {

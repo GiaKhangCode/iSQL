@@ -9,9 +9,10 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/app/providers/AuthContext";
 import { APP_NAME } from "@/data/models";
+import { AREA_LABELS, homeForArea, type Area } from "@/shared/lib/access/areas";
 import { findMatchingTab, getTabSession, isPathMatchingTab, setTabSession } from "@/shared/lib/tabSession";
 
-type Role = "student" | "teacher" | "office" | "admin";
+type Role = Area;
 const links: Record<Role, [string, string][]> = {
   student: [["Dashboard", "/dashboard"], ["Assignments", "/assignments"], ["Submissions", "/submissions"]],
   teacher: [["Problems", "/teacher/problems"], ["Database library", "/teacher/database-library"], ["Assignments", "/teacher/assignments"], ["Classes", "/teacher/classes"], ["Examinations", "/teacher/exams"], ["Results", "/teacher/results"], ["Statistics", "/teacher/statistics"], ["Regrade", "/teacher/regrade"]],
@@ -22,7 +23,7 @@ const links: Record<Role, [string, string][]> = {
 export function RoleHeader({ role, workspace, workspaceActions, workspaceProblemNavigation }: { role: Role; workspaceActions?: ReactNode; workspaceProblemNavigation?: ReactNode; workspace?: { title: string; number: string; topic: string; source?: string; context?: string; backTo?: string } }) {
   const { t: tr } = useLanguage("common");
   const { t } = useLanguage();
-  const { session, logout, permissions } = useAuth();
+  const { session, logout, permissions, areas, chooseArea } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [hasProctorDuty,setHasProctorDuty]=useState(false);
@@ -36,10 +37,10 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
     };
     void refresh();const timer=setInterval(()=>void refresh(),30000);return()=>{active=false;clearInterval(timer);};
   },[session?.id,permissions?.join("|")]);
-  const required:Record<string,string>={"/teacher/problems":"problem.create","/teacher/database-library":"library.manage","/teacher/assignments":"assignment.create","/teacher/results":"results.grade","/teacher/statistics":"results.grade","/office/examinations":"examination.manage","/office/sessions":"examination.manage","/office/results":"results.grade","/office/statistics":"results.grade","/office/regrade":"examination.manage","/teacher/regrade":"results.grade","/teacher/regrade-assignments":"examination.manage","/admin/regrade":"examination.manage"};
+  const required:Record<string,string>={"/teacher/problems":"problem.create","/teacher/database-library":"library.manage","/teacher/assignments":"assignment.create","/teacher/results":"results.grade","/teacher/statistics":"results.grade","/office/examinations":"examination.manage","/office/sessions":"examination.manage","/office/results":"examination.manage","/office/statistics":"examination.manage","/office/regrade":"examination.manage","/teacher/regrade":"results.grade","/teacher/regrade-assignments":"examination.manage","/admin/regrade":"examination.manage"};
   const baseLinks=links[role].filter(([,path])=>!required[path]||permissions?.includes(required[path]));
   const extraLinks:[string,string][]=[];
-  if(role==="teacher" && session?.technical_role==="department_head" && permissions?.includes("examination.manage")){
+  if(role==="teacher" && permissions?.includes("examination.manage")){
     extraLinks.push(["Regrade assignment","/teacher/regrade-assignments"]);
   }
   const proctorLink: [string,string][] = role!=='teacher'&&hasProctorDuty?[["Proctoring","/proctor"]]:[];
@@ -113,7 +114,7 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
       window.removeEventListener("resize", updateIndicator);
     };
   }, [location.pathname, role, menuOpen, workspace,hasProctorDuty,permissions?.join("|")]);
-  const accountRole = session?.role === "instructor" ? "Lecturer" : session?.role === "faculty_office" ? "Faculty office" : session?.role === "admin" ? "Admin" : "Student";
+  const accountRole = AREA_LABELS[role];
   const home = role === "admin" ? "/admin/overview" : links[role][0][1];
   return <header className={`global-header role-header u267-header role-${role}${workspace ? " workspace-header" : ""}`}>
     <Link className="brand" to={home} aria-label={`${APP_NAME} · ${t("Home")}`}><img src="/favicon.svg" width="40" height="40" alt="" /><span className="brand-name">{APP_NAME}</span></Link>
@@ -156,6 +157,9 @@ export function RoleHeader({ role, workspace, workspaceActions, workspaceProblem
       </button>
       {accountOpen && <div id="role-account-menu" className="role-account-menu u219-account-menu" role="region" aria-label={t("Account settings")}>
         <b><TranslatedText>{session?.name || t("Account")}</TranslatedText></b>
+        {!workspace && !session?.examSessionId && areas && areas.length > 1 && <div className="area-switch" role="group" aria-label={t("Switch area")}>
+          {areas.map(area => <button key={area} type="button" aria-pressed={area === role} disabled={area === role} onClick={() => { chooseArea(area); navigate(homeForArea(area)); }}><TranslatedText>{t(AREA_LABELS[area])}</TranslatedText></button>)}
+        </div>}
         {role === "student" && !session?.examSessionId && <Link to="/profile"><TranslatedText>{tr("Profile")}</TranslatedText></Link>}
         <AppearanceSettings />
         {!workspace && <button type="button" data-workspace-exit onClick={() => { logout(); navigate("/login", { replace: true }); }}><LogOut size={16} /><TranslatedText>{t("Log out")}</TranslatedText></button>}

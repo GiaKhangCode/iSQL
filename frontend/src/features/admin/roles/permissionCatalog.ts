@@ -15,7 +15,7 @@ export interface PermissionGroup {
   permissions: PermissionMeta[];
 }
 
-/** Human-readable catalog of the capability codes the backend enforces (`PERMISSIONS` in access_control.py). */
+/** Human-readable catalog of the capability codes the backend knows (`PermissionCatalog::PERMISSIONS`). */
 const GROUPS: PermissionGroup[] = [
   {
     id: "practice",
@@ -53,7 +53,18 @@ const GROUPS: PermissionGroup[] = [
     hint: "Kết quả học tập",
     permissions: [
       { code: "results.grade", label: "Chấm bài và xem kết quả", description: "Xem bài làm, chấm điểm, công bố điểm và phúc khảo trong phạm vi được phụ trách." },
-      { code: "statistics.all", label: "Thống kê mọi lớp", description: "Xem thống kê điểm của tất cả các lớp (dành cho trưởng bộ môn)." },
+      { code: "results.view_all", label: "Xem kết quả mọi lớp", description: "Xem bài làm và thống kê của tất cả các lớp, không chấm điểm (dành cho trưởng bộ môn)." },
+    ],
+  },
+  {
+    id: "people",
+    label: "Lớp học & người dùng",
+    hint: "Thường dành cho quản trị",
+    permissions: [
+      { code: "class.manage", label: "Quản lý lớp học", description: "Tạo lớp, thêm sinh viên vào lớp và phân công giảng viên." },
+      { code: "class.teach", label: "Giảng dạy lớp", description: "Được phân công giảng dạy lớp (lý thuyết hoặc thực hành); có tên trong danh sách chọn giảng viên." },
+      { code: "student.reset_password", label: "Đặt lại mật khẩu sinh viên", description: "Đặt lại mật khẩu cho sinh viên trong lớp mình dạy." },
+      { code: "user.manage", label: "Quản lý người dùng", description: "Tạo, sửa, duyệt và khóa tài khoản người dùng." },
     ],
   },
   {

@@ -4,7 +4,6 @@ import {ExamLoginPage} from "@/features/office/ExamSessionApp";
 import {apiFetch, ApiError} from "@/shared/api/apiClient";
 import {ProctorPage, ProctorRoomsView} from "@/features/office/ProctorPage";
 import {AdminAccessPage} from "@/features/admin/AccessPages";
-import {homeForRole} from "@/features/auth/authService";
 import {ExaminationsPage} from "@/features/office/ExaminationsPage";
 import {ExamAdmissionsPage} from "@/features/office/ExamAdmissionsPage";
 import {RegradeAssignmentsPage} from "@/features/office/RegradeAssignmentsPage";
@@ -25,6 +24,7 @@ import {
   PublicOnlyRoute,
   TeacherRoute,
   OfficeRoute,
+  HomeRedirect,
 } from "@/app/routes/ProtectedRoute";
 import {
   ForgotPasswordPage,
@@ -108,7 +108,6 @@ export function App() {
       window.clearInterval(timer);
     };
   }, [session?.examSessionId, location.pathname, navigate]);
-  const home = session?.examSessionId ? "/examinations" : homeForRole(session?.role);
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -117,7 +116,7 @@ export function App() {
       <Routes>
         <Route
           path="/"
-          element={<Navigate replace to={session ? home : "/login"} />}
+          element={<HomeRedirect />}
         />
         <Route path="/exam-login" element={<ExamLoginPage/>}/>
         <Route path="/proctor" element={<ProctorPage/>}/>
@@ -207,11 +206,11 @@ export function App() {
             <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ExamSessionsListPage/></CapabilityGuard>}/>
             <Route path="sessions/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExamSessionBuilderPage/></CapabilityGuard>}/>
             <Route path="regrade" element={<CapabilityGuard permission="examination.manage"><RegradeAssignmentsPage/></CapabilityGuard>}/>
-            <Route path="results" element={<CapabilityGuard permission="results.grade"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
-            <Route path="statistics" element={<CapabilityGuard permission="results.grade"><OfficeStatisticsPage/></CapabilityGuard>}/>
-            <Route path="results/activity/:activityId" element={<CapabilityGuard permission="results.grade"><ActivityResultsPage/></CapabilityGuard>}/>
-            <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="results.grade"><ManualReviewPage/></CapabilityGuard>}/>
-            <Route path="results/review/:submissionId" element={<CapabilityGuard permission="results.grade"><ManualReviewPage/></CapabilityGuard>}/>
+            <Route path="results" element={<CapabilityGuard permission="examination.manage"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
+            <Route path="statistics" element={<CapabilityGuard permission="examination.manage"><OfficeStatisticsPage/></CapabilityGuard>}/>
+            <Route path="results/activity/:activityId" element={<CapabilityGuard permission="examination.manage"><ActivityResultsPage/></CapabilityGuard>}/>
+            <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="examination.manage"><ManualReviewPage/></CapabilityGuard>}/>
+            <Route path="results/review/:submissionId" element={<CapabilityGuard permission="examination.manage"><ManualReviewPage/></CapabilityGuard>}/>
           </Route>
         </Route>
         <Route element={<AdminRoute />}>
@@ -244,7 +243,7 @@ export function App() {
         </Route>
         <Route
           path="*"
-          element={<Navigate replace to={session ? home : "/login"} />}
+          element={<HomeRedirect />}
         />
       </Routes>
     </>
