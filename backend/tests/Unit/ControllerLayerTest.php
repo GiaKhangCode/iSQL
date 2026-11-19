@@ -31,10 +31,6 @@ class ControllerLayerTest extends TestCase
         // Giai đoạn 1: CRUD nhỏ
         // Giai đoạn 2: mức vừa
         // Giai đoạn 3: controller lớn
-        'RegradeAssignmentController.php'       => 38,
-        'Student/ActivityAttemptController.php' => 18,
-        'ExamLoginProctorController.php'        => 59,
-        'SubmissionController.php'              => 72,
     ];
 
     private static function controllersDir(): string
