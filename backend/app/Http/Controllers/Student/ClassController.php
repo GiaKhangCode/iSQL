@@ -16,8 +16,6 @@ class ClassController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        abort_unless($request->user()->role === User::ROLE_STUDENT, 403, 'Only students can view their enrolled classes here.');
-
         return response()->json($this->classService->getStudentClasses($request->user()->id));
     }
 }

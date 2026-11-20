@@ -200,38 +200,28 @@ Sau khi chạy `db:seed`, bạn có thể sử dụng ngay các tài khoản sau
 
 ---
 
-## 🛡️ Hệ Thống Ma Trận Phân Quyền (RBAC Permission Matrix)
+## 🛡️ Hệ Thống Phân Quyền (RBAC theo capability)
 
-Hệ thống kết hợp ma trận phân quyền động dựa trên các Chức năng (**Functions**) và Hành động (**Actions**):
+Một **vai trò** là tập các mã quyền (`practice.solve`, `problem.create`, `assignment.create`, `results.grade`, `class.manage`, `user.manage`, `access.manage`...). Một người có thể giữ nhiều vai trò; quyền hiệu lực = hợp các vai trò + quyền gán trực tiếp. Vai trò **Admin** là siêu quản trị (có mọi quyền trừ `results.grade` và `class.teach`: admin không chấm bài và không phải giảng viên đứng lớp). Khu vực giao diện (`student|teacher|office|admin`) được suy ra từ quyền, xem `GET /api/auth/permissions`. Quản trị vai trò qua `/api/admin/access*` (trang **Roles** của admin).
 
-### 1. Bảng Chức Năng (Functions)
-- `USER_MGMT`: Quản lý tài khoản người dùng, duyệt giảng viên, import CSV.
-- `PERMISSION_MGMT`: Cấu hình vai trò chi tiết, nhóm quyền và gán quyền người dùng.
-- `CLASS_MGMT`: Quản lý lớp học, phân công giảng viên lý thuyết/thực hành, quản lý danh sách sinh viên.
-- `PROBLEM_MGMT`: Soạn thảo và quản lý kho bài tập thực hành SQL.
-- `ASSIGNMENT_MGMT`: Quản lý kỳ thi, bài kiểm tra, cấu hình sandbox và chấm điểm.
-- `PRACTICE_MGMT`: Luyện tập truy vấn SQL và nộp bài cá nhân.
-
-### 2. Các hành động (Actions)
-Mỗi quyền được phân tách thành 5 hành vi độc lập: `view` (Xem), `add` (Thêm), `edit` (Sửa), `delete` (Xóa), `download` (Tải về/Export).
-
-### 3. Quy tắc đăng ký tài khoản
-- **Sinh viên (`POST /api/auth/register`):** Tự động kích hoạt (`status = 'Active'`) và gán vào Nhóm quyền **Sinh viên**.
-- **Giảng viên (`POST /api/auth/register-lecturer`):** Đăng ký ở trạng thái chờ duyệt (`status = 'Pending'`). Sau khi Quản trị viên duyệt (`POST /api/admin/users/{id}/approve`), tài khoản được chuyển sang `Active` và tự động gán vào Nhóm quyền **Giảng viên**.
+### Quy tắc đăng ký tài khoản
+- **Sinh viên (`POST /api/auth/register`):** Tự động kích hoạt (`status = 'Active'`) và nhận vai trò mặc định **Sinh viên**.
+- **Giảng viên (`POST /api/auth/register-lecturer`):** Đăng ký ở trạng thái chờ duyệt (`status = 'Pending'`). Sau khi Quản trị viên duyệt (`POST /api/admin/users/{id}/approve`), tài khoản được chuyển sang `Active` và dùng vai trò mặc định **Giảng viên** (đã gán lúc tạo tài khoản).
 
 ---
 
 ## 📡 Danh Mục API Endpoints Chính
 
-- `/api/auth/*`: Đăng nhập, Đăng ký sinh viên/giảng viên, Quên mật khẩu qua OTP email, Thông tin cá nhân (`/me`), Ma trận quyền cá nhân (`/my-permissions`).
+- `/api/auth/*`: Đăng nhập, Đăng ký sinh viên/giảng viên, Quên mật khẩu qua OTP email, Thông tin cá nhân (`/me`), Quyền hiệu lực và khu vực giao diện (`/permissions`).
 - `/api/admin/users/*`: Quản lý người dùng, nhập danh sách qua CSV, duyệt giảng viên, reset mật khẩu sinh viên.
 - `/api/admin/courses` & `/api/admin/terms`: Quản lý danh mục Môn học và Học kỳ.
-- `/api/admin/roles` & `/api/admin/role-groups`: Quản trị ma trận phân quyền chi tiết.
+- `/api/admin/access*`: Quản trị vai trò, quyền và gán vai trò cho tài khoản.
 - `/api/teacher/classes/*`: Quản lý lớp học, phân công giảng viên, quản lý danh sách sinh viên lớp.
 - `/api/student/*`: Dashboard tiến độ học tập cá nhân, danh sách lớp theo học, database cá nhân.
 - `/api/problems/*`: Ngân hàng bài tập SQL (CRUD, chạy thử câu lệnh, nộp bài chấm điểm).
 - `/api/assignments/*` & `/api/examinations/*`: Quản lý kỳ thi, ca thi, giám thị, liên kết lớp học, cấu hình bài thi DDL/DML/Query.
-- `/api/contests/*`: **Sandbox phòng thi SQL Server** (khởi tạo schema, chạy DDL/DML/Query, nộp bài).
+- `/api/exam-sessions/*`: **Sandbox phòng thi SQL Server** của ca thi (khởi tạo schema, chạy DDL/DML/Query, nộp bài).
+- `/api/notifications/*` & `/api/sharing/*`: Thông báo (chuông) và chia sẻ bài toán/thư viện CSDL giữa giảng viên.
 - `/api/submissions/*` & `/api/regrade-assignments/*`: Lịch sử nộp bài, chấm bài, công bố/ẩn điểm và phân công phúc khảo.
 
 ---

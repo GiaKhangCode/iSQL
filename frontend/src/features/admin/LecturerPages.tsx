@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Dialog, Loading } from "@/shared/ui/ui";
 import { adminCapabilities, defaultAdminRolePolicy, type AdminClass, type AdminRoleName } from "@/data/adminPolicy";
-import { adminService } from "@/features/admin/adminService";
+import { adminService, lecturerOptionsFor, type InstructorOption } from "@/features/admin/adminService";
 
 import { PageIntro, Split, Field, Notice, AddUserDialog, BulkImportDialog, BulkImportMembersDialog, AdminListPagination } from "@/features/admin/AdminShared";
 
@@ -143,7 +143,7 @@ export function AdminLecturersPage() {
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [lecturer, setLecturer] = useState("Unassigned");
   const [notice, setNotice] = useState("");
-  const [lecturers, setLecturers] = useState<{name: string, id: string}[]>([]);
+  const [lecturers, setLecturers] = useState<InstructorOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -151,8 +151,8 @@ export function AdminLecturersPage() {
   useEffect(() => {
     Promise.all([
       adminService.getClasses(),
-      adminService.getUsers()
-    ]).then(([classes, users]) => {
+      adminService.getInstructors()
+    ]).then(([classes, instructors]) => {
       const sorted = [...classes];
       setAssignments(sorted);
       if (sorted.length > 0 && !selectedId) {
@@ -162,7 +162,7 @@ export function AdminLecturersPage() {
         const cls = sorted.find(c => c.id === selectedId);
         if (cls) setLecturer(cls.lecturerId || "Unassigned");
       }
-      setLecturers(users.filter((user: any) => user.role.toLowerCase() === "lecturer" || user.role === "instructor").map((user: any) => ({ name: user.name, id: user.id })));
+      setLecturers(instructors);
     }).catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load classes and lecturers.")).finally(() => setLoading(false));
   }, []);
 
@@ -187,7 +187,7 @@ export function AdminLecturersPage() {
     </PageIntro>{notice && <Notice><TranslatedText>{tr(notice)}</TranslatedText></Notice>}
     {loading ? <Loading variant="table" columns={4} label={tr("Loading classes and lecturers…")} /> : loadError ? <p className="admin-notice" role="alert"><TranslatedText>{tr(loadError)}</TranslatedText></p> : assignments.length === 0 ? <p className="admin-muted"><TranslatedText>{tr("No classes are available for lecturer assignment.")}</TranslatedText></p> :
     <Split main={<div className="admin-table-wrap sticky-list-table-wrap"><Table className="admin-table sticky-list-table admin-lecturer-table"><thead><tr><th><TranslatedText>{tr("CLASS")}</TranslatedText></th><th><TranslatedText>{tr("CURRENT LECTURER")}</TranslatedText></th><th><TranslatedText>{tr("STATUS")}</TranslatedText></th></tr></thead><tbody>{assignments.map((item) => <TableRow selected={item.id === selectedId} key={item.id} className={item.id === selectedId ? "is-selected" : ""} onClick={() => { setSelectedId(item.id); setLecturer(item.lecturerId || "Unassigned"); }}><td data-label={tr("CLASS")}><b>{item.id}</b></td><td data-label={tr("CURRENT LECTURER")} className={item.lecturer === "Unassigned" ? "admin-warning" : ""}>{item.lecturer}</td><td data-label={tr("STATUS")}><TranslatedText>{item.lecturer === "Unassigned" ? tr("Needs lecturer") : tr("Assigned")}</TranslatedText></td></TableRow>)}</tbody></Table></div>} side={selected ? <>
-      <h2><TranslatedText>{tr("Assign")}</TranslatedText> {selected.id}</h2><p className="admin-muted">{selected.course.split(" · ")[1] || selected.course} · {selected.semester} · {selected.students} <TranslatedText>{tr("student")}</TranslatedText><TranslatedText>{selected.students === 1 ? "" : tr("s")}</TranslatedText></p><Field label={tr("LECTURER")}><Select value={lecturer} onChange={(e) => setLecturer(e.target.value)}><option value="Unassigned">{tr("Unassigned")}</option>{lecturers.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</Select></Field><div className="admin-detail-divider" /><h3 className="admin-subheading"><TranslatedText>{tr("Access preview")}</TranslatedText></h3><p className="admin-muted"><TranslatedText>{tr("The selected lecturer can manage assignments, view class results and review submissions after assignment is saved.")}</TranslatedText></p>
+      <h2><TranslatedText>{tr("Assign")}</TranslatedText> {selected.id}</h2><p className="admin-muted">{selected.course.split(" · ")[1] || selected.course} · {selected.semester} · {selected.students} <TranslatedText>{tr("student")}</TranslatedText><TranslatedText>{selected.students === 1 ? "" : tr("s")}</TranslatedText></p><Field label={tr("LECTURER")}><Select value={lecturer} onChange={(e) => setLecturer(e.target.value)}><option value="Unassigned">{tr("Unassigned")}</option>{lecturerOptionsFor(lecturers, selected).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</Select></Field><div className="admin-detail-divider" /><h3 className="admin-subheading"><TranslatedText>{tr("Access preview")}</TranslatedText></h3><p className="admin-muted"><TranslatedText>{tr("The selected lecturer can manage assignments, view class results and review submissions after assignment is saved.")}</TranslatedText></p>
     </> : <h2><TranslatedText>{tr("No class selected")}</TranslatedText></h2>} />}
   </div>;
 }

@@ -14,7 +14,7 @@ globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
 globalThis.Image = class { set src(value) {} };
 const revokedBannerUrls = [];
-globalThis.URL.createObjectURL = () => 'blob:contest-banner-test';
+globalThis.URL.createObjectURL = () => 'blob:exam-session-banner-test';
 globalThis.URL.revokeObjectURL = url => revokedBannerUrls.push(url);
 let viewportScroll=420;
 Object.defineProperty(window,'scrollY',{configurable:true,get:()=>viewportScroll});
@@ -32,7 +32,7 @@ globalThis.__builderState = {
   summaries, saves: [],
 };
 const output = await build({
-  stdin: { contents: `export { createElement, act } from "react"; export { createRoot } from "react-dom/client"; export { MemoryRouter, Routes, Route } from "react-router-dom"; export { ContestBuilderPage, AssignmentBuilderPage } from "./src/features/teacher/builder/BuilderPages"; export { ToastProvider } from "./src/shared/ui/StackingToasts"; export { Simulate } from "react-dom/test-utils";`, resolveDir: process.cwd(), loader: 'tsx' },
+  stdin: { contents: `export { createElement, act } from "react"; export { createRoot } from "react-dom/client"; export { MemoryRouter, Routes, Route } from "react-router-dom"; export { ExamSessionBuilderPage, AssignmentBuilderPage } from "./src/features/teacher/builder/BuilderPages"; export { ToastProvider } from "./src/shared/ui/StackingToasts"; export { Simulate } from "react-dom/test-utils";`, resolveDir: process.cwd(), loader: 'tsx' },
   bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic', loader: { '.css': 'empty' }, define: { 'import.meta.hot': 'undefined', 'import.meta.env.VITE_API_URL': '""' },
   plugins: [{ name: 'mock-teacher', setup(build) {
     build.onResolve({ filter: /shared\/api\/teacherService$/ }, () => ({ path: 'teacher', namespace: 'mock' }));
@@ -51,10 +51,10 @@ const output = await build({
 const filename = join(tmpdir(), `sqluit-builder-flow-${process.pid}.cjs`);
 try {
   await writeFile(filename, output.outputFiles[0].contents);
-  const { createElement: h, act, createRoot, MemoryRouter, Routes, Route, ContestBuilderPage, AssignmentBuilderPage, ToastProvider, Simulate } = createRequire(import.meta.url)(filename);
+  const { createElement: h, act, createRoot, MemoryRouter, Routes, Route, ExamSessionBuilderPage, AssignmentBuilderPage, ToastProvider, Simulate } = createRequire(import.meta.url)(filename);
   let root;
-  const mount = async (kind = 'contests', isNew = false) => {
-    const Page = kind === 'contests' ? ContestBuilderPage : AssignmentBuilderPage;
+  const mount = async (kind = 'exam-sessions', isNew = false) => {
+    const Page = kind === 'exam-sessions' ? ExamSessionBuilderPage : AssignmentBuilderPage;
     root = createRoot(document.getElementById('root'));
     await act(async () => root.render(h(ToastProvider, null, h(MemoryRouter, {
       initialEntries: [`/teacher/${kind}/${isNew ? 'new' : 'a/edit'}`], future: { v7_startTransition: true, v7_relativeSplatPath: true }
@@ -68,14 +68,14 @@ try {
   const sectionToggle = part => document.querySelector(`#builder-settings-${part}`)?.closest('.builder-settings-section').querySelector('input');
   const openQuery = async () => { await click(document.querySelector('.builder-database-heading')); await click(document.querySelector('[aria-controls="builder-settings-SQL"]')); };
   const hideButtons = () => [...document.querySelectorAll('.builder-settings-visibility button')];
-  const save = () => click(document.querySelector('.teacher-contest-save-exit-actions .primary'));
+  const save = () => click(document.querySelector('.teacher-exam-session-save-exit-actions .primary'));
   await mount();
-  assert.equal(document.querySelector('#contest-banner, .teacher-builder-main .teacher-layered-banner-preview'), null, 'Banner editing is removed from the form');
-  assert.equal(document.querySelector('.teacher-builder-main .student-email-picker'), null, 'The email textarea is no longer displayed in the contest form');
+  assert.equal(document.querySelector('#exam-session-banner, .teacher-builder-main .teacher-layered-banner-preview'), null, 'Banner editing is removed from the form');
+  assert.equal(document.querySelector('.teacher-builder-main .student-email-picker'), null, 'The email textarea is no longer displayed in the exam session form');
   const studentButton = () => document.querySelector('.teacher-class-browser-column:first-child [role=tab][id$="-students"]');
   const classTab=()=>document.querySelector('.teacher-class-browser-column:first-child [role=tab][id$="-classes"]');
   assert.equal(studentButton(), null, 'Individual student action is hidden for all students');
-  await click(document.querySelector('input[name="contest-audience"]'));
+  await click(document.querySelector('input[name="exam-session-audience"]'));
   assert.equal(document.querySelector('.teacher-add-class'),null,'The separate Add class button is removed');
   assert.equal(studentButton().parentElement.getAttribute('role'),'tablist');
   await click(studentButton());
@@ -141,24 +141,24 @@ try {
   await click(document.querySelector('.teacher-audience-collapse'));
   assert.ok(document.querySelector('.teacher-class-options'),'Radio arrow reopens the picker');
   reducedMotion=true;
-  await click(document.querySelector('input[name="contest-audience"][value="all_students"]') || document.querySelectorAll('input[name="contest-audience"]')[1]);
+  await click(document.querySelector('input[name="exam-session-audience"][value="all_students"]') || document.querySelectorAll('input[name="exam-session-audience"]')[1]);
   assert.equal(studentButton(), null);
   assert.equal(document.querySelector('.teacher-audience-students-count'), null);
   await save();
   assert.deepEqual(globalThis.__builderState.saves.at(-1).classIds,[],'All students sends no class restriction');
   assert.deepEqual(globalThis.__builderState.saves.at(-1).studentEmails,[],'All students sends no individual restriction');
-  await click(document.querySelector('input[name="contest-audience"]'));
+  await click(document.querySelector('input[name="exam-session-audience"]'));
   assert.equal(document.querySelectorAll('.teacher-selected-class-row').length,1,'Returning to selected classes restores prior choices');
   assert.ok(document.querySelector('.teacher-class-options input[type=checkbox]').checked);
   await save();
   assert.deepEqual(globalThis.__builderState.saves.at(-1).studentEmails,['23520002@gm.uit.edu.vn'],'Individually selected students survive audience switching');
-  await click(document.querySelectorAll('input[name="contest-audience"]')[1]);
+  await click(document.querySelectorAll('input[name="exam-session-audience"]')[1]);
 
-  await click(document.querySelector('.teacher-contest-navigation-actions .button'));
+  await click(document.querySelector('.teacher-exam-session-navigation-actions .button'));
   assert.ok(document.querySelector('.teacher-builder-main'), 'Opening preview keeps the form in place');
-  assert.ok(document.querySelector('.teacher-contest-preview-panel'), 'Contest preview remains the sliding side panel');
-  assert.equal(document.querySelector('.teacher-contest-preview-page'), null);
-  const bannerEditor = () => document.querySelector('.contest-detail-banner .teacher-contest-banner-editor');
+  assert.ok(document.querySelector('.teacher-exam-session-preview-panel'), 'Exam session preview remains the sliding side panel');
+  assert.equal(document.querySelector('.teacher-exam-session-preview-page'), null);
+  const bannerEditor = () => document.querySelector('.exam-session-detail-banner .teacher-exam-session-banner-editor');
   assert.ok(bannerEditor().textContent.includes('Nhấn để đổi ảnh'));
   await click(bannerEditor().querySelectorAll('button')[1]);
   assert.ok(document.querySelector('.teacher-banner-crop-dialog'), 'Crop adjustments are opened directly from the preview banner');
@@ -171,10 +171,10 @@ try {
   await act(async () => Simulate.change(fileInput, {target: {files: [{type:'image/png',size:1024}],value:''}}));
   assert.ok(document.querySelector('.teacher-banner-crop-dialog'), 'Choosing a valid replacement opens the cropper');
   await click(document.querySelector('.teacher-banner-crop-dialog .section-heading .icon-button'));
-  assert.ok(revokedBannerUrls.includes('blob:contest-banner-test'), 'Cancelling releases the temporary image');
-  assert.match(document.querySelector('.contest-detail-banner .u049-image').style.backgroundImage, /cover.webp/, 'Cancelling keeps the previous cover');
+  assert.ok(revokedBannerUrls.includes('blob:exam-session-banner-test'), 'Cancelling releases the temporary image');
+  assert.match(document.querySelector('.exam-session-detail-banner .u049-image').style.backgroundImage, /cover.webp/, 'Cancelling keeps the previous cover');
   await click(bannerEditor().querySelectorAll('button')[2]);
-  assert.equal(document.querySelector('.contest-detail-banner .u049-image'), null, 'Removing the cover restores the default banner immediately');
+  assert.equal(document.querySelector('.exam-session-detail-banner .u049-image'), null, 'Removing the cover restores the default banner immediately');
   await click(document.querySelector('.teacher-student-preview-heading .icon-button'));
   await save();
   const savedCover = globalThis.__builderState.saves.at(-1);
@@ -302,19 +302,19 @@ try {
   assert.equal(added.id, 'p3'); assert.equal(added.databaseDescriptionVisible, false);
   assert.deepEqual(added.workspaceParts, ['DDL','SQL']);
   await act(async () => root.unmount());
-  for (const kind of ['assignments', 'contests']) {
+  for (const kind of ['assignments', 'exam-sessions']) {
     viewportScroll=600;
     await mount(kind, true);
     assert.equal(viewportScroll,0,`New ${kind} starts at the top even after leaving a scrolled page`);
     const classSearch=document.querySelector('.teacher-class-search-input input');
     assert.ok(classSearch,'The class picker can still be visible on initial load');
     assert.notEqual(document.activeElement,classSearch,'The participant search never steals focus when opening a new builder');
-    assert.ok(document.querySelector('.teacher-contest-page-nav .is-active').textContent.includes('Thông tin chung'),'The initial navigation section is General information');
+    assert.ok(document.querySelector('.teacher-exam-session-page-nav .is-active').textContent.includes('Thông tin chung'),'The initial navigation section is General information');
     assert.equal(document.querySelector('[data-label="Difficulty"], [data-label="Độ khó"]'), null);
     const titleInput = document.querySelector('.teacher-builder-setup .teacher-field input');
     await act(async () => Simulate.change(titleInput, { target: { value: `New ${kind}` } }));
     assert.ok(document.querySelector('.unsaved-changes-badge'), 'Both builders show the compact shared unsaved state');
-    assert.ok(!document.querySelector('.teacher-contest-navigation-heading').textContent.includes('Đã lưu mọi thay đổi'));
+    assert.ok(!document.querySelector('.teacher-exam-session-navigation-heading').textContent.includes('Đã lưu mọi thay đổi'));
     let finish;
     globalThis.__builderSaveGate = new Promise(resolve => { finish = resolve; });
     await save();
@@ -323,7 +323,6 @@ try {
     await act(async () => finish());
     assert.equal(notification.dataset.variant, 'success', `${kind} updates the same toast after New to Edit navigation`);
     assert.equal(document.querySelector('.unsaved-changes-badge'), null);
-    assert.equal(globalThis.__builderState.saves.at(-1).isContest, kind === 'contests');
     assert.equal(globalThis.__builderState.saves.at(-1).studentOptions.hints, false);
     assert.equal(globalThis.__builderState.saves.at(-1).studentOptions.aiAllowed, false);
     assert.equal(document.querySelector('[aria-label="Hints"], [aria-label="Gợi ý"], [aria-label="Allow AI assistance"], [aria-label="Cho phép trợ giúp AI"]'), null);

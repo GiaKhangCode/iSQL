@@ -22,7 +22,6 @@ class ClassModel extends Model
         'term',
         'term_id',
         'instructor_id',
-        'practice_instructor_id',
         'start_date',
         'end_date',
         'status',
@@ -36,17 +35,6 @@ class ClassModel extends Model
     public function instructor()
     {
         return $this->belongsTo(User::class, 'instructor_id');
-    }
-
-    public function practiceInstructor()
-    {
-        return $this->belongsTo(User::class, 'practice_instructor_id');
-    }
-
-    public function instructors()
-    {
-        return $this->belongsToMany(User::class, 'class_instructors', 'class_id', 'instructor_id')
-            ->withPivot('assignment_type', 'assigned_at');
     }
 
     public function courseRecord()

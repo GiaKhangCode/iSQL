@@ -5,7 +5,6 @@ export type ExerciseTag = {
   kind: "difficulty" | "category";
   name: string;
   part: "ALL" | "DDL" | "DML" | "DQL" | "TRIGGER";
-  orderIndex: number;
   createdAt?: string;
 };
 
@@ -13,13 +12,13 @@ export const exerciseTagsApi = {
   getTags(): Promise<ExerciseTag[]> {
     return apiFetch<ExerciseTag[]>("/api/exercise-tags");
   },
-  createTag(data: { kind: string; name: string; part?: string; orderIndex?: number }): Promise<ExerciseTag> {
+  createTag(data: { kind: string; name: string; part?: string }): Promise<ExerciseTag> {
     return apiFetch<ExerciseTag>("/api/admin/exercise-tags", {
       method: "POST",
       body: JSON.stringify(data),
     });
   },
-  updateTag(id: string, data: { name?: string; part?: string; orderIndex?: number }): Promise<ExerciseTag> {
+  updateTag(id: string, data: { name?: string; part?: string }): Promise<ExerciseTag> {
     return apiFetch<ExerciseTag>(`/api/admin/exercise-tags/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: JSON.stringify(data),

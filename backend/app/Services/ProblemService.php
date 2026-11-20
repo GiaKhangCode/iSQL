@@ -10,6 +10,7 @@ use App\Models\TestCase;
 use App\Models\TestCaseScript;
 use App\Models\Topic;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,8 +18,24 @@ use Illuminate\Support\Str;
 class ProblemService
 {
     public function __construct(
-        protected readonly ProblemWorkspaceService $workspaceService
+        protected readonly ProblemWorkspaceService $workspaceService,
+        protected readonly AccessControlService $access,
     ) {
+    }
+
+    /** Siêu quản trị (vai trò Admin): thấy và quản lý mọi bài toán. */
+    private function isSuper(User $user): bool
+    {
+        return $this->access->isSuperAdmin($user);
+    }
+
+    /**
+     * Góc nhìn giảng viên (thấy đáp án, bài của mình và bài được chia sẻ): người soạn bài toán hoặc người giao bài tập.
+     * Không đọc users.role.
+     */
+    private function hasStaffView(User $user): bool
+    {
+        return $this->access->canAny($user, ['problem.create', 'assignment.create']);
     }
 
     /**
@@ -26,12 +43,8 @@ class ProblemService
      */
     public function getAllProblems(User $user): Collection
     {
-        $isAdmin = $user->isAdmin();
-        $isInstructor = !$isAdmin && (
-            in_array($user->role, User::INSTRUCTOR_ROLES, true)
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $user->canDo('PROBLEM_MGMT', 'view')
-        );
+        $isAdmin = $this->isSuper($user);
+        $isInstructor = !$isAdmin && $this->hasStaffView($user);
 
         if ($isAdmin) {
             $problems = Problem::orderByDesc('created_at')->orderByDesc('id')->get();
@@ -58,8 +71,7 @@ class ProblemService
                     $q->whereNull('assignments.opens')->orWhere('assignments.opens', '<=', now());
                 })
                 ->where(function ($q) use ($user) {
-                    $q->where('assignments.audience_type', 'all_students')
-                        ->orWhereExists(function ($ex) use ($user) {
+                    $q->whereExists(function ($ex) use ($user) {
                             $ex->select(DB::raw(1))
                                 ->from('assignment_classes')
                                 ->join('class_enrollments', 'class_enrollments.class_id', '=', 'assignment_classes.class_id')
@@ -187,10 +199,8 @@ class ProblemService
 
         $this->assertProblemAccess($problem, $user, $context);
 
-        $isAdmin = $user->role === User::ROLE_ADMIN || $user->role === 'admin';
-        $isTeacher = in_array($user->role, User::INSTRUCTOR_ROLES)
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $user->canDo('PROBLEM_MGMT', 'view');
+        $isAdmin = $this->isSuper($user);
+        $isTeacher = $this->hasStaffView($user);
 
         // Submissions progress
         $subsQuery = DB::table('submissions')
@@ -507,7 +517,7 @@ class ProblemService
      */
     public function createProblem(array $data, User $user): array
     {
-        $this->assertCanManageProblems($user, 'add');
+        $this->assertCanAuthorProblems($user);
 
         return DB::transaction(function () use ($data, $user) {
             $problemId = (string) Str::uuid();
@@ -772,7 +782,7 @@ class ProblemService
      */
     public function validateSolution(array $data, User $user): array
     {
-        $this->assertCanManageProblems($user, 'edit');
+        $this->assertCanRunAuthoringSql($user);
         return $this->workspaceService->validateSolution($data);
     }
 
@@ -781,7 +791,7 @@ class ProblemService
      */
     public function validateStage(array $data, User $user): array
     {
-        $this->assertCanManageProblems($user, 'edit');
+        $this->assertCanRunAuthoringSql($user);
         return $this->workspaceService->validateStage($data);
     }
 
@@ -1232,7 +1242,7 @@ class ProblemService
             return;
         }
 
-        if ($user->isAdmin()) {
+        if ($this->isSuper($user)) {
             return;
         }
 
@@ -1241,11 +1251,7 @@ class ProblemService
             return;
         }
 
-        $isTeacher = in_array($user->role, User::INSTRUCTOR_ROLES, true)
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $user->canDo('PROBLEM_MGMT', 'view');
-
-        if ($isTeacher) {
+        if ($this->hasStaffView($user)) {
             $isShared = ContentShare::where('kind', 'problem')
                 ->where('resource_id', $p->id)
                 ->where('recipient_id', $user->id)
@@ -1279,8 +1285,7 @@ class ProblemService
                     $q->where('assignments.id', $context);
                 }
                 $q->where(function ($sub) use ($user) {
-                    $sub->where('assignments.audience_type', 'all_students')
-                        ->orWhereExists(function ($ex) use ($user) {
+                    $sub->whereExists(function ($ex) use ($user) {
                             $ex->select(DB::raw(1))
                                 ->from('assignment_classes')
                                 ->join('class_enrollments', 'class_enrollments.class_id', '=', 'assignment_classes.class_id')
@@ -1311,28 +1316,25 @@ class ProblemService
         abort(403, "You don't have permission to view this problem.");
     }
 
-    private function assertCanManageProblems(User $user, string $action): void
+    /** Tạo bài toán: quyền problem.create. */
+    private function assertCanAuthorProblems(User $user): void
     {
-        if ($user->isAdmin()) {
-            return;
-        }
+        abort_unless($this->access->can($user, 'problem.create'), 403, 'Bạn không có quyền quản lý bài toán.');
+    }
 
-        $isTeacher = in_array($user->role, User::INSTRUCTOR_ROLES, true)
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $user->canDo('PROBLEM_MGMT', $action);
-
-        abort_unless($isTeacher, 403, 'Chỉ giảng viên và quản trị viên mới có quyền quản lý bài toán.');
+    /** Chạy thử SQL của đáp án / giai đoạn: người soạn bài toán hoặc người soạn cơ sở dữ liệu mẫu. */
+    private function assertCanRunAuthoringSql(User $user): void
+    {
+        abort_unless($this->access->canAny($user, ['problem.create', 'library.manage']), 403, 'Bạn không có quyền chạy thử SQL khi soạn nội dung.');
     }
 
     private function canEditProblem(Problem $p, User $user): bool
     {
-        if ($user->isAdmin()) {
+        if ($this->isSuper($user)) {
             return true;
         }
 
-        $hasEditPerm = in_array($user->role, User::INSTRUCTOR_ROLES, true)
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $user->canDo('PROBLEM_MGMT', 'edit');
+        $hasEditPerm = $this->access->can($user, 'problem.create');
 
         $isCreator = $p->creator_id === $user->id;
         $isSharedEditor = ContentShare::where('kind', 'problem')
@@ -1346,13 +1348,11 @@ class ProblemService
 
     private function canDeleteProblem(Problem $p, User $user): bool
     {
-        if ($user->isAdmin()) {
+        if ($this->isSuper($user)) {
             return true;
         }
 
-        $hasDeletePerm = in_array($user->role, User::INSTRUCTOR_ROLES, true)
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $user->canDo('PROBLEM_MGMT', 'delete');
+        $hasDeletePerm = $this->access->can($user, 'problem.create');
 
         $isCreator = $p->creator_id === $user->id;
 

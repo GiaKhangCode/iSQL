@@ -16,6 +16,7 @@ use App\Models\ProblemStageExercise;
 use App\Models\StudentIdentity;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Access\AccessControlService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -27,27 +28,23 @@ class ExaminationService
     private const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
     public function __construct(
-        protected readonly AssignmentService $assignmentService
+        protected readonly AssignmentService $assignmentService,
+        protected readonly AccessControlService $access,
     ) {
     }
 
     public function assertCanManageExaminations(User $user): void
     {
-        $allowed = $user->isAdmin()
-            || $user->isFacultyOffice()
-            || $user->isInstructor()
-            || $user->canDo('ASSIGNMENT_MGMT', 'view')
-            || $user->canDo('ASSIGNMENT_MGMT', 'add');
-
-        abort_unless($allowed, 403, 'Chỉ giảng viên, giáo vụ khoa hoặc quản trị viên mới có quyền quản lý kỳ thi.');
+        abort_unless(
+            $this->access->canAny($user, ['examination.manage', 'exam.credentials']),
+            403,
+            'Bạn không có quyền quản lý kỳ thi.'
+        );
     }
 
     public function canAccessExamination(Examination $exam, User $user): bool
     {
-        return $user->isAdmin()
-            || $user->isFacultyOffice()
-            || $user->role === User::ROLE_DEPARTMENT_HEAD
-            || $exam->owner_id === $user->id;
+        return $this->access->can($user, 'examination.manage') || $exam->owner_id === $user->id;
     }
 
     public function listExaminations(User $user): array
@@ -55,7 +52,7 @@ class ExaminationService
         $this->assertCanManageExaminations($user);
 
         $query = Examination::query()->orderByDesc('created_at')->orderByDesc('id');
-        if (!$user->isAdmin() && !$user->isFacultyOffice() && $user->role !== User::ROLE_DEPARTMENT_HEAD) {
+        if (!$this->access->can($user, 'examination.manage')) {
             $query->where('owner_id', $user->id);
         }
 
@@ -339,13 +336,12 @@ class ExaminationService
 
     public function ensureSessionStudentAccounts(Assignment $session, ?string $examinationId = null): array
     {
-        $session->loadMissing(['classes.instructor', 'classes.practiceInstructor', 'selectedStudents', 'assignmentProblems']);
+        $session->loadMissing(['classes.instructor', 'selectedStudents', 'assignmentProblems']);
 
         $classIds = $session->classes->pluck('id')->all();
         $classesMap = $session->classes->keyBy('id');
 
         $instructorIds = $session->classes->pluck('instructor_id')
-            ->merge($session->classes->pluck('practice_instructor_id'))
             ->push($session->instructor_id)
             ->filter()
             ->unique()
@@ -370,7 +366,7 @@ class ExaminationService
 
         $students = !empty($allStudentIds)
             ? User::whereIn('id', $allStudentIds)
-                ->where('role', User::ROLE_STUDENT)
+                ->where('account_type', User::ACCOUNT_STUDENT)
                 ->where('status', 'Active')
                 ->orderBy('name')
                 ->orderBy('email')
@@ -410,7 +406,7 @@ class ExaminationService
             $mssv = $this->studentCode($student->email, $student->id);
             $sortMssvKey = $mssv ?: $student->name;
 
-            $tId = $cObj ? ($cObj->practice_instructor_id ?: $cObj->instructor_id) : $session->instructor_id;
+            $tId = $cObj ? $cObj->instructor_id : $session->instructor_id;
             $tObj = $tId ? $instructorsMap->get($tId) : null;
             $tName = $tObj ? $tObj->name : (is_array($session->proctors) && !empty($session->proctors) ? implode(', ', $session->proctors) : '');
 
@@ -742,7 +738,9 @@ class ExaminationService
             }
 
             $qPoints = [];
-            $rawPoints = $rule['questionPoints'] ?? $rule['question_points'] ?? [];
+            // Điểm từng câu: trong cấu hình của phần (`questionPoints`) hoặc ở cấp trên cùng (`_questionPoints[PHẦN]`),
+            // cách sau dùng được khi phần chỉ là mảng mã câu như giao diện soạn kỳ thi lưu.
+            $rawPoints = $rule['questionPoints'] ?? $rule['question_points'] ?? $raw['_questionPoints'][$part] ?? [];
             if (is_array($rawPoints)) {
                 foreach ($ids as $qid) {
                     if (isset($rawPoints[$qid]) && is_numeric($rawPoints[$qid]) && (float) $rawPoints[$qid] > 0) {
@@ -1130,7 +1128,6 @@ class ExaminationService
         $session->examination_id = $exam->id;
         $session->session_index = (int) $item['index'];
         $session->title = $item['title'];
-        $session->is_contest = true;
         $session->scoring_mode = (string) ($payload['scoringMode'] ?? $payload['scoring_mode'] ?? 'equal_questions');
         $session->audience_type = 'classes';
         $session->short_description = (string) ($payload['shortDescription'] ?? $payload['short_description'] ?? '');

@@ -1,32 +1,28 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\AccessController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\AcademicTermController;
+use App\Http\Controllers\Admin\LecturerRequestController;
 use App\Http\Controllers\Admin\OverviewController;
 use App\Http\Controllers\ClassRosterController;
-use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\Admin\ExerciseTagController;
 
-Route::middleware(['auth:sanctum', 'active', 'role:admin'])->group(function () {
-    // Permission & Role Management
-    Route::get('/my-permissions', [PermissionController::class, 'getPermission']);
-    Route::get('/functions', [PermissionController::class, 'getFunctions']);
-    Route::get('/roles', [PermissionController::class, 'getRoles']);
-    Route::post('/roles', [PermissionController::class, 'storeRole']);
-    Route::delete('/roles/{id}', [PermissionController::class, 'deleteRole']);
-    Route::get('/role-groups', [PermissionController::class, 'getRoleGroups']);
-    Route::post('/role-groups', [PermissionController::class, 'storeRoleGroup']);
-    Route::delete('/role-groups/{id}', [PermissionController::class, 'deleteRoleGroup']);
-    Route::post('/role-groups/{id}/assign-roles', [PermissionController::class, 'assignRolesToGroup']);
-    Route::post('/users/{id}/assign', [PermissionController::class, 'assignToUser']);
-
-    // User Management
+// Khu vực quản trị: quyền theo từng nhóm chức năng (capability), không so sánh loại tài khoản hay tên vai trò.
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
+    // Quản lý tài khoản: quyền user.manage.
+    Route::middleware('capability:user.manage')->group(function () {
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
     Route::post('/users/import', [UserController::class, 'importCsv']);
+    Route::get('/users/role-options', [UserController::class, 'roleOptions']);
+    // Duyệt giảng viên đăng ký (phải đứng trước /users/{id}).
+    Route::get('/users/lecturer-requests', [LecturerRequestController::class, 'index']);
+    Route::post('/users/lecturer-requests/{id}/approve', [LecturerRequestController::class, 'approve']);
+    Route::post('/users/lecturer-requests/{id}/reject', [LecturerRequestController::class, 'reject']);
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::patch('/users/{id}', [UserController::class, 'update']);
@@ -35,9 +31,20 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->group(function () {
     Route::post('/users/{id}/approve', [UserController::class, 'approve']);
     Route::post('/users/{id}/reset-password', [UserController::class, 'resetStudentPassword']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
-    Route::get('/overview', [OverviewController::class, 'index']);
+    });
+
+    // Trang Tổng quan: số liệu, nhật ký gần đây, lỗi chấm bài gần đây.
+    Route::prefix('overview')->middleware('capability:user.manage,class.manage,access.manage')->group(function () {
+        Route::get('/stats', [OverviewController::class, 'stats']);
+        Route::get('/activities', [OverviewController::class, 'activities']);
+        Route::get('/errors', [OverviewController::class, 'errors']);
+    });
+
+    // Lớp, danh mục môn học, học kỳ và thẻ bài tập: quyền class.manage.
+    Route::middleware('capability:class.manage')->group(function () {
     Route::get('/classes', [ClassController::class, 'index']);
     Route::post('/classes', [ClassController::class, 'store']);
+    Route::get('/instructors', [ClassController::class, 'instructors']);
     Route::get('/classes/students', [ClassRosterController::class, 'getAllStudents']);
     Route::get('/classes/{id}', [ClassController::class, 'show']);
     Route::put('/classes/{id}', [ClassController::class, 'update']);
@@ -47,9 +54,6 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->group(function () {
     Route::post('/classes/{id}/instructor', [ClassController::class, 'assignInstructor']);
     Route::put('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
     Route::post('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
-    Route::put('/classes/{id}/instructors', [ClassController::class, 'syncInstructors']);
-    Route::delete('/classes/{id}/instructors/{assignmentType}', [ClassController::class, 'removeInstructorAssignment'])
-        ->whereIn('assignmentType', ['theory', 'practical']);
 
     Route::get('/classes/{id}/members', [ClassRosterController::class, 'getMembers']);
     Route::post('/classes/{id}/members', [ClassRosterController::class, 'addMember']);
@@ -69,4 +73,16 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])->group(function () {
     Route::post('/exercise-tags', [ExerciseTagController::class, 'store']);
     Route::put('/exercise-tags/{id}', [ExerciseTagController::class, 'update']);
     Route::delete('/exercise-tags/{id}', [ExerciseTagController::class, 'destroy']);
+    });
+});
+
+// Trang Vai trò: gắn theo mã quyền access.manage (không phụ thuộc tên vai trò).
+Route::middleware(['auth:sanctum', 'active', 'capability:access.manage'])->prefix('access')->group(function () {
+    Route::get('/', [AccessController::class, 'catalog']);
+    Route::post('/roles', [AccessController::class, 'storeRole']);
+    Route::put('/roles/{id}', [AccessController::class, 'updateRole']);
+    Route::patch('/roles/{id}', [AccessController::class, 'updateRole']);
+    Route::get('/users/{id}', [AccessController::class, 'showUser']);
+    Route::put('/users/{id}', [AccessController::class, 'assignUser']);
+    Route::put('/users/{id}/student-code', [AccessController::class, 'setStudentCode']);
 });

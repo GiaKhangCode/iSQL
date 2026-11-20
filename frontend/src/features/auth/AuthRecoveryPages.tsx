@@ -1,28 +1,42 @@
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { useLanguage } from "@/shared/context/LanguageContext";
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { validEmail } from "@/features/auth/authService";
-import { AuthLayout, PasswordField, RecoveryUnavailable, type Errors } from "@/features/auth/AuthParts";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { authService, validEmail } from "@/features/auth/authService";
+import { AuthLayout, PasswordField } from "@/features/auth/AuthParts";
+
+const RESEND_SECONDS = 60;
+
+const errorText = (error: unknown, fallback: string) =>
+  error instanceof Error && error.message ? error.message : fallback;
 
 export function ForgotPasswordPage() {
   const { t: tr } = useLanguage("auth");
   const location = useLocation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState(
     (location.state as { email?: string } | null)?.email ?? "",
   );
   const [error, setError] = useState("");
-  const [unavailable, setUnavailable] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    setUnavailable(false);
-    if (!validEmail(email.trim())) {
+    if (busy) return;
+    const value = email.trim();
+    if (!validEmail(value)) {
       setError("Enter a valid email address.");
       return;
     }
     setError("");
-    setUnavailable(true);
+    setBusy(true);
+    try {
+      await authService.requestPasswordReset(value);
+      navigate("/verify-otp", { state: { email: value, sentAt: Date.now() } });
+    } catch (err) {
+      setError(errorText(err, "Could not send the verification code. Try again."));
+      setBusy(false);
+    }
   }
 
   return (
@@ -42,10 +56,9 @@ export function ForgotPasswordPage() {
             onChange={(event) => setEmail(event.target.value)}
             aria-invalid={!!error}
           />
-          {error && <small className="field-error"><TranslatedText>{tr(error)}</TranslatedText></small>}
+          {error && <small className="field-error" role="alert"><TranslatedText>{tr(error)}</TranslatedText></small>}
         </label>
-        {unavailable && <RecoveryUnavailable />}
-        <button className="button primary full" type="submit">
+        <button className="button primary full" type="submit" disabled={busy}>
           <TranslatedText>{tr("Send code")}</TranslatedText>
         </button>
       </form>
@@ -57,11 +70,67 @@ export function ForgotPasswordPage() {
 export function VerifyOtpPage() {
   const { t: tr } = useLanguage("auth");
   const location = useLocation();
-  const email =
-    (location.state as { email?: string } | null)?.email ?? "name@example.com";
+  const navigate = useNavigate();
+  const state = location.state as { email?: string; sentAt?: number } | null;
+  const email = state?.email ?? "";
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const cells = useRef<Array<HTMLInputElement | null>>([]);
-  const [unavailable, setUnavailable] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [cooldown, setCooldown] = useState(() => {
+    const elapsed = state?.sentAt ? Math.floor((Date.now() - state.sentAt) / 1000) : RESEND_SECONDS;
+    return Math.max(0, RESEND_SECONDS - elapsed);
+  });
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
+
+  // Không có email (vào thẳng trang) thì quay về bước nhập email.
+  if (!email) return <Navigate to="/forgot-password" replace />;
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    const otp = code.join("");
+    if (otp.length !== 6) {
+      setInfo("");
+      setError("Enter the 6-digit code.");
+      return;
+    }
+    setError("");
+    setInfo("");
+    setBusy(true);
+    try {
+      await authService.verifyResetOtp(email, otp);
+      navigate("/reset-password", { state: { email, otp }, replace: true });
+    } catch (err) {
+      setError(errorText(err, "Could not verify the code. Try again."));
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    if (busy || cooldown > 0) return;
+    setError("");
+    setInfo("");
+    setBusy(true);
+    try {
+      await authService.requestPasswordReset(email);
+      setCode(["", "", "", "", "", ""]);
+      setCooldown(RESEND_SECONDS);
+      setInfo("A new verification code has been sent.");
+      cells.current[0]?.focus();
+    } catch (err) {
+      setError(errorText(err, "Could not send the verification code. Try again."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AuthLayout
       title={tr("Verify your email")}
@@ -69,12 +138,7 @@ export function VerifyOtpPage() {
       showTeacherNote={false}
       centered
     >
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          setUnavailable(true);
-        }}
-      >
+      <form onSubmit={submit}>
         <fieldset className="otp-fieldset">
           <legend className="sr-only"><TranslatedText>{tr("Verification code")}</TranslatedText></legend>
           <div className="otp-cells">
@@ -116,9 +180,14 @@ export function VerifyOtpPage() {
             ))}
           </div>
         </fieldset>
-        <p className="tiny muted"><TranslatedText>{tr("Resend code in 42s")}</TranslatedText></p>
-        {unavailable && <RecoveryUnavailable />}
-        <button className="button primary full" type="submit">
+        <p className="tiny muted">
+          {cooldown > 0
+            ? <TranslatedText>{tr("Resend code in {value0}s", { value0: cooldown })}</TranslatedText>
+            : <button type="button" className="forgot-link" onClick={resend} disabled={busy}><TranslatedText>{tr("Resend code")}</TranslatedText></button>}
+        </p>
+        {error && <p className="form-message" role="alert"><TranslatedText>{tr(error)}</TranslatedText></p>}
+        {info && <p className="form-message" role="status"><TranslatedText>{tr(info)}</TranslatedText></p>}
+        <button className="button primary full" type="submit" disabled={busy}>
           <TranslatedText>{tr("Verify")}</TranslatedText>
         </button>
       </form>
@@ -129,18 +198,44 @@ export function VerifyOtpPage() {
 
 export function ResetPasswordPage() {
   const { t: tr } = useLanguage("auth");
+  const location = useLocation();
+  const state = location.state as { email?: string; otp?: string } | null;
+  const email = state?.email ?? "";
+  const otp = state?.otp ?? "";
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
-  const [unavailable, setUnavailable] = useState(false);
-  function submit(event: FormEvent) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  // Chưa qua bước xác thực OTP thì không được đặt lại mật khẩu.
+  if (!email || !otp) return <Navigate to="/forgot-password" replace />;
+
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    setUnavailable(false);
+    if (busy) return;
     if (password.length < 8) return setError("Use at least 8 characters.");
     if (password !== confirm) return setError("Passwords must match.");
     setError("");
-    setUnavailable(true);
+    setBusy(true);
+    try {
+      await authService.resetPassword(email, otp, password);
+      setDone(true);
+    } catch (err) {
+      setError(errorText(err, "Could not update the password. Try again."));
+      setBusy(false);
+    }
   }
+
+  if (done) {
+    return (
+      <AuthLayout title={tr("Set a new password")} showTeacherNote={false} centered>
+        <p className="form-message" role="status"><TranslatedText>{tr("Your password has been updated. Sign in with your new password.")}</TranslatedText></p>
+        <Link className="button primary full" to="/login"><TranslatedText>{tr("Back to sign in")}</TranslatedText></Link>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout
       title={tr("Set a new password")}
@@ -170,8 +265,7 @@ export function ResetPasswordPage() {
             <TranslatedText>{tr(error)}</TranslatedText>
           </p>
         )}
-        {unavailable && <RecoveryUnavailable />}
-        <button className="button primary full" type="submit">
+        <button className="button primary full" type="submit" disabled={busy}>
           <TranslatedText>{tr("Update password")}</TranslatedText>
         </button>
       </form>

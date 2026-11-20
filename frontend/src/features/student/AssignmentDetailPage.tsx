@@ -119,7 +119,7 @@ export function AssignmentDetailPage() {
               <div><dt><TranslatedText>{tr("Progress")}</TranslatedText></dt><dd>{solved}/{selected.problemIds.length} <TranslatedText>{tr("solved")}</TranslatedText></dd></div>
             </dl>
             <Link className="button primary" to={`/assignments/work/${selected.id}?classId=${encodeURIComponent(currentClass.id)}`}><TranslatedText>{tr("View assignment →")}</TranslatedText></Link>
-            {selected.instructions && <section><h3><TranslatedText>{tr("Instructions")}</TranslatedText></h3><ProblemMarkdown className="contest-markdown">{selected.instructions}</ProblemMarkdown></section>}
+            {selected.instructions && <section><h3><TranslatedText>{tr("Instructions")}</TranslatedText></h3><ProblemMarkdown className="exam-session-markdown">{selected.instructions}</ProblemMarkdown></section>}
             <section><h3><TranslatedText>{tr("Problems ·")}</TranslatedText> {selected.problemIds.length}</h3>
               {selected.problemIds.map((id, index) => {
                 const problem = data.problems.find((item) => item.id === id);

@@ -18,9 +18,7 @@
 }
 
 .u267-header.role-header .u267-language { margin-left:auto; }
-.u267-header.role-header .student-header-status + .u267-language { margin-left:0; }
 .u267-header.role-header .role-account { margin-left:auto; }
-.u267-header.role-header .student-header-status + .role-account { margin-left:0; }
 @media (max-width:1100px) {
   .u267-header.role-header { gap:12px; }
   .u267-header.role-header .mobile-menu { display:inline-flex; align-items:center; min-height:40px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius-md); }

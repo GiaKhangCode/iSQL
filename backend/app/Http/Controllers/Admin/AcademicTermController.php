@@ -3,53 +3,39 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AcademicTerm;
+use App\Http\Requests\Admin\AcademicTermRequest;
+use App\Services\CatalogService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class AcademicTermController extends Controller
 {
-    public function index(): JsonResponse
+    public function __construct(private readonly CatalogService $catalogService)
     {
-        return response()->json(AcademicTerm::withCount('classes')->orderByDesc('start_date')->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:100', 'unique:academic_terms,name'],
-            'start_date' => ['sometimes', 'nullable', 'date'],
-            'end_date' => ['sometimes', 'nullable', 'date', 'after_or_equal:start_date'],
-            'status' => ['sometimes', Rule::in(['Active', 'Archived'])],
-        ]);
+        return response()->json($this->catalogService->listTerms());
+    }
 
-        return response()->json(AcademicTerm::create($data), 201);
+    public function store(AcademicTermRequest $request): JsonResponse
+    {
+        return response()->json($this->catalogService->createTerm($request->validated()), 201);
     }
 
     public function show(string $id): JsonResponse
     {
-        return response()->json(AcademicTerm::withCount('classes')->findOrFail($id));
+        return response()->json($this->catalogService->findTerm($id));
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(AcademicTermRequest $request, string $id): JsonResponse
     {
-        $term = AcademicTerm::findOrFail($id);
-        $data = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:100', Rule::unique('academic_terms', 'name')->ignore($id, 'id')],
-            'start_date' => ['sometimes', 'nullable', 'date'],
-            'end_date' => ['sometimes', 'nullable', 'date', 'after_or_equal:start_date'],
-            'status' => ['sometimes', Rule::in(['Active', 'Archived'])],
-        ]);
-
-        $term->update($data);
-
-        return response()->json($term->refresh());
+        return response()->json($this->catalogService->updateTerm($id, $request->validated()));
     }
 
     public function destroy(string $id): JsonResponse
     {
-        AcademicTerm::findOrFail($id)->delete();
+        $this->catalogService->deleteTerm($id);
 
         return response()->json(['message' => 'Academic term deleted successfully']);
     }

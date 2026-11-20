@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\GradeSubmissionJob;
-use App\Jobs\GradeContestExamJob;
+use App\Jobs\GradeExamSessionJob;
 use App\Models\Submission;
 
 class SubmissionQueueService
@@ -17,10 +17,10 @@ class SubmissionQueueService
     }
 
     /**
-     * Dispatch comprehensive contest grading to Redis queue
+     * Dispatch comprehensive exam-session grading to Redis queue
      */
-    public function dispatchContestGrading(string $contestId, string $userId): void
+    public function dispatchExamSessionGrading(string $examSessionId, string $userId): void
     {
-        GradeContestExamJob::dispatch($contestId, $userId)->onQueue('grading');
+        GradeExamSessionJob::dispatch($examSessionId, $userId)->onQueue('grading');
     }
 }

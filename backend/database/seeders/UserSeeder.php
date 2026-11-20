@@ -17,7 +17,8 @@ class UserSeeder extends Seeder
                 'name'            => 'System Administrator',
                 'initials'        => 'AD',
                 'hashed_password' => Hash::make('password123'),
-                'role'            => 'admin',
+                'account_type'    => 'staff',
+                'initial_role'    => 'admin',
                 'status'          => 'Active',
                 'department'      => 'IT Department',
             ]
@@ -30,7 +31,8 @@ class UserSeeder extends Seeder
                 'name'            => 'Dr. Nguyen Van A',
                 'initials'        => 'NA',
                 'hashed_password' => Hash::make('password123'),
-                'role'            => 'instructor_practical',
+                'account_type'    => 'staff',
+                'initial_role'    => 'instructor',
                 'status'          => 'Active',
                 'department'      => 'Faculty of Software Engineering',
             ]
@@ -43,7 +45,7 @@ class UserSeeder extends Seeder
                 'name'            => 'Tran Thi B',
                 'initials'        => 'TB',
                 'hashed_password' => Hash::make('password123'),
-                'role'            => 'student',
+                'account_type'    => 'student',
                 'status'          => 'Active',
                 'department'      => 'Information Systems',
             ]
@@ -56,7 +58,8 @@ class UserSeeder extends Seeder
                 'name'            => 'Giáo Vụ Khoa',
                 'initials'        => 'GV',
                 'hashed_password' => Hash::make('12345678'),
-                'role'            => 'faculty_office',
+                'account_type'    => 'staff',
+                'initial_role'    => 'faculty_office',
                 'status'          => 'Active',
                 'department'      => 'Văn phòng Khoa / Phòng Giáo vụ',
             ]

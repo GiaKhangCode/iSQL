@@ -18,8 +18,8 @@ const detail={id:'new',student:'Student A',problem:'Sales',autoScore:5,maxScore:
 ],attemptHistory:[{id:'old',number:1,autoScore:2,finalScore:null},{id:'new',number:2,autoScore:5,finalScore:null}]};
 let saves=0,inspection;
 globalThis.__reviewApi={
-  getAssignments:async()=>[{id:'A',title:'Sales exam',classes:'Class A',isContest:true,submitted:'1/1',average:'50%',awaiting:1}],
-  getAssignment:async()=>({id:'A',title:'Sales exam',classes:'Class A',isContest:true}),
+  getAssignments:async()=>[{id:'A',title:'Sales exam',classes:'Class A',isExamSession:true,submitted:'1/1',average:'50%',awaiting:1}],
+  getAssignment:async()=>({id:'A',title:'Sales exam',classes:'Class A',isExamSession:true}),
   getAssignmentSubmissions:async()=>[{id:'new',student:'Student A',problem:'Sales',score:5,maxScore:10,status:'Needs review',parts:['DDL','DML','SQL'],submittedAt:detail.submittedAt},{id:'other',student:'Student B',problem:'Simple select',score:10,maxScore:10,status:'Accepted',parts:['SQL'],submittedAt:detail.submittedAt}],
   getSubmission:async id=>id==='old'?{...detail,id:'old',feedback:'Older feedback',reviewSections:[detail.reviewSections[2]]}:structuredClone(detail),
   updateSubmissionReview:async(id,score,feedback)=>{saves++;if(globalThis.__saveFail)throw Error('Save failed');return {...detail,id,finalScore:score,feedback};},

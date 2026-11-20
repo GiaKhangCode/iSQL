@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Assignment;
 use App\Services\ExamAdmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -86,25 +85,22 @@ class ExamAdmissionController extends Controller
         $username = (string) ($request->input('username') ?? '');
         $password = (string) ($request->input('password') ?? '');
 
-        [$row, $payload] = $this->examAdmissionService->unlockAdmission($activityId, $username, $password, $user);
+        [$row, $payload, $activity] = $this->examAdmissionService->unlockAdmission($activityId, $username, $password, $user);
 
         $response = response()->json($payload);
         if ($row) {
-            $activity = Assignment::find($activityId);
-            if ($activity) {
-                $cookieValue = $this->examAdmissionService->buildAdmissionCookieValue($user, $activity, $row);
-                $response->withCookie(cookie(
-                    ExamAdmissionService::COOKIE_NAME,
-                    $cookieValue,
-                    480,
-                    '/',
-                    null,
-                    false,
-                    true,
-                    false,
-                    'Lax'
-                ));
-            }
+            $cookieValue = $this->examAdmissionService->buildAdmissionCookieValue($user, $activity, $row);
+            $response->withCookie(cookie(
+                ExamAdmissionService::COOKIE_NAME,
+                $cookieValue,
+                480,
+                '/',
+                null,
+                false,
+                true,
+                false,
+                'Lax'
+            ));
         }
 
         return $response;

@@ -1,0 +1,2030 @@
+{
+ "qlbh": {
+  "number": "QLBH",
+  "title": "Quản lý bán hàng (QLBH) – DDL, DML, trigger và 44 câu truy vấn",
+  "difficulty": "Medium",
+  "topics": [
+   "Quản lý bán hàng",
+   "DDL",
+   "DML",
+   "Trigger",
+   "DQL",
+   "Cơ sở dữ liệu quan hệ"
+  ],
+  "statement": "**Bài tập 1 – Cơ sở dữ liệu quản lý bán hàng** (Cơ sở dữ liệu quan hệ – Khoa Hệ thống thông tin, UIT).\n\nCSDL gồm 5 quan hệ KHACHHANG, NHANVIEN, SANPHAM, HOADON, CTHD (xem *Mô tả cơ sở dữ liệu*). Bài gồm 4 phần: **DDL** (tạo bảng, sửa cấu trúc, ràng buộc CHECK), **DML** (nhập và cập nhật dữ liệu), **Trigger** (ràng buộc trị giá hóa đơn, doanh số) và **DQL** (44 câu truy vấn).\n\nMỗi câu hỏi được gắn *dạng bài* và *mức độ* (Dễ / Trung bình / Khó). Tên nước sản xuất không dấu, ví dụ `Trung Quoc`, `Thai Lan`, `Viet Nam`.",
+  "libraryKey": "qlbh",
+  "relations": [
+   {
+    "tableName": "KHACHHANG",
+    "attributes": "MAKH (char(4)): Mã khách hàng\nHOTEN (varchar(40)): Họ tên\nDCHI (varchar(50)): Địa chỉ\nSODT (varchar(20)): Số điện thoại\nNGSINH (smalldatetime): Ngày sinh\nNGDK (smalldatetime): Ngày đăng ký thành viên\nDOANHSO (money): Tổng trị giá các hóa đơn khách hàng đã mua",
+    "predicate": "Quan hệ khách hàng thành viên: mã, họ tên, địa chỉ, điện thoại, ngày sinh, ngày đăng ký và doanh số (tổng trị giá các hóa đơn của khách hàng này)."
+   },
+   {
+    "tableName": "NHANVIEN",
+    "attributes": "MANV (char(4)): Mã nhân viên\nHOTEN (varchar(40)): Họ tên\nSODT (varchar(20)): Số điện thoại\nNGVL (smalldatetime): Ngày vào làm",
+    "predicate": "Nhân viên bán hàng: họ tên, ngày vào làm, điện thoại; phân biệt bằng mã nhân viên."
+   },
+   {
+    "tableName": "SANPHAM",
+    "attributes": "MASP (char(4)): Mã sản phẩm\nTENSP (varchar(40)): Tên sản phẩm\nDVT (varchar(20)): Đơn vị tính\nNUOCSX (varchar(40)): Nước sản xuất\nGIA (money): Giá bán",
+    "predicate": "Sản phẩm có mã số, tên gọi, đơn vị tính, nước sản xuất và giá bán."
+   },
+   {
+    "tableName": "HOADON",
+    "attributes": "SOHD (int): Số hóa đơn\nNGHD (smalldatetime): Ngày mua hàng\nMAKH (char(4)): Mã khách hàng nào mua\nMANV (char(4)): Nhân viên bán hàng\nTRIGIA (money): Trị giá hóa đơn",
+    "predicate": "Mỗi lần mua hàng khách nhận một hóa đơn: số hóa đơn, ngày mua, nhân viên bán, trị giá và mã khách hàng (NULL nếu không phải khách thành viên)."
+   },
+   {
+    "tableName": "CTHD",
+    "attributes": "SOHD (int): Số hóa đơn\nMASP (char(4)): Mã sản phẩm\nSL (int): Số lượng",
+    "predicate": "Chi tiết hóa đơn: các sản phẩm trong mỗi hóa đơn và số lượng."
+   }
+  ],
+  "ddl": [
+   {
+    "id": "qlbh-ddl-01",
+    "name": "DDL-01 Tạo quan hệ.sql",
+    "description": "Câu 1. Tạo các quan hệ KHACHHANG, NHANVIEN, SANPHAM, HOADON, CTHD theo bảng thuộc tính; khai báo các khóa chính, khóa ngoại.",
+    "answer": "-- Bai tap 1: Quan ly ban hang (SQL Server). Chi khai bao khoa chinh, khoa ngoai va NOT NULL;\n-- cac rang buoc CHECK/trigger la cac cau hoi DDL rieng cua bai.\nCREATE TABLE KHACHHANG (\n    MAKH CHAR(4) NOT NULL PRIMARY KEY,\n    HOTEN VARCHAR(40) NOT NULL,\n    DCHI VARCHAR(50) NULL,\n    SODT VARCHAR(20) NULL,\n    NGSINH SMALLDATETIME NULL,\n    DOANHSO MONEY NOT NULL,\n    NGDK SMALLDATETIME NOT NULL\n);\n\nCREATE TABLE NHANVIEN (\n    MANV CHAR(4) NOT NULL PRIMARY KEY,\n    HOTEN VARCHAR(40) NOT NULL,\n    SODT VARCHAR(20) NULL,\n    NGVL SMALLDATETIME NOT NULL\n);\n\nCREATE TABLE SANPHAM (\n    MASP CHAR(4) NOT NULL PRIMARY KEY,\n    TENSP VARCHAR(40) NOT NULL,\n    DVT VARCHAR(20) NOT NULL,\n    NUOCSX VARCHAR(40) NOT NULL,\n    GIA MONEY NOT NULL\n);\n\nCREATE TABLE HOADON (\n    SOHD INT NOT NULL PRIMARY KEY,\n    NGHD SMALLDATETIME NOT NULL,\n    MAKH CHAR(4) NULL,\n    MANV CHAR(4) NOT NULL,\n    TRIGIA MONEY NOT NULL,\n    FOREIGN KEY (MAKH) REFERENCES KHACHHANG(MAKH),\n    FOREIGN KEY (MANV) REFERENCES NHANVIEN(MANV)\n);\n\nCREATE TABLE CTHD (\n    SOHD INT NOT NULL,\n    MASP CHAR(4) NOT NULL,\n    SL INT NOT NULL,\n    PRIMARY KEY (SOHD, MASP),\n    FOREIGN KEY (SOHD) REFERENCES HOADON(SOHD),\n    FOREIGN KEY (MASP) REFERENCES SANPHAM(MASP)\n);",
+    "enabled": true,
+    "startFrom": "empty",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Tạo bảng (CREATE TABLE)"
+   },
+   {
+    "id": "qlbh-ddl-02",
+    "name": "DDL-02 Thêm GHICHU.sql",
+    "description": "Câu 2. Thêm vào thuộc tính GHICHU có kiểu dữ liệu varchar(20) cho quan hệ SANPHAM.",
+    "answer": "ALTER TABLE SANPHAM ADD GHICHU VARCHAR(20);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Thay đổi cấu trúc (ALTER TABLE)"
+   },
+   {
+    "id": "qlbh-ddl-03",
+    "name": "DDL-03 Thêm LOAIKH.sql",
+    "description": "Câu 3. Thêm vào thuộc tính LOAIKH có kiểu dữ liệu là tinyint cho quan hệ KHACHHANG.",
+    "answer": "ALTER TABLE KHACHHANG ADD LOAIKH TINYINT;",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Thay đổi cấu trúc (ALTER TABLE)"
+   },
+   {
+    "id": "qlbh-ddl-04",
+    "name": "DDL-04 Sửa kiểu GHICHU.sql",
+    "description": "Câu 4. Sửa kiểu dữ liệu của thuộc tính GHICHU trong quan hệ SANPHAM thành varchar(100).",
+    "answer": "ALTER TABLE SANPHAM ALTER COLUMN GHICHU VARCHAR(100);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "ALTER TABLE SANPHAM ADD GHICHU VARCHAR(20);",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Thay đổi cấu trúc (ALTER TABLE)"
+   },
+   {
+    "id": "qlbh-ddl-05",
+    "name": "DDL-05 Xóa GHICHU.sql",
+    "description": "Câu 5. Xóa thuộc tính GHICHU trong quan hệ SANPHAM.",
+    "answer": "ALTER TABLE SANPHAM DROP COLUMN GHICHU;",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "ALTER TABLE SANPHAM ADD GHICHU VARCHAR(20);",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Thay đổi cấu trúc (ALTER TABLE)"
+   },
+   {
+    "id": "qlbh-ddl-06",
+    "name": "DDL-06 LOAIKH lưu chuỗi.sql",
+    "description": "Câu 6. Làm thế nào để thuộc tính LOAIKH trong quan hệ KHACHHANG có thể lưu các giá trị là: “Vang lai”, “Thuong xuyen”, “Vip”…? (Gợi ý: đổi kiểu dữ liệu của cột.)",
+    "answer": "ALTER TABLE KHACHHANG ALTER COLUMN LOAIKH VARCHAR(20);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "ALTER TABLE KHACHHANG ADD LOAIKH TINYINT;",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Thay đổi cấu trúc (ALTER TABLE)"
+   },
+   {
+    "id": "qlbh-ddl-07",
+    "name": "DDL-07 Đơn vị tính.sql",
+    "description": "Câu 7. Đơn vị tính của sản phẩm chỉ có thể là (“cay”, ”hop”, ”cai”, ”quyen”, ”chuc”).",
+    "answer": "ALTER TABLE SANPHAM\nADD CONSTRAINT CK_SANPHAM CHECK (DVT IN ('cay', 'hop', 'cai', 'quyen', 'chuc'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlbh-ddl-08",
+    "name": "DDL-08 Giá bán tối thiểu.sql",
+    "description": "Câu 8. Giá bán của sản phẩm từ 500 đồng trở lên.",
+    "answer": "ALTER TABLE SANPHAM\nADD CONSTRAINT CK_SANPHAM CHECK (GIA >= 500);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlbh-ddl-10",
+    "name": "DDL-10 Ngày đăng ký.sql",
+    "description": "Câu 10. Ngày khách hàng đăng ký là khách hàng thành viên phải lớn hơn ngày sinh của người đó.",
+    "answer": "ALTER TABLE KHACHHANG\nADD CONSTRAINT CK_KHACHHANG CHECK (NGDK > NGSINH);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Ràng buộc CHECK"
+   }
+  ],
+  "dml": [
+   {
+    "id": "qlbh-dml-01",
+    "name": "DML-01 Nhập dữ liệu.sql",
+    "description": "Câu 1. Nhập dữ liệu cho các quan hệ KHACHHANG, NHANVIEN, SANPHAM, HOADON và CTHD (theo dữ liệu trong đề).",
+    "answer": "-- Du lieu goc cua Bai tap 1 (BaiTap_THCSDL_v2025.pdf); ngay dung dinh dang YYYYMMDD.\nINSERT INTO KHACHHANG (MAKH, HOTEN, DCHI, SODT, NGSINH, DOANHSO, NGDK)\nVALUES\n    ('KH01', 'Nguyen Van A', '731 Tran Hung Dao, Q5, TpHCM', '08823451', '19601022', 13060000, '20060722'),\n    ('KH02', 'Tran Ngoc Han', '23/5 Nguyen Trai, Q5, TpHCM', '0908256478', '19740403', 280000, '20060730'),\n    ('KH03', 'Tran Ngoc Linh', '45 Nguyen Canh Chan, Q1, TpHCM', '0938776266', '19800612', 3860000, '20060805'),\n    ('KH04', 'Tran Minh Long', '50/34 Le Dai Hanh, Q10, TpHCM', '0917325476', '19650309', 250000, '20061002'),\n    ('KH05', 'Le Nhat Minh', '34 Truong Dinh, Q3, TpHCM', '08246108', '19500310', 21000, '20061028'),\n    ('KH06', 'Le Hoai Thuong', '227 Nguyen Van Cu, Q5, TpHCM', '08631738', '19811231', 915000, '20061124'),\n    ('KH07', 'Nguyen Van Tam', '32/3 Tran Binh Trong, Q5, TpHCM', '0916783565', '19710406', 12500, '20061201'),\n    ('KH08', 'Phan Thi Thanh', '45/2 An Duong Vuong, Q5, TpHCM', '0938435756', '19710110', 365000, '20061213'),\n    ('KH09', 'Le Ha Vinh', '873 Le Hong Phong, Q5, TpHCM', '08654763', '19790903', 70000, '20070114'),\n    ('KH10', 'Ha Duy Lap', '34/34B Nguyen Trai, Q1, TpHCM', '08768904', '19830502', 67500, '20070116');\n\nINSERT INTO NHANVIEN (MANV, HOTEN, SODT, NGVL)\nVALUES\n    ('NV01', 'Nguyen Nhu Nhut', '0927345678', '20060413'),\n    ('NV02', 'Le Thi Phi Yen', '0987567390', '20060421'),\n    ('NV03', 'Nguyen Van B', '0997047382', '20060427'),\n    ('NV04', 'Ngo Thanh Tuan', '0913758498', '20060624'),\n    ('NV05', 'Nguyen Thi Truc Thanh', '0918590387', '20060720');\n\nINSERT INTO SANPHAM (MASP, TENSP, DVT, NUOCSX, GIA)\nVALUES\n    ('BC01', 'But chi', 'cay', 'Singapore', 3000),\n    ('BC02', 'But chi', 'cay', 'Singapore', 5000),\n    ('BC03', 'But chi', 'cay', 'Viet Nam', 3500),\n    ('BC04', 'But chi', 'hop', 'Viet Nam', 30000),\n    ('BB01', 'But bi', 'cay', 'Viet Nam', 5000),\n    ('BB02', 'But bi', 'cay', 'Trung Quoc', 7000),\n    ('BB03', 'But bi', 'hop', 'Thai Lan', 100000),\n    ('TV01', 'Tap 100 giay mong', 'quyen', 'Trung Quoc', 2500),\n    ('TV02', 'Tap 200 giay mong', 'quyen', 'Trung Quoc', 4500),\n    ('TV03', 'Tap 100 giay tot', 'quyen', 'Viet Nam', 3000),\n    ('TV04', 'Tap 200 giay tot', 'quyen', 'Viet Nam', 5500),\n    ('TV05', 'Tap 100 trang', 'chuc', 'Viet Nam', 23000),\n    ('TV06', 'Tap 200 trang', 'chuc', 'Viet Nam', 53000),\n    ('TV07', 'Tap 100 trang', 'chuc', 'Trung Quoc', 34000),\n    ('ST01', 'So tay 500 trang', 'quyen', 'Trung Quoc', 40000),\n    ('ST02', 'So tay loai 1', 'quyen', 'Viet Nam', 55000),\n    ('ST03', 'So tay loai 2', 'quyen', 'Viet Nam', 51000),\n    ('ST04', 'So tay', 'quyen', 'Thai Lan', 55000),\n    ('ST05', 'So tay mong', 'quyen', 'Thai Lan', 20000),\n    ('ST06', 'Phan viet bang', 'hop', 'Viet Nam', 5000),\n    ('ST07', 'Phan khong bui', 'hop', 'Viet Nam', 7000),\n    ('ST08', 'Bong bang', 'cai', 'Viet Nam', 1000),\n    ('ST09', 'But long', 'cay', 'Viet Nam', 5000),\n    ('ST10', 'But long', 'cay', 'Trung Quoc', 7000);\n\nINSERT INTO HOADON (SOHD, NGHD, MAKH, MANV, TRIGIA)\nVALUES\n    (1001, '20060723', 'KH01', 'NV01', 320000),\n    (1002, '20060812', 'KH01', 'NV02', 840000),\n    (1003, '20060823', 'KH02', 'NV01', 100000),\n    (1004, '20060901', 'KH02', 'NV01', 180000),\n    (1005, '20061020', 'KH01', 'NV02', 3800000),\n    (1006, '20061016', 'KH01', 'NV03', 2430000),\n    (1007, '20061028', 'KH03', 'NV03', 510000),\n    (1008, '20061028', 'KH01', 'NV03', 440000),\n    (1009, '20061028', 'KH03', 'NV04', 200000),\n    (1010, '20061101', 'KH01', 'NV01', 5200000),\n    (1011, '20061104', 'KH04', 'NV03', 250000),\n    (1012, '20061130', 'KH05', 'NV03', 21000),\n    (1013, '20061212', 'KH06', 'NV01', 5000),\n    (1014, '20061231', 'KH03', 'NV02', 3150000),\n    (1015, '20070101', 'KH06', 'NV01', 910000),\n    (1016, '20070101', 'KH07', 'NV02', 12500),\n    (1017, '20070102', 'KH08', 'NV03', 35000),\n    (1018, '20070113', 'KH08', 'NV03', 330000),\n    (1019, '20070113', 'KH01', 'NV03', 30000),\n    (1020, '20070114', 'KH09', 'NV04', 70000),\n    (1021, '20070116', 'KH10', 'NV03', 67500),\n    (1022, '20070116', NULL, 'NV03', 7000),\n    (1023, '20070117', NULL, 'NV01', 330000);\n\nINSERT INTO CTHD (SOHD, MASP, SL)\nVALUES\n    (1001, 'TV02', 10),\n    (1001, 'ST01', 5),\n    (1001, 'BC01', 5),\n    (1001, 'BC02', 10),\n    (1001, 'ST08', 10),\n    (1002, 'BC04', 20),\n    (1002, 'BB01', 20),\n    (1002, 'BB02', 20),\n    (1003, 'BB03', 10),\n    (1004, 'TV01', 20),\n    (1004, 'TV02', 10),\n    (1004, 'TV03', 10),\n    (1004, 'TV04', 10),\n    (1005, 'TV05', 50),\n    (1005, 'TV06', 50),\n    (1006, 'TV07', 20),\n    (1006, 'ST01', 30),\n    (1006, 'ST02', 10),\n    (1007, 'ST03', 10),\n    (1008, 'ST04', 8),\n    (1009, 'ST05', 10),\n    (1010, 'TV07', 50),\n    (1010, 'ST07', 50),\n    (1010, 'ST08', 100),\n    (1010, 'ST04', 50),\n    (1010, 'TV03', 100),\n    (1011, 'ST06', 50),\n    (1012, 'ST07', 3),\n    (1013, 'ST08', 5),\n    (1014, 'BC02', 80),\n    (1014, 'BB02', 100),\n    (1014, 'BC04', 60),\n    (1014, 'BB01', 50),\n    (1015, 'BB02', 30),\n    (1015, 'BB03', 7),\n    (1016, 'TV01', 5),\n    (1017, 'TV02', 1),\n    (1017, 'TV03', 1),\n    (1017, 'TV04', 5),\n    (1018, 'ST04', 6),\n    (1019, 'ST05', 1),\n    (1019, 'ST06', 2),\n    (1020, 'ST07', 10),\n    (1021, 'ST08', 5),\n    (1021, 'TV01', 7),\n    (1021, 'TV02', 10),\n    (1022, 'ST07', 1),\n    (1023, 'ST04', 6);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DML - Thêm dòng dữ liệu (INSERT)"
+   },
+   {
+    "id": "qlbh-dml-02",
+    "name": "DML-02 Tạo bản sao.sql",
+    "description": "Câu 2. Tạo quan hệ SANPHAM1 chứa toàn bộ dữ liệu của quan hệ SANPHAM. Tạo quan hệ KHACHHANG1 chứa toàn bộ dữ liệu của quan hệ KHACHHANG.",
+    "answer": "SELECT * INTO SANPHAM1 FROM SANPHAM;\nSELECT * INTO KHACHHANG1 FROM KHACHHANG;",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DML - Sao chép bảng (SELECT INTO)"
+   },
+   {
+    "id": "qlbh-dml-03",
+    "name": "DML-03 Tăng giá Thai Lan.sql",
+    "description": "Câu 3. Cập nhật giá tăng 5% đối với những sản phẩm do “Thai Lan” sản xuất (cho quan hệ SANPHAM1).",
+    "answer": "UPDATE SANPHAM1\nSET GIA = GIA * 1.05\nWHERE NUOCSX = 'Thai Lan';",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "SELECT * INTO SANPHAM1 FROM SANPHAM;",
+    "difficulty": "Dễ",
+    "category": "DML - Cập nhật dữ liệu (UPDATE)"
+   },
+   {
+    "id": "qlbh-dml-04",
+    "name": "DML-04 Giảm giá Trung Quoc.sql",
+    "description": "Câu 4. Cập nhật giá giảm 5% đối với những sản phẩm do “Trung Quoc” sản xuất có giá từ 10.000 trở xuống (cho quan hệ SANPHAM1).",
+    "answer": "UPDATE SANPHAM1\nSET GIA = GIA * 0.95\nWHERE NUOCSX = 'Trung Quoc' AND GIA <= 10000;",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "SELECT * INTO SANPHAM1 FROM SANPHAM;",
+    "difficulty": "Trung bình",
+    "category": "DML - Cập nhật dữ liệu (UPDATE)"
+   },
+   {
+    "id": "qlbh-dml-05",
+    "name": "DML-05 Khách hàng Vip.sql",
+    "description": "Câu 5. Cập nhật giá trị LOAIKH là “Vip” đối với những khách hàng đăng ký thành viên trước ngày 1/1/2007 có doanh số từ 10.000.000 trở lên hoặc khách hàng đăng ký thành viên từ 1/1/2007 trở về sau có doanh số từ 2.000.000 trở lên (cho quan hệ KHACHHANG1).",
+    "answer": "UPDATE KHACHHANG1\nSET LOAIKH = 'Vip'\nWHERE (NGDK < '20070101' AND DOANHSO >= 10000000)\n   OR (NGDK >= '20070101' AND DOANHSO >= 2000000);",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "SELECT MAKH, HOTEN, DCHI, SODT, NGSINH, DOANHSO, NGDK, CAST(NULL AS VARCHAR(10)) AS LOAIKH\nINTO KHACHHANG1\nFROM KHACHHANG;",
+    "difficulty": "Khó",
+    "category": "DML - Cập nhật dữ liệu (UPDATE)"
+   }
+  ],
+  "trigger": [
+   {
+    "id": "qlbh-trg-13",
+    "name": "TRG-13 Trị giá hóa đơn.sql",
+    "description": "Câu 13. Trị giá của một hóa đơn là tổng thành tiền (số lượng * đơn giá) của các chi tiết thuộc hóa đơn đó. Viết trigger trên bảng CTHD cho các thao tác thêm, sửa, xóa chi tiết để HOADON.TRIGIA luôn đúng (hóa đơn không còn chi tiết thì trị giá bằng 0).",
+    "answer": "CREATE TRIGGER trg_CTHD_TriGia ON CTHD\nAFTER INSERT, UPDATE, DELETE\nAS\nBEGIN\n    UPDATE hd\n    SET hd.TRIGIA = ISNULL((SELECT SUM(ct.SL * sp.GIA)\n                            FROM CTHD ct JOIN SANPHAM sp ON sp.MASP = ct.MASP\n                            WHERE ct.SOHD = hd.SOHD), 0)\n    FROM HOADON hd\n    WHERE hd.SOHD IN (SELECT SOHD FROM inserted UNION SELECT SOHD FROM deleted)\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "INSERT INTO CTHD (SOHD, MASP, SL) VALUES (1013, 'ST07', 2);",
+     "INSERT INTO CTHD (SOHD, MASP, SL) VALUES (1016, 'ST07', 3), (1017, 'ST06', 4);",
+     "UPDATE CTHD SET SL = SL + 1 WHERE SOHD = 1004;",
+     "DELETE FROM CTHD WHERE SOHD = 1001 AND MASP IN ('ST01', 'BC01');",
+     "DELETE FROM CTHD WHERE SOHD = 1022;"
+    ]
+   },
+   {
+    "id": "qlbh-trg-14",
+    "name": "TRG-14 Doanh số khách hàng.sql",
+    "description": "Câu 14. Doanh số của một khách hàng là tổng trị giá các hóa đơn mà khách hàng thành viên đó đã mua. Viết trigger trên bảng HOADON cho các thao tác thêm, sửa, xóa hóa đơn để KHACHHANG.DOANHSO luôn đúng (hóa đơn không có mã khách hàng thì bỏ qua).",
+    "answer": "CREATE TRIGGER trg_HOADON_DoanhSo ON HOADON\nAFTER INSERT, UPDATE, DELETE\nAS\nBEGIN\n    UPDATE kh\n    SET kh.DOANHSO = ISNULL((SELECT SUM(hd.TRIGIA) FROM HOADON hd WHERE hd.MAKH = kh.MAKH), 0)\n    FROM KHACHHANG kh\n    WHERE kh.MAKH IN (SELECT MAKH FROM inserted UNION SELECT MAKH FROM deleted)\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "INSERT INTO HOADON (SOHD, NGHD, MAKH, MANV, TRIGIA) VALUES (1024, '20070120', 'KH02', 'NV01', 100000);",
+     "INSERT INTO HOADON (SOHD, NGHD, MAKH, MANV, TRIGIA) VALUES (1024, '20070120', 'KH03', 'NV01', 50000), (1025, '20070121', 'KH04', 'NV02', 70000), (1026, '20070121', NULL, 'NV02', 9000);",
+     "UPDATE HOADON SET TRIGIA = TRIGIA * 2 WHERE MAKH = 'KH01';",
+     "UPDATE HOADON SET MAKH = 'KH10' WHERE SOHD = 1001;",
+     "DELETE FROM CTHD WHERE SOHD = 1020; DELETE FROM HOADON WHERE SOHD = 1020;",
+     "DELETE FROM CTHD WHERE SOHD IN (1022, 1023); DELETE FROM HOADON WHERE SOHD IN (1022, 1023);"
+    ]
+   }
+  ],
+  "sql": [
+   {
+    "id": "qlbh-dql-01",
+    "name": "DQL-01.sql",
+    "description": "Câu 1. In ra danh sách các sản phẩm (MASP,TENSP) do “Trung Quoc” sản xuất.",
+    "query": "SELECT MASP, TENSP FROM SANPHAM WHERE NUOCSX = 'Trung Quoc' ORDER BY MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-02",
+    "name": "DQL-02.sql",
+    "description": "Câu 2. In ra danh sách các sản phẩm (MASP, TENSP) có đơn vị tính là “cay”, ”quyen”.",
+    "query": "SELECT MASP, TENSP FROM SANPHAM WHERE DVT IN ('cay', 'quyen') ORDER BY MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-03",
+    "name": "DQL-03.sql",
+    "description": "Câu 3. In ra danh sách các sản phẩm (MASP,TENSP) có mã sản phẩm bắt đầu là “B” và kết thúc là “01”.",
+    "query": "SELECT MASP, TENSP FROM SANPHAM WHERE MASP LIKE 'B%01' ORDER BY MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-04",
+    "name": "DQL-04.sql",
+    "description": "Câu 4. In ra danh sách các sản phẩm (MASP,TENSP) do “Trung Quoc” sản xuất có giá từ 30.000 đến 40.000.",
+    "query": "SELECT MASP, TENSP FROM SANPHAM WHERE NUOCSX = 'Trung Quoc' AND GIA BETWEEN 30000 AND 40000 ORDER BY MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-05",
+    "name": "DQL-05.sql",
+    "description": "Câu 5. In ra danh sách các sản phẩm (MASP,TENSP) do “Trung Quoc” hoặc “Thai Lan” sản xuất có giá từ 30.000 đến 40.000.",
+    "query": "SELECT MASP, TENSP FROM SANPHAM WHERE NUOCSX IN ('Trung Quoc', 'Thai Lan') AND GIA BETWEEN 30000 AND 40000 ORDER BY MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-06",
+    "name": "DQL-06.sql",
+    "description": "Câu 6. In ra các số hóa đơn, trị giá hóa đơn bán ra trong ngày 1/1/2007 và ngày 2/1/2007.",
+    "query": "SELECT SOHD, TRIGIA FROM HOADON WHERE NGHD >= '20070101' AND NGHD < '20070103' ORDER BY SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-07",
+    "name": "DQL-07.sql",
+    "description": "Câu 7. In ra các số hóa đơn, trị giá hóa đơn trong tháng 1/2007, sắp xếp theo ngày (tăng dần) và trị giá của hóa đơn (giảm dần).",
+    "query": "SELECT SOHD, TRIGIA FROM HOADON WHERE NGHD >= '20070101' AND NGHD < '20070201' ORDER BY NGHD ASC, TRIGIA DESC, SOHD ASC;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-08",
+    "name": "DQL-08.sql",
+    "description": "Câu 8. In ra danh sách các khách hàng (MAKH, HOTEN) đã mua hàng trong ngày 1/1/2007.",
+    "query": "SELECT kh.MAKH, kh.HOTEN\nFROM KHACHHANG kh\nWHERE EXISTS (SELECT 1 FROM HOADON hd WHERE hd.MAKH = kh.MAKH AND hd.NGHD >= '20070101' AND hd.NGHD < '20070102')\nORDER BY kh.MAKH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlbh-dql-09",
+    "name": "DQL-09.sql",
+    "description": "Câu 9. In ra số hóa đơn, trị giá các hóa đơn do nhân viên có tên “Nguyen Van B” lập trong ngày 28/10/2006.",
+    "query": "SELECT hd.SOHD, hd.TRIGIA\nFROM HOADON hd JOIN NHANVIEN nv ON nv.MANV = hd.MANV\nWHERE nv.HOTEN = 'Nguyen Van B' AND hd.NGHD >= '20061028' AND hd.NGHD < '20061029'\nORDER BY hd.SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlbh-dql-10",
+    "name": "DQL-10.sql",
+    "description": "Câu 10. In ra danh sách các sản phẩm (MASP,TENSP) được khách hàng có tên “Nguyen Van A” mua trong tháng 10/2006.",
+    "query": "SELECT sp.MASP, sp.TENSP\nFROM SANPHAM sp\nWHERE EXISTS (SELECT 1 FROM CTHD ct JOIN HOADON hd ON hd.SOHD = ct.SOHD JOIN KHACHHANG kh ON kh.MAKH = hd.MAKH\n              WHERE ct.MASP = sp.MASP AND kh.HOTEN = 'Nguyen Van A' AND hd.NGHD >= '20061001' AND hd.NGHD < '20061101')\nORDER BY sp.MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlbh-dql-11",
+    "name": "DQL-11.sql",
+    "description": "Câu 11. Tìm các số hóa đơn đã mua sản phẩm có mã số “BB01” hoặc “BB02”.",
+    "query": "SELECT DISTINCT SOHD FROM CTHD WHERE MASP IN ('BB01', 'BB02') ORDER BY SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-12",
+    "name": "DQL-12.sql",
+    "description": "Câu 12. Tìm các số hóa đơn đã mua sản phẩm có mã số “BB01” hoặc “BB02”, mỗi sản phẩm mua với số lượng từ 10 đến 20.",
+    "query": "SELECT DISTINCT SOHD FROM CTHD WHERE MASP IN ('BB01', 'BB02') AND SL BETWEEN 10 AND 20 ORDER BY SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn cơ bản (SELECT/WHERE)"
+   },
+   {
+    "id": "qlbh-dql-13",
+    "name": "DQL-13.sql",
+    "description": "Câu 13. Tìm các số hóa đơn mua cùng lúc 2 sản phẩm có mã số “BB01” và “BB02”, mỗi sản phẩm mua với số lượng từ 10 đến 20.",
+    "query": "SELECT SOHD\nFROM CTHD\nWHERE MASP IN ('BB01', 'BB02') AND SL BETWEEN 10 AND 20\nGROUP BY SOHD\nHAVING COUNT(DISTINCT MASP) = 2\nORDER BY SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlbh-dql-14",
+    "name": "DQL-14.sql",
+    "description": "Câu 14. In ra danh sách các sản phẩm (MASP,TENSP) do “Trung Quoc” sản xuất hoặc các sản phẩm được bán ra trong ngày 1/1/2007.",
+    "query": "SELECT sp.MASP, sp.TENSP\nFROM SANPHAM sp\nWHERE sp.NUOCSX = 'Trung Quoc'\n   OR EXISTS (SELECT 1 FROM CTHD ct JOIN HOADON hd ON hd.SOHD = ct.SOHD\n              WHERE ct.MASP = sp.MASP AND hd.NGHD >= '20070101' AND hd.NGHD < '20070102')\nORDER BY sp.MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlbh-dql-15",
+    "name": "DQL-15.sql",
+    "description": "Câu 15. In ra danh sách các sản phẩm (MASP,TENSP) không bán được.",
+    "query": "SELECT sp.MASP, sp.TENSP FROM SANPHAM sp WHERE NOT EXISTS (SELECT 1 FROM CTHD ct WHERE ct.MASP = sp.MASP) ORDER BY sp.MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlbh-dql-16",
+    "name": "DQL-16.sql",
+    "description": "Câu 16. In ra danh sách các sản phẩm (MASP,TENSP) không bán được trong năm 2006.",
+    "query": "SELECT sp.MASP, sp.TENSP\nFROM SANPHAM sp\nWHERE NOT EXISTS (SELECT 1 FROM CTHD ct JOIN HOADON hd ON hd.SOHD = ct.SOHD\n                  WHERE ct.MASP = sp.MASP AND hd.NGHD >= '20060101' AND hd.NGHD < '20070101')\nORDER BY sp.MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlbh-dql-17",
+    "name": "DQL-17.sql",
+    "description": "Câu 17. In ra danh sách các sản phẩm (MASP,TENSP) do “Trung Quoc” sản xuất không bán được trong năm 2006.",
+    "query": "SELECT sp.MASP, sp.TENSP\nFROM SANPHAM sp\nWHERE sp.NUOCSX = 'Trung Quoc'\n  AND NOT EXISTS (SELECT 1 FROM CTHD ct JOIN HOADON hd ON hd.SOHD = ct.SOHD\n                  WHERE ct.MASP = sp.MASP AND hd.NGHD >= '20060101' AND hd.NGHD < '20070101')\nORDER BY sp.MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlbh-dql-18",
+    "name": "DQL-18.sql",
+    "description": "Câu 18. Tìm số hóa đơn trong năm 2006 đã mua ít nhất tất cả các sản phẩm do Singapore sản xuất.",
+    "query": "SELECT hd.SOHD\nFROM HOADON hd\nWHERE hd.NGHD >= '20060101' AND hd.NGHD < '20070101'\n  AND NOT EXISTS (SELECT 1 FROM SANPHAM sp\n                  WHERE sp.NUOCSX = 'Singapore'\n                    AND NOT EXISTS (SELECT 1 FROM CTHD ct WHERE ct.SOHD = hd.SOHD AND ct.MASP = sp.MASP))\nORDER BY hd.SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlbh-dql-19",
+    "name": "DQL-19.sql",
+    "description": "Câu 19. Có bao nhiêu hóa đơn không phải của khách hàng đăng ký thành viên mua?",
+    "query": "SELECT COUNT(*) AS SO_HOA_DON FROM HOADON WHERE MAKH IS NULL;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-20",
+    "name": "DQL-20.sql",
+    "description": "Câu 20. Có bao nhiêu sản phẩm khác nhau được bán ra trong năm 2006.",
+    "query": "SELECT COUNT(DISTINCT ct.MASP) AS SO_SAN_PHAM\nFROM CTHD ct JOIN HOADON hd ON hd.SOHD = ct.SOHD\nWHERE hd.NGHD >= '20060101' AND hd.NGHD < '20070101';",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-21",
+    "name": "DQL-21.sql",
+    "description": "Câu 21. Cho biết trị giá hóa đơn cao nhất, thấp nhất là bao nhiêu?",
+    "query": "SELECT MAX(TRIGIA) AS CAO_NHAT, MIN(TRIGIA) AS THAP_NHAT FROM HOADON;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-22",
+    "name": "DQL-22.sql",
+    "description": "Câu 22. Trị giá trung bình của tất cả các hóa đơn được bán ra trong năm 2006 là bao nhiêu?",
+    "query": "SELECT AVG(TRIGIA) AS TRUNG_BINH FROM HOADON WHERE NGHD >= '20060101' AND NGHD < '20070101';",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-23",
+    "name": "DQL-23.sql",
+    "description": "Câu 23. Tính doanh thu bán hàng trong năm 2006.",
+    "query": "SELECT SUM(TRIGIA) AS DOANH_THU FROM HOADON WHERE NGHD >= '20060101' AND NGHD < '20070101';",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-24",
+    "name": "DQL-24.sql",
+    "description": "Câu 24. Tìm số hóa đơn có trị giá cao nhất trong năm 2006.",
+    "query": "SELECT SOHD\nFROM HOADON\nWHERE NGHD >= '20060101' AND NGHD < '20070101'\n  AND TRIGIA = (SELECT MAX(TRIGIA) FROM HOADON WHERE NGHD >= '20060101' AND NGHD < '20070101')\nORDER BY SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlbh-dql-25",
+    "name": "DQL-25.sql",
+    "description": "Câu 25. Tìm họ tên khách hàng đã mua hóa đơn có trị giá cao nhất trong năm 2006.",
+    "query": "SELECT DISTINCT kh.HOTEN\nFROM KHACHHANG kh JOIN HOADON hd ON hd.MAKH = kh.MAKH\nWHERE hd.NGHD >= '20060101' AND hd.NGHD < '20070101'\n  AND hd.TRIGIA = (SELECT MAX(TRIGIA) FROM HOADON WHERE NGHD >= '20060101' AND NGHD < '20070101')\nORDER BY kh.HOTEN;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlbh-dql-26",
+    "name": "DQL-26.sql",
+    "description": "Câu 26. In ra danh sách 3 khách hàng (MAKH, HOTEN) có doanh số cao nhất.",
+    "query": "SELECT TOP (3) MAKH, HOTEN FROM KHACHHANG ORDER BY DOANHSO DESC, MAKH ASC;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Top N và xếp hạng (TOP, DENSE_RANK)"
+   },
+   {
+    "id": "qlbh-dql-27",
+    "name": "DQL-27.sql",
+    "description": "Câu 27. In ra danh sách các sản phẩm (MASP, TENSP) có giá bán bằng 1 trong 3 mức giá cao nhất.",
+    "query": "SELECT MASP, TENSP FROM SANPHAM WHERE GIA IN (SELECT DISTINCT TOP (3) GIA FROM SANPHAM ORDER BY GIA DESC) ORDER BY GIA DESC, MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Top N và xếp hạng (TOP, DENSE_RANK)"
+   },
+   {
+    "id": "qlbh-dql-28",
+    "name": "DQL-28.sql",
+    "description": "Câu 28. In ra danh sách các sản phẩm (MASP, TENSP) do “Thai Lan” sản xuất có giá bằng 1 trong 3 mức giá cao nhất (của tất cả các sản phẩm).",
+    "query": "SELECT MASP, TENSP\nFROM SANPHAM\nWHERE NUOCSX = 'Thai Lan' AND GIA IN (SELECT DISTINCT TOP (3) GIA FROM SANPHAM ORDER BY GIA DESC)\nORDER BY GIA DESC, MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Top N và xếp hạng (TOP, DENSE_RANK)"
+   },
+   {
+    "id": "qlbh-dql-29",
+    "name": "DQL-29.sql",
+    "description": "Câu 29. In ra danh sách các sản phẩm (MASP, TENSP) do “Trung Quoc” sản xuất có giá bằng 1 trong 3 mức giá cao nhất (của sản phẩm do “Trung Quoc” sản xuất).",
+    "query": "SELECT MASP, TENSP\nFROM SANPHAM\nWHERE NUOCSX = 'Trung Quoc'\n  AND GIA IN (SELECT DISTINCT TOP (3) GIA FROM SANPHAM WHERE NUOCSX = 'Trung Quoc' ORDER BY GIA DESC)\nORDER BY GIA DESC, MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Top N và xếp hạng (TOP, DENSE_RANK)"
+   },
+   {
+    "id": "qlbh-dql-30",
+    "name": "DQL-30.sql",
+    "description": "Câu 30. In ra danh sách 3 khách hàng có doanh số cao nhất (sắp xếp theo kiểu xếp hạng).",
+    "query": "WITH XepHang AS (\n    SELECT MAKH, HOTEN, DOANHSO, DENSE_RANK() OVER (ORDER BY DOANHSO DESC) AS HANG\n    FROM KHACHHANG\n)\nSELECT MAKH, HOTEN, DOANHSO, HANG\nFROM XepHang\nWHERE HANG <= 3\nORDER BY HANG, MAKH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Top N và xếp hạng (TOP, DENSE_RANK)"
+   },
+   {
+    "id": "qlbh-dql-31",
+    "name": "DQL-31.sql",
+    "description": "Câu 31. Tính tổng số sản phẩm do “Trung Quoc” sản xuất.",
+    "query": "SELECT COUNT(*) AS SO_SAN_PHAM FROM SANPHAM WHERE NUOCSX = 'Trung Quoc';",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-32",
+    "name": "DQL-32.sql",
+    "description": "Câu 32. Tính tổng số sản phẩm của từng nước sản xuất.",
+    "query": "SELECT NUOCSX, COUNT(*) AS SO_SAN_PHAM FROM SANPHAM GROUP BY NUOCSX ORDER BY NUOCSX;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-33",
+    "name": "DQL-33.sql",
+    "description": "Câu 33. Với từng nước sản xuất, tìm giá bán cao nhất, thấp nhất, trung bình của các sản phẩm.",
+    "query": "SELECT NUOCSX, MAX(GIA) AS CAO_NHAT, MIN(GIA) AS THAP_NHAT, AVG(GIA) AS TRUNG_BINH FROM SANPHAM GROUP BY NUOCSX ORDER BY NUOCSX;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-34",
+    "name": "DQL-34.sql",
+    "description": "Câu 34. Tính doanh thu bán hàng mỗi ngày.",
+    "query": "SELECT CAST(NGHD AS DATE) AS NGAY, SUM(TRIGIA) AS DOANH_THU FROM HOADON GROUP BY CAST(NGHD AS DATE) ORDER BY NGAY;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-35",
+    "name": "DQL-35.sql",
+    "description": "Câu 35. Tính tổng số lượng của từng sản phẩm bán ra trong tháng 10/2006.",
+    "query": "SELECT sp.MASP, sp.TENSP, SUM(ct.SL) AS TONG_SO_LUONG\nFROM SANPHAM sp JOIN CTHD ct ON ct.MASP = sp.MASP JOIN HOADON hd ON hd.SOHD = ct.SOHD\nWHERE hd.NGHD >= '20061001' AND hd.NGHD < '20061101'\nGROUP BY sp.MASP, sp.TENSP\nORDER BY sp.MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-36",
+    "name": "DQL-36.sql",
+    "description": "Câu 36. Tính doanh thu bán hàng của từng tháng trong năm 2006.",
+    "query": "SELECT MONTH(NGHD) AS THANG, SUM(TRIGIA) AS DOANH_THU\nFROM HOADON\nWHERE NGHD >= '20060101' AND NGHD < '20070101'\nGROUP BY MONTH(NGHD)\nORDER BY THANG;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-37",
+    "name": "DQL-37.sql",
+    "description": "Câu 37. Tìm hóa đơn có mua ít nhất 4 sản phẩm khác nhau.",
+    "query": "SELECT SOHD FROM CTHD GROUP BY SOHD HAVING COUNT(DISTINCT MASP) >= 4 ORDER BY SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-38",
+    "name": "DQL-38.sql",
+    "description": "Câu 38. Tìm hóa đơn có mua 3 sản phẩm do “Viet Nam” sản xuất (3 sản phẩm khác nhau).",
+    "query": "SELECT ct.SOHD\nFROM CTHD ct JOIN SANPHAM sp ON sp.MASP = ct.MASP\nWHERE sp.NUOCSX = 'Viet Nam'\nGROUP BY ct.SOHD\nHAVING COUNT(DISTINCT ct.MASP) = 3\nORDER BY ct.SOHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-39",
+    "name": "DQL-39.sql",
+    "description": "Câu 39. Tìm khách hàng (MAKH, HOTEN) có số lần mua hàng nhiều nhất.",
+    "query": "WITH SoLanMua AS (\n    SELECT kh.MAKH, kh.HOTEN, COUNT(hd.SOHD) AS SO_LAN\n    FROM KHACHHANG kh LEFT JOIN HOADON hd ON hd.MAKH = kh.MAKH\n    GROUP BY kh.MAKH, kh.HOTEN\n)\nSELECT MAKH, HOTEN FROM SoLanMua WHERE SO_LAN = (SELECT MAX(SO_LAN) FROM SoLanMua) ORDER BY MAKH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlbh-dql-40",
+    "name": "DQL-40.sql",
+    "description": "Câu 40. Tháng mấy trong năm 2006, doanh số bán hàng cao nhất ?",
+    "query": "WITH DoanhThuThang AS (\n    SELECT MONTH(NGHD) AS THANG, SUM(TRIGIA) AS DOANH_THU\n    FROM HOADON\n    WHERE NGHD >= '20060101' AND NGHD < '20070101'\n    GROUP BY MONTH(NGHD)\n)\nSELECT THANG FROM DoanhThuThang WHERE DOANH_THU = (SELECT MAX(DOANH_THU) FROM DoanhThuThang) ORDER BY THANG;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlbh-dql-41",
+    "name": "DQL-41.sql",
+    "description": "Câu 41. Tìm sản phẩm (MASP, TENSP) có tổng số lượng bán ra thấp nhất trong năm 2006.",
+    "query": "WITH LuongBan AS (\n    SELECT sp.MASP, sp.TENSP, SUM(ct.SL) AS TONG_SL\n    FROM SANPHAM sp JOIN CTHD ct ON ct.MASP = sp.MASP JOIN HOADON hd ON hd.SOHD = ct.SOHD\n    WHERE hd.NGHD >= '20060101' AND hd.NGHD < '20070101'\n    GROUP BY sp.MASP, sp.TENSP\n)\nSELECT MASP, TENSP FROM LuongBan WHERE TONG_SL = (SELECT MIN(TONG_SL) FROM LuongBan) ORDER BY MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlbh-dql-42",
+    "name": "DQL-42.sql",
+    "description": "Câu 42. Mỗi nước sản xuất, tìm sản phẩm (MASP,TENSP) có giá bán cao nhất.",
+    "query": "SELECT sp.NUOCSX, sp.MASP, sp.TENSP, sp.GIA\nFROM SANPHAM sp\nWHERE sp.GIA = (SELECT MAX(sp2.GIA) FROM SANPHAM sp2 WHERE sp2.NUOCSX = sp.NUOCSX)\nORDER BY sp.NUOCSX, sp.MASP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlbh-dql-43",
+    "name": "DQL-43.sql",
+    "description": "Câu 43. Tìm nước sản xuất sản xuất ít nhất 3 sản phẩm có giá bán khác nhau.",
+    "query": "SELECT NUOCSX FROM SANPHAM GROUP BY NUOCSX HAVING COUNT(DISTINCT GIA) >= 3 ORDER BY NUOCSX;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlbh-dql-44",
+    "name": "DQL-44.sql",
+    "description": "Câu 44. Trong 10 khách hàng có doanh số cao nhất, tìm khách hàng có số lần mua hàng nhiều nhất.",
+    "query": "WITH TopKH AS (\n    SELECT TOP (10) MAKH, HOTEN FROM KHACHHANG ORDER BY DOANHSO DESC, MAKH ASC\n), SoLanMua AS (\n    SELECT t.MAKH, t.HOTEN, COUNT(hd.SOHD) AS SO_LAN\n    FROM TopKH t LEFT JOIN HOADON hd ON hd.MAKH = t.MAKH\n    GROUP BY t.MAKH, t.HOTEN\n)\nSELECT MAKH, HOTEN FROM SoLanMua WHERE SO_LAN = (SELECT MAX(SO_LAN) FROM SoLanMua) ORDER BY MAKH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   }
+  ]
+ },
+ "qlgv": {
+  "number": "QLGV",
+  "title": "Quản lý giáo vụ (QLGV) – DDL, DML, trigger và 35 câu truy vấn",
+  "difficulty": "Medium",
+  "topics": [
+   "Quản lý giáo vụ",
+   "DDL",
+   "DML",
+   "Trigger",
+   "DQL",
+   "Cơ sở dữ liệu quan hệ"
+  ],
+  "statement": "**Bài tập 2 – Cơ sở dữ liệu quản lý giáo vụ** (Cơ sở dữ liệu quan hệ – Khoa Hệ thống thông tin, UIT).\n\nCSDL gồm 8 quan hệ HOCVIEN, LOP, KHOA, MONHOC, DIEUKIEN, GIAOVIEN, GIANGDAY, KETQUATHI (xem *Mô tả cơ sở dữ liệu*). Bài gồm 4 phần: **DDL** (tạo bảng, khóa ngoại, ràng buộc CHECK), **DML** (cập nhật dữ liệu), **Trigger** (sĩ số lớp) và **DQL** (35 câu truy vấn).\n\nMỗi câu hỏi được gắn *dạng bài* và *mức độ* (Dễ / Trung bình / Khó). Mã học viên dạng `K1101` (3 ký tự đầu là mã lớp); kết quả thi là `Dat` hoặc `Khong Dat`.",
+  "libraryKey": "qlgv",
+  "relations": [
+   {
+    "tableName": "KHOA",
+    "attributes": "MAKHOA (varchar(4)): Mã khoa (khóa chính)\nTENKHOA (varchar(40)): Tên khoa\nNGTLAP (smalldatetime): Ngày thành lập khoa\nTRGKHOA (char(4)): Trưởng khoa (mã giáo viên)",
+    "predicate": "Mỗi khoa có mã khoa, tên khoa, ngày thành lập và trưởng khoa (một giáo viên thuộc khoa)."
+   },
+   {
+    "tableName": "MONHOC",
+    "attributes": "MAMH (varchar(10)): Mã môn học (khóa chính)\nTENMH (varchar(40)): Tên môn học\nTCLT (tinyint): Số tín chỉ lý thuyết\nTCTH (tinyint): Số tín chỉ thực hành\nMAKHOA (varchar(4)): Khoa phụ trách",
+    "predicate": "Mỗi môn học có tên, số tín chỉ lý thuyết, số tín chỉ thực hành và khoa phụ trách."
+   },
+   {
+    "tableName": "DIEUKIEN",
+    "attributes": "MAMH (varchar(10)): Mã môn học (thuộc tính khóa)\nMAMH_TRUOC (varchar(10)): Mã môn học phải học trước (thuộc tính khóa)",
+    "predicate": "Một số môn học viên phải có kiến thức từ các môn học trước."
+   },
+   {
+    "tableName": "GIAOVIEN",
+    "attributes": "MAGV (char(4)): Mã giáo viên (khóa chính)\nHOTEN (varchar(40)): Họ tên\nHOCVI (varchar(10)): Học vị\nHOCHAM (varchar(10)): Học hàm\nGIOITINH (varchar(3)): Giới tính\nNGSINH (smalldatetime): Ngày sinh\nNGVL (smalldatetime): Ngày vào làm việc\nHESO (numeric(4,2)): Hệ số lương\nMUCLUONG (money): Mức lương\nMAKHOA (varchar(4)): Thuộc khoa nào",
+    "predicate": "Giáo viên: họ tên, học vị, học hàm, giới tính, ngày sinh, ngày vào làm, hệ số, mức lương và khoa."
+   },
+   {
+    "tableName": "LOP",
+    "attributes": "MALOP (char(3)): Mã lớp (khóa chính)\nTENLOP (varchar(40)): Tên lớp\nTRGLOP (char(5)): Lớp trưởng (mã học viên)\nSISO (tinyint): Sĩ số lớp\nMAGVCN (char(4)): Mã giáo viên chủ nhiệm",
+    "predicate": "Mỗi lớp có mã lớp, tên lớp, lớp trưởng (một học viên), sĩ số và giáo viên chủ nhiệm."
+   },
+   {
+    "tableName": "HOCVIEN",
+    "attributes": "MAHV (char(5)): Mã học viên (khóa chính)\nHO (varchar(40)): Họ và tên lót\nTEN (varchar(10)): Tên\nNGSINH (smalldatetime): Ngày sinh\nGIOITINH (varchar(3)): Giới tính\nNOISINH (varchar(40)): Nơi sinh\nMALOP (char(3)): Mã lớp\nGHICHU (varchar(50)): Ghi chú\nDIEMTB (numeric(4,2)): Điểm trung bình các môn\nXEPLOAI (varchar(5)): Xếp loại (XS, G, K, TB, Y)",
+    "predicate": "Học viên: họ, tên, ngày sinh, giới tính, nơi sinh, lớp; thêm GHICHU, DIEMTB, XEPLOAI."
+   },
+   {
+    "tableName": "GIANGDAY",
+    "attributes": "MALOP (char(3)): Mã lớp (thuộc tính khóa)\nMAMH (varchar(10)): Mã môn học (thuộc tính khóa)\nMAGV (char(4)): Mã giáo viên\nHOCKY (tinyint): Học kỳ\nNAM (smallint): Năm học\nTUNGAY (smalldatetime): Ngày bắt đầu môn học\nDENNGAY (smalldatetime): Ngày kết thúc môn học",
+    "predicate": "Mỗi học kỳ của năm học phân công giảng dạy lớp nào học môn gì, giáo viên nào phụ trách."
+   },
+   {
+    "tableName": "KETQUATHI",
+    "attributes": "MAHV (char(5)): Mã học viên (thuộc tính khóa)\nMAMH (varchar(10)): Mã môn học (thuộc tính khóa)\nLANTHI (tinyint): Lần thi (thuộc tính khóa)\nNGTHI (smalldatetime): Ngày thi\nDIEM (numeric(4,2)): Điểm thi\nKQUA (varchar(10)): Kết quả thi (Dat / Khong Dat)",
+    "predicate": "Kết quả thi của học viên: môn nào, lần thi thứ mấy, ngày thi, điểm và kết quả đạt / không đạt."
+   }
+  ],
+  "ddl": [
+   {
+    "id": "qlgv-ddl-01",
+    "name": "DDL-01 Tạo quan hệ.sql",
+    "description": "Câu 1. Tạo các quan hệ KHOA, MONHOC, DIEUKIEN, GIAOVIEN, LOP, HOCVIEN, GIANGDAY, KETQUATHI và khai báo các khóa chính, khóa ngoại (trừ hai khóa ngoại vòng KHOA.TRGKHOA và LOP.TRGLOP, làm ở câu 2 và câu 3). Quan hệ HOCVIEN có thêm 3 thuộc tính GHICHU varchar(50), DIEMTB numeric(4,2), XEPLOAI varchar(5).",
+    "answer": "-- Bai tap 2: Quan ly giao vu (SQL Server). Gom 3 cot GHICHU, DIEMTB, XEPLOAI cua HOCVIEN (DDL cau 1).\n-- Hai khoa ngoai vong KHOA.TRGKHOA -> GIAOVIEN va LOP.TRGLOP -> HOCVIEN khong khai bao o day\n-- (khong the nap du lieu theo thu tu bat ky); chung la hai cau hoi DDL rieng.\nCREATE TABLE KHOA (\n    MAKHOA VARCHAR(4) NOT NULL PRIMARY KEY,\n    TENKHOA VARCHAR(40) NOT NULL,\n    NGTLAP SMALLDATETIME NULL,\n    TRGKHOA CHAR(4) NULL\n);\n\nCREATE TABLE MONHOC (\n    MAMH VARCHAR(10) NOT NULL PRIMARY KEY,\n    TENMH VARCHAR(40) NOT NULL,\n    TCLT TINYINT NULL,\n    TCTH TINYINT NULL,\n    MAKHOA VARCHAR(4) NULL,\n    FOREIGN KEY (MAKHOA) REFERENCES KHOA(MAKHOA)\n);\n\nCREATE TABLE DIEUKIEN (\n    MAMH VARCHAR(10) NOT NULL,\n    MAMH_TRUOC VARCHAR(10) NOT NULL,\n    PRIMARY KEY (MAMH, MAMH_TRUOC),\n    FOREIGN KEY (MAMH) REFERENCES MONHOC(MAMH),\n    FOREIGN KEY (MAMH_TRUOC) REFERENCES MONHOC(MAMH)\n);\n\nCREATE TABLE GIAOVIEN (\n    MAGV CHAR(4) NOT NULL PRIMARY KEY,\n    HOTEN VARCHAR(40) NOT NULL,\n    HOCVI VARCHAR(10) NULL,\n    HOCHAM VARCHAR(10) NULL,\n    GIOITINH VARCHAR(3) NULL,\n    NGSINH SMALLDATETIME NULL,\n    NGVL SMALLDATETIME NULL,\n    HESO NUMERIC(4,2) NULL,\n    MUCLUONG MONEY NULL,\n    MAKHOA VARCHAR(4) NULL,\n    FOREIGN KEY (MAKHOA) REFERENCES KHOA(MAKHOA)\n);\n\nCREATE TABLE LOP (\n    MALOP CHAR(3) NOT NULL PRIMARY KEY,\n    TENLOP VARCHAR(40) NOT NULL,\n    TRGLOP CHAR(5) NULL,\n    SISO TINYINT NULL,\n    MAGVCN CHAR(4) NULL,\n    FOREIGN KEY (MAGVCN) REFERENCES GIAOVIEN(MAGV)\n);\n\nCREATE TABLE HOCVIEN (\n    MAHV CHAR(5) NOT NULL PRIMARY KEY,\n    HO VARCHAR(40) NOT NULL,\n    TEN VARCHAR(10) NOT NULL,\n    NGSINH SMALLDATETIME NULL,\n    GIOITINH VARCHAR(3) NULL,\n    NOISINH VARCHAR(40) NULL,\n    MALOP CHAR(3) NULL,\n    GHICHU VARCHAR(50) NULL,\n    DIEMTB NUMERIC(4,2) NULL,\n    XEPLOAI VARCHAR(5) NULL,\n    FOREIGN KEY (MALOP) REFERENCES LOP(MALOP)\n);\n\nCREATE TABLE GIANGDAY (\n    MALOP CHAR(3) NOT NULL,\n    MAMH VARCHAR(10) NOT NULL,\n    MAGV CHAR(4) NOT NULL,\n    HOCKY TINYINT NOT NULL,\n    NAM SMALLINT NOT NULL,\n    TUNGAY SMALLDATETIME NULL,\n    DENNGAY SMALLDATETIME NULL,\n    PRIMARY KEY (MALOP, MAMH),\n    FOREIGN KEY (MALOP) REFERENCES LOP(MALOP),\n    FOREIGN KEY (MAMH) REFERENCES MONHOC(MAMH),\n    FOREIGN KEY (MAGV) REFERENCES GIAOVIEN(MAGV)\n);\n\nCREATE TABLE KETQUATHI (\n    MAHV CHAR(5) NOT NULL,\n    MAMH VARCHAR(10) NOT NULL,\n    LANTHI TINYINT NOT NULL,\n    NGTHI SMALLDATETIME NULL,\n    DIEM NUMERIC(4,2) NULL,\n    KQUA VARCHAR(10) NULL,\n    PRIMARY KEY (MAHV, MAMH, LANTHI),\n    FOREIGN KEY (MAHV) REFERENCES HOCVIEN(MAHV),\n    FOREIGN KEY (MAMH) REFERENCES MONHOC(MAMH)\n);",
+    "enabled": true,
+    "startFrom": "empty",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Tạo bảng (CREATE TABLE)"
+   },
+   {
+    "id": "qlgv-ddl-02",
+    "name": "DDL-02 Khóa ngoại TRGKHOA.sql",
+    "description": "Câu 2. Khai báo khóa ngoại cho thuộc tính TRGKHOA của quan hệ KHOA tham chiếu đến MAGV của quan hệ GIAOVIEN.",
+    "answer": "ALTER TABLE KHOA\nADD FOREIGN KEY (TRGKHOA) REFERENCES GIAOVIEN(MAGV);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Khóa ngoại (FOREIGN KEY)"
+   },
+   {
+    "id": "qlgv-ddl-03",
+    "name": "DDL-03 Khóa ngoại TRGLOP.sql",
+    "description": "Câu 3. Khai báo khóa ngoại cho thuộc tính TRGLOP của quan hệ LOP tham chiếu đến MAHV của quan hệ HOCVIEN.",
+    "answer": "ALTER TABLE LOP\nADD FOREIGN KEY (TRGLOP) REFERENCES HOCVIEN(MAHV);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Khóa ngoại (FOREIGN KEY)"
+   },
+   {
+    "id": "qlgv-ddl-04",
+    "name": "DDL-04 Mã học viên.sql",
+    "description": "Câu 4. Mã học viên là một chuỗi 5 ký tự, 3 ký tự đầu là mã lớp, 2 ký tự cuối cùng là số thứ tự học viên trong lớp. VD: “K1101”.",
+    "answer": "ALTER TABLE HOCVIEN\nADD CONSTRAINT CK_HOCVIEN CHECK (LEFT(MAHV, 3) = MALOP AND RIGHT(MAHV, 2) LIKE '[0-9][0-9]');",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-05",
+    "name": "DDL-05 Giới tính.sql",
+    "description": "Câu 5. Thuộc tính GIOITINH (của học viên và giáo viên) chỉ có giá trị là “Nam” hoặc “Nu”.",
+    "answer": "ALTER TABLE HOCVIEN\nADD CONSTRAINT CK_HOCVIEN CHECK (GIOITINH IN ('Nam', 'Nu'));\nALTER TABLE GIAOVIEN\nADD CONSTRAINT CK_GIAOVIEN CHECK (GIOITINH IN ('Nam', 'Nu'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-06",
+    "name": "DDL-06 Điểm số.sql",
+    "description": "Câu 6. Điểm số của một lần thi có giá trị từ 0 đến 10 và cần lưu 2 số lẻ (VD: 6.22).",
+    "answer": "ALTER TABLE KETQUATHI\nADD CONSTRAINT CK_KETQUATHI CHECK (DIEM BETWEEN 0 AND 10);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-07",
+    "name": "DDL-07 Kết quả thi.sql",
+    "description": "Câu 7. Kết quả thi là “Dat” nếu điểm từ 5 đến 10 và “Khong Dat” nếu điểm nhỏ hơn 5.",
+    "answer": "ALTER TABLE KETQUATHI\nADD CONSTRAINT CK_KETQUATHI CHECK ((DIEM >= 5 AND KQUA = 'Dat') OR (DIEM < 5 AND KQUA = 'Khong Dat'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-08",
+    "name": "DDL-08 Số lần thi.sql",
+    "description": "Câu 8. Học viên thi một môn tối đa 3 lần.",
+    "answer": "ALTER TABLE KETQUATHI\nADD CONSTRAINT CK_KETQUATHI CHECK (LANTHI <= 3);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-09",
+    "name": "DDL-09 Học kỳ.sql",
+    "description": "Câu 9. Học kỳ chỉ có giá trị từ 1 đến 3.",
+    "answer": "ALTER TABLE GIANGDAY\nADD CONSTRAINT CK_GIANGDAY CHECK (HOCKY BETWEEN 1 AND 3);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-10",
+    "name": "DDL-10 Học vị.sql",
+    "description": "Câu 10. Học vị của giáo viên chỉ có thể là “CN”, “KS”, “ThS”, “TS”, “PTS”.",
+    "answer": "ALTER TABLE GIAOVIEN\nADD CONSTRAINT CK_GIAOVIEN CHECK (HOCVI IN ('CN', 'KS', 'ThS', 'TS', 'PTS'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-11",
+    "name": "DDL-11 Tuổi học viên.sql",
+    "description": "Câu 11. Học viên ít nhất là 18 tuổi.",
+    "answer": "ALTER TABLE HOCVIEN\nADD CONSTRAINT CK_HOCVIEN CHECK (DATEDIFF(YEAR, NGSINH, GETDATE()) >= 18);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-12",
+    "name": "DDL-12 Ngày giảng dạy.sql",
+    "description": "Câu 12. Giảng dạy một môn học ngày bắt đầu (TUNGAY) phải nhỏ hơn ngày kết thúc (DENNGAY).",
+    "answer": "ALTER TABLE GIANGDAY\nADD CONSTRAINT CK_GIANGDAY CHECK (TUNGAY < DENNGAY);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-13",
+    "name": "DDL-13 Tuổi vào làm.sql",
+    "description": "Câu 13. Giáo viên khi vào làm ít nhất là 22 tuổi.",
+    "answer": "ALTER TABLE GIAOVIEN\nADD CONSTRAINT CK_GIAOVIEN CHECK (DATEDIFF(YEAR, NGSINH, NGVL) >= 22);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-14",
+    "name": "DDL-14 Tín chỉ.sql",
+    "description": "Câu 14. Tất cả các môn học đều có số tín chỉ lý thuyết và tín chỉ thực hành chênh lệch nhau không quá 3.",
+    "answer": "ALTER TABLE MONHOC\nADD CONSTRAINT CK_MONHOC CHECK (ABS(TCLT - TCTH) <= 3);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlgv-ddl-18",
+    "name": "DDL-18 Điều kiện môn học.sql",
+    "description": "Câu 18 (phần 1). Trong quan hệ DIEUKIEN giá trị của thuộc tính MAMH và MAMH_TRUOC trong cùng một bộ không được giống nhau (“A”,”A”).",
+    "answer": "ALTER TABLE DIEUKIEN\nADD CONSTRAINT CK_DIEUKIEN CHECK (MAMH <> MAMH_TRUOC);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   }
+  ],
+  "dml": [
+   {
+    "id": "qlgv-dml-01",
+    "name": "DML-01 Tăng hệ số trưởng khoa.sql",
+    "description": "Câu 1. Tăng hệ số lương thêm 0.2 cho những giáo viên là trưởng khoa.",
+    "answer": "UPDATE GIAOVIEN\nSET HESO = HESO + 0.2\nWHERE MAGV IN (SELECT TRGKHOA FROM KHOA WHERE TRGKHOA IS NOT NULL);",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DML - Cập nhật dữ liệu (UPDATE)"
+   },
+   {
+    "id": "qlgv-dml-02",
+    "name": "DML-02 Điểm trung bình.sql",
+    "description": "Câu 2. Cập nhật giá trị điểm trung bình tất cả các môn học (DIEMTB) của mỗi học viên (tất cả các môn học đều có hệ số 1 và nếu học viên thi một môn nhiều lần, chỉ lấy điểm của lần thi sau cùng).",
+    "answer": "UPDATE HOCVIEN\nSET DIEMTB = t.DTB\nFROM HOCVIEN\nJOIN (SELECT k.MAHV, AVG(k.DIEM) AS DTB\n      FROM KETQUATHI k\n      WHERE k.LANTHI = (SELECT MAX(k2.LANTHI) FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = k.MAMH)\n      GROUP BY k.MAHV) t ON t.MAHV = HOCVIEN.MAHV;",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "DML - Cập nhật dữ liệu (UPDATE)"
+   },
+   {
+    "id": "qlgv-dml-03",
+    "name": "DML-03 Cấm thi.sql",
+    "description": "Câu 3. Cập nhật giá trị cho cột GHICHU là “Cam thi” đối với trường hợp: học viên có một môn bất kỳ thi lần thứ 3 dưới 5 điểm.",
+    "answer": "UPDATE HOCVIEN\nSET GHICHU = 'Cam thi'\nWHERE MAHV IN (SELECT MAHV FROM KETQUATHI WHERE LANTHI = 3 AND DIEM < 5);",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Trung bình",
+    "category": "DML - Cập nhật dữ liệu (UPDATE)"
+   },
+   {
+    "id": "qlgv-dml-04",
+    "name": "DML-04 Xếp loại.sql",
+    "description": "Câu 4. Cập nhật giá trị cho cột XEPLOAI trong quan hệ HOCVIEN: DIEMTB >= 9 thì “XS”; 8 <= DIEMTB < 9 thì “G”; 6.5 <= DIEMTB < 8 thì “K”; 5 <= DIEMTB < 6.5 thì “TB”; DIEMTB < 5 thì “Y”. (Quan hệ HOCVIEN đã có sẵn DIEMTB; học viên chưa có DIEMTB giữ XEPLOAI là NULL.)",
+    "answer": "UPDATE HOCVIEN\nSET XEPLOAI = CASE\n        WHEN DIEMTB >= 9 THEN 'XS'\n        WHEN DIEMTB >= 8 THEN 'G'\n        WHEN DIEMTB >= 6.5 THEN 'K'\n        WHEN DIEMTB >= 5 THEN 'TB'\n        ELSE 'Y'\n    END\nWHERE DIEMTB IS NOT NULL;",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "UPDATE HOCVIEN SET DIEMTB = 9.5 WHERE MAHV = 'K1101';\nUPDATE HOCVIEN SET DIEMTB = 8.0 WHERE MAHV = 'K1102';\nUPDATE HOCVIEN SET DIEMTB = 6.5 WHERE MAHV = 'K1103';\nUPDATE HOCVIEN SET DIEMTB = 5.0 WHERE MAHV = 'K1104';\nUPDATE HOCVIEN SET DIEMTB = 4.99 WHERE MAHV = 'K1201';",
+    "difficulty": "Trung bình",
+    "category": "DML - Cập nhật dữ liệu (UPDATE)"
+   }
+  ],
+  "trigger": [
+   {
+    "id": "qlgv-trg-17",
+    "name": "TRG-17 Sĩ số lớp.sql",
+    "description": "Câu 17. Sĩ số của một lớp bằng với số lượng học viên thuộc lớp đó. Viết trigger trên bảng HOCVIEN cho các thao tác thêm, sửa, xóa học viên để LOP.SISO luôn đúng.",
+    "answer": "CREATE TRIGGER trg_HOCVIEN_SiSo ON HOCVIEN\nAFTER INSERT, UPDATE, DELETE\nAS\nBEGIN\n    UPDATE l\n    SET l.SISO = (SELECT COUNT(*) FROM HOCVIEN hv WHERE hv.MALOP = l.MALOP)\n    FROM LOP l\n    WHERE l.MALOP IN (SELECT MALOP FROM inserted UNION SELECT MALOP FROM deleted)\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "INSERT INTO HOCVIEN (MAHV, HO, TEN, NGSINH, GIOITINH, NOISINH, MALOP) VALUES ('K1112', 'Nguyen Van', 'C', '19860101', 'Nam', 'TpHCM', 'K11');",
+     "INSERT INTO HOCVIEN (MAHV, HO, TEN, NGSINH, GIOITINH, NOISINH, MALOP) VALUES ('K1213', 'Le Thi', 'D', '19860102', 'Nu', 'Ha Noi', 'K12'), ('K1313', 'Tran Van', 'E', '19860103', 'Nam', 'Can Tho', 'K13'), ('K1214', 'Pham Thi', 'F', '19860104', 'Nu', 'Hue', 'K12');",
+     "UPDATE HOCVIEN SET MALOP = 'K12' WHERE MAHV IN ('K1105', 'K1106');",
+     "DELETE FROM HOCVIEN WHERE MAHV IN ('K1306', 'K1307');"
+    ]
+   }
+  ],
+  "sql": [
+   {
+    "id": "qlgv-dql-01",
+    "name": "DQL-01.sql",
+    "description": "Câu 1. In ra danh sách (mã học viên, họ tên, ngày sinh, mã lớp) lớp trưởng của các lớp.",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN, hv.NGSINH, hv.MALOP\nFROM LOP l JOIN HOCVIEN hv ON hv.MAHV = l.TRGLOP\nORDER BY hv.MALOP;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-02",
+    "name": "DQL-02.sql",
+    "description": "Câu 2. In ra bảng điểm khi thi (mã học viên, họ tên, lần thi, điểm số) môn CTRR của lớp “K12”, sắp xếp theo tên, họ học viên.",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN, k.LANTHI, k.DIEM\nFROM KETQUATHI k JOIN HOCVIEN hv ON hv.MAHV = k.MAHV\nWHERE k.MAMH = 'CTRR' AND hv.MALOP = 'K12'\nORDER BY hv.TEN, hv.HO, hv.MAHV, k.LANTHI;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-03",
+    "name": "DQL-03.sql",
+    "description": "Câu 3. In ra danh sách những học viên (mã học viên, họ tên) và những môn học mà học viên đó thi lần thứ nhất đã đạt.",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN, mh.MAMH, mh.TENMH\nFROM KETQUATHI k JOIN HOCVIEN hv ON hv.MAHV = k.MAHV JOIN MONHOC mh ON mh.MAMH = k.MAMH\nWHERE k.LANTHI = 1 AND k.KQUA = 'Dat'\nORDER BY hv.MAHV, mh.MAMH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-04",
+    "name": "DQL-04.sql",
+    "description": "Câu 4. In ra danh sách học viên (mã học viên, họ tên) của lớp “K11” thi môn CTRR không đạt (ở lần thi 1).",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv JOIN KETQUATHI k ON k.MAHV = hv.MAHV\nWHERE hv.MALOP = 'K11' AND k.MAMH = 'CTRR' AND k.LANTHI = 1 AND k.KQUA = 'Khong Dat'\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-05",
+    "name": "DQL-05.sql",
+    "description": "Câu 5. Danh sách học viên (mã học viên, họ tên) của lớp “K” (mã lớp bắt đầu bằng K) thi môn CTRR không đạt (ở tất cả các lần thi).",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv\nWHERE hv.MALOP LIKE 'K%'\n  AND EXISTS (SELECT 1 FROM KETQUATHI k WHERE k.MAHV = hv.MAHV AND k.MAMH = 'CTRR')\n  AND NOT EXISTS (SELECT 1 FROM KETQUATHI k WHERE k.MAHV = hv.MAHV AND k.MAMH = 'CTRR' AND k.KQUA = 'Dat')\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-06",
+    "name": "DQL-06.sql",
+    "description": "Câu 6. Tìm tên những môn học mà giáo viên có tên “Tran Tam Thanh” dạy trong học kỳ 1 năm 2006.",
+    "query": "SELECT DISTINCT mh.TENMH\nFROM GIANGDAY gd JOIN GIAOVIEN gv ON gv.MAGV = gd.MAGV JOIN MONHOC mh ON mh.MAMH = gd.MAMH\nWHERE gv.HOTEN = 'Tran Tam Thanh' AND gd.HOCKY = 1 AND gd.NAM = 2006\nORDER BY mh.TENMH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-07",
+    "name": "DQL-07.sql",
+    "description": "Câu 7. Tìm những môn học (mã môn học, tên môn học) mà giáo viên chủ nhiệm lớp “K11” dạy trong học kỳ 1 năm 2006.",
+    "query": "SELECT DISTINCT mh.MAMH, mh.TENMH\nFROM LOP l JOIN GIANGDAY gd ON gd.MAGV = l.MAGVCN JOIN MONHOC mh ON mh.MAMH = gd.MAMH\nWHERE l.MALOP = 'K11' AND gd.HOCKY = 1 AND gd.NAM = 2006\nORDER BY mh.MAMH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-08",
+    "name": "DQL-08.sql",
+    "description": "Câu 8. Tìm họ tên lớp trưởng của các lớp mà giáo viên có tên “Nguyen To Lan” dạy môn “Co So Du Lieu”.",
+    "query": "SELECT DISTINCT hv.HO + ' ' + hv.TEN AS HOTEN\nFROM GIANGDAY gd\nJOIN GIAOVIEN gv ON gv.MAGV = gd.MAGV\nJOIN MONHOC mh ON mh.MAMH = gd.MAMH\nJOIN LOP l ON l.MALOP = gd.MALOP\nJOIN HOCVIEN hv ON hv.MAHV = l.TRGLOP\nWHERE gv.HOTEN = 'Nguyen To Lan' AND mh.TENMH = 'Co So Du Lieu'\nORDER BY HOTEN;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-09",
+    "name": "DQL-09.sql",
+    "description": "Câu 9. In ra danh sách những môn học (mã môn học, tên môn học) phải học liền trước môn “Co So Du Lieu”.",
+    "query": "SELECT mt.MAMH, mt.TENMH\nFROM DIEUKIEN dk\nJOIN MONHOC mh ON mh.MAMH = dk.MAMH\nJOIN MONHOC mt ON mt.MAMH = dk.MAMH_TRUOC\nWHERE mh.TENMH = 'Co So Du Lieu'\nORDER BY mt.MAMH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-10",
+    "name": "DQL-10.sql",
+    "description": "Câu 10. Môn “Cau Truc Roi Rac” là môn bắt buộc phải học liền trước những môn học (mã môn học, tên môn học) nào.",
+    "query": "SELECT mh.MAMH, mh.TENMH\nFROM DIEUKIEN dk\nJOIN MONHOC mt ON mt.MAMH = dk.MAMH_TRUOC\nJOIN MONHOC mh ON mh.MAMH = dk.MAMH\nWHERE mt.TENMH = 'Cau Truc Roi Rac'\nORDER BY mh.MAMH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-11",
+    "name": "DQL-11.sql",
+    "description": "Câu 11. Tìm họ tên giáo viên dạy môn CTRR cho cả hai lớp “K11” và “K12” trong cùng học kỳ 1 năm 2006.",
+    "query": "SELECT gv.HOTEN\nFROM GIAOVIEN gv JOIN GIANGDAY gd ON gd.MAGV = gv.MAGV\nWHERE gd.MAMH = 'CTRR' AND gd.HOCKY = 1 AND gd.NAM = 2006 AND gd.MALOP IN ('K11', 'K12')\nGROUP BY gv.MAGV, gv.HOTEN\nHAVING COUNT(DISTINCT gd.MALOP) = 2;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-12",
+    "name": "DQL-12.sql",
+    "description": "Câu 12. Tìm những học viên (mã học viên, họ tên) thi không đạt môn CSDL ở lần thi thứ 1 nhưng chưa thi lại môn này.",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv JOIN KETQUATHI k ON k.MAHV = hv.MAHV\nWHERE k.MAMH = 'CSDL' AND k.LANTHI = 1 AND k.KQUA = 'Khong Dat'\n  AND NOT EXISTS (SELECT 1 FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = 'CSDL' AND k2.LANTHI > 1)\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-13",
+    "name": "DQL-13.sql",
+    "description": "Câu 13. Tìm giáo viên (mã giáo viên, họ tên) không được phân công giảng dạy bất kỳ môn học nào.",
+    "query": "SELECT gv.MAGV, gv.HOTEN\nFROM GIAOVIEN gv\nWHERE NOT EXISTS (SELECT 1 FROM GIANGDAY gd WHERE gd.MAGV = gv.MAGV)\nORDER BY gv.MAGV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-14",
+    "name": "DQL-14.sql",
+    "description": "Câu 14. Tìm giáo viên (mã giáo viên, họ tên) không được phân công giảng dạy bất kỳ môn học nào thuộc khoa giáo viên đó phụ trách.",
+    "query": "SELECT gv.MAGV, gv.HOTEN\nFROM GIAOVIEN gv\nWHERE NOT EXISTS (SELECT 1 FROM GIANGDAY gd JOIN MONHOC mh ON mh.MAMH = gd.MAMH\n                  WHERE gd.MAGV = gv.MAGV AND mh.MAKHOA = gv.MAKHOA)\nORDER BY gv.MAGV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-15",
+    "name": "DQL-15.sql",
+    "description": "Câu 15. Tìm họ tên các học viên thuộc lớp “K11” thi một môn bất kỳ quá 3 lần vẫn “Khong Dat” hoặc thi lần thứ 2 môn CTRR được 5 điểm.",
+    "query": "SELECT hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv\nWHERE hv.MALOP = 'K11'\n  AND (EXISTS (SELECT 1 FROM KETQUATHI k WHERE k.MAHV = hv.MAHV AND k.LANTHI = 3 AND k.KQUA = 'Khong Dat')\n       OR EXISTS (SELECT 1 FROM KETQUATHI k WHERE k.MAHV = hv.MAHV AND k.MAMH = 'CTRR' AND k.LANTHI = 2 AND k.DIEM = 5))\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-16",
+    "name": "DQL-16.sql",
+    "description": "Câu 16. Tìm họ tên giáo viên dạy môn CTRR cho ít nhất hai lớp trong cùng một học kỳ của một năm học.",
+    "query": "SELECT DISTINCT gv.MAGV, gv.HOTEN\nFROM GIAOVIEN gv JOIN GIANGDAY gd ON gd.MAGV = gv.MAGV\nWHERE gd.MAMH = 'CTRR'\nGROUP BY gv.MAGV, gv.HOTEN, gd.HOCKY, gd.NAM\nHAVING COUNT(DISTINCT gd.MALOP) >= 2;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlgv-dql-17",
+    "name": "DQL-17.sql",
+    "description": "Câu 17. Danh sách học viên và điểm thi môn CSDL (chỉ lấy điểm của lần thi sau cùng).",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN, k.DIEM\nFROM KETQUATHI k JOIN HOCVIEN hv ON hv.MAHV = k.MAHV\nWHERE k.MAMH = 'CSDL'\n  AND k.LANTHI = (SELECT MAX(k2.LANTHI) FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = k.MAMH)\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlgv-dql-18",
+    "name": "DQL-18.sql",
+    "description": "Câu 18. Danh sách học viên và điểm thi môn “Co So Du Lieu” (chỉ lấy điểm cao nhất của các lần thi).",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN, MAX(k.DIEM) AS DIEM_CAO_NHAT\nFROM KETQUATHI k JOIN HOCVIEN hv ON hv.MAHV = k.MAHV JOIN MONHOC mh ON mh.MAMH = k.MAMH\nWHERE mh.TENMH = 'Co So Du Lieu'\nGROUP BY hv.MAHV, hv.HO, hv.TEN\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlgv-dql-19",
+    "name": "DQL-19.sql",
+    "description": "Câu 19. Khoa nào (mã khoa, tên khoa) được thành lập sớm nhất.",
+    "query": "SELECT MAKHOA, TENKHOA FROM KHOA WHERE NGTLAP = (SELECT MIN(NGTLAP) FROM KHOA) ORDER BY MAKHOA;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlgv-dql-20",
+    "name": "DQL-20.sql",
+    "description": "Câu 20. Có bao nhiêu giáo viên có học hàm là “GS” hoặc “PGS”.",
+    "query": "SELECT COUNT(*) AS SO_GIAO_VIEN FROM GIAOVIEN WHERE HOCHAM IN ('GS', 'PGS');",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlgv-dql-21",
+    "name": "DQL-21.sql",
+    "description": "Câu 21. Thống kê có bao nhiêu giáo viên có học vị là “CN”, “KS”, “ThS”, “TS”, “PTS” trong mỗi khoa.",
+    "query": "SELECT MAKHOA, HOCVI, COUNT(*) AS SO_GIAO_VIEN FROM GIAOVIEN GROUP BY MAKHOA, HOCVI ORDER BY MAKHOA, HOCVI;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Dễ",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlgv-dql-22",
+    "name": "DQL-22.sql",
+    "description": "Câu 22. Mỗi môn học thống kê số lượng học viên theo kết quả (đạt và không đạt), tính theo lần thi sau cùng của từng học viên.",
+    "query": "SELECT k.MAMH, k.KQUA, COUNT(*) AS SO_HOC_VIEN\nFROM KETQUATHI k\nWHERE k.LANTHI = (SELECT MAX(k2.LANTHI) FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = k.MAMH)\nGROUP BY k.MAMH, k.KQUA\nORDER BY k.MAMH, k.KQUA;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlgv-dql-23",
+    "name": "DQL-23.sql",
+    "description": "Câu 23. Tìm giáo viên (mã giáo viên, họ tên) là giáo viên chủ nhiệm của một lớp, đồng thời dạy cho lớp đó ít nhất một môn học.",
+    "query": "SELECT DISTINCT gv.MAGV, gv.HOTEN\nFROM LOP l\nJOIN GIAOVIEN gv ON gv.MAGV = l.MAGVCN\nJOIN GIANGDAY gd ON gd.MALOP = l.MALOP AND gd.MAGV = l.MAGVCN\nORDER BY gv.MAGV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlgv-dql-24",
+    "name": "DQL-24.sql",
+    "description": "Câu 24. Tìm họ tên lớp trưởng của lớp có sĩ số cao nhất.",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM LOP l JOIN HOCVIEN hv ON hv.MAHV = l.TRGLOP\nWHERE l.SISO = (SELECT MAX(SISO) FROM LOP)\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlgv-dql-25",
+    "name": "DQL-25.sql",
+    "description": "Câu 25. Tìm họ tên những lớp trưởng thi không đạt quá 3 môn (mỗi môn đều thi không đạt ở tất cả các lần thi).",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv JOIN LOP l ON l.TRGLOP = hv.MAHV\nWHERE (SELECT COUNT(DISTINCT k.MAMH)\n       FROM KETQUATHI k\n       WHERE k.MAHV = hv.MAHV\n         AND NOT EXISTS (SELECT 1 FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = k.MAMH AND k2.KQUA = 'Dat')) > 3\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlgv-dql-26",
+    "name": "DQL-26.sql",
+    "description": "Câu 26. Tìm học viên (mã học viên, họ tên) có số môn đạt điểm 9, 10 nhiều nhất.",
+    "query": "WITH Dem AS (\n    SELECT MAHV, COUNT(DISTINCT MAMH) AS SO_MON FROM KETQUATHI WHERE DIEM >= 9 GROUP BY MAHV\n)\nSELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN, d.SO_MON\nFROM Dem d JOIN HOCVIEN hv ON hv.MAHV = d.MAHV\nWHERE d.SO_MON = (SELECT MAX(SO_MON) FROM Dem)\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlgv-dql-27",
+    "name": "DQL-27.sql",
+    "description": "Câu 27. Trong từng lớp, tìm học viên (mã học viên, họ tên) có số môn đạt điểm 9, 10 nhiều nhất.",
+    "query": "WITH Dem AS (\n    SELECT hv.MALOP, hv.MAHV, hv.HO, hv.TEN, COUNT(DISTINCT k.MAMH) AS SO_MON\n    FROM HOCVIEN hv JOIN KETQUATHI k ON k.MAHV = hv.MAHV\n    WHERE k.DIEM >= 9\n    GROUP BY hv.MALOP, hv.MAHV, hv.HO, hv.TEN\n)\nSELECT d.MALOP, d.MAHV, d.HO + ' ' + d.TEN AS HOTEN, d.SO_MON\nFROM Dem d\nWHERE d.SO_MON = (SELECT MAX(d2.SO_MON) FROM Dem d2 WHERE d2.MALOP = d.MALOP)\nORDER BY d.MALOP, d.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlgv-dql-28",
+    "name": "DQL-28.sql",
+    "description": "Câu 28. Trong từng học kỳ của từng năm, mỗi giáo viên phân công dạy bao nhiêu môn học, bao nhiêu lớp.",
+    "query": "SELECT gd.NAM, gd.HOCKY, gv.MAGV, gv.HOTEN, COUNT(DISTINCT gd.MAMH) AS SO_MON, COUNT(DISTINCT gd.MALOP) AS SO_LOP\nFROM GIANGDAY gd JOIN GIAOVIEN gv ON gv.MAGV = gd.MAGV\nGROUP BY gd.NAM, gd.HOCKY, gv.MAGV, gv.HOTEN\nORDER BY gd.NAM, gd.HOCKY, gv.MAGV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlgv-dql-29",
+    "name": "DQL-29.sql",
+    "description": "Câu 29. Trong từng học kỳ của từng năm, tìm giáo viên (mã giáo viên, họ tên) giảng dạy nhiều nhất (tính theo số phân công giảng dạy).",
+    "query": "WITH Dem AS (\n    SELECT NAM, HOCKY, MAGV, COUNT(*) AS SO_LUOT FROM GIANGDAY GROUP BY NAM, HOCKY, MAGV\n)\nSELECT d.NAM, d.HOCKY, gv.MAGV, gv.HOTEN, d.SO_LUOT\nFROM Dem d JOIN GIAOVIEN gv ON gv.MAGV = d.MAGV\nWHERE d.SO_LUOT = (SELECT MAX(d2.SO_LUOT) FROM Dem d2 WHERE d2.NAM = d.NAM AND d2.HOCKY = d.HOCKY)\nORDER BY d.NAM, d.HOCKY, gv.MAGV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlgv-dql-30",
+    "name": "DQL-30.sql",
+    "description": "Câu 30. Tìm môn học (mã môn học, tên môn học) có nhiều học viên thi không đạt (ở lần thi thứ 1) nhất.",
+    "query": "WITH Rot AS (\n    SELECT MAMH, COUNT(*) AS SO_HV FROM KETQUATHI WHERE LANTHI = 1 AND KQUA = 'Khong Dat' GROUP BY MAMH\n)\nSELECT mh.MAMH, mh.TENMH\nFROM Rot r JOIN MONHOC mh ON mh.MAMH = r.MAMH\nWHERE r.SO_HV = (SELECT MAX(SO_HV) FROM Rot)\nORDER BY mh.MAMH;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlgv-dql-31",
+    "name": "DQL-31.sql",
+    "description": "Câu 31. Tìm học viên (mã học viên, họ tên) thi môn nào cũng đạt (chỉ xét lần thi thứ 1).",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv\nWHERE EXISTS (SELECT 1 FROM KETQUATHI k WHERE k.MAHV = hv.MAHV AND k.LANTHI = 1)\n  AND NOT EXISTS (SELECT 1 FROM KETQUATHI k WHERE k.MAHV = hv.MAHV AND k.LANTHI = 1 AND k.KQUA = 'Khong Dat')\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-32",
+    "name": "DQL-32.sql",
+    "description": "Câu 32. Tìm học viên (mã học viên, họ tên) thi môn nào cũng đạt (chỉ xét lần thi sau cùng).",
+    "query": "WITH Cuoi AS (\n    SELECT k.* FROM KETQUATHI k\n    WHERE k.LANTHI = (SELECT MAX(k2.LANTHI) FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = k.MAMH)\n)\nSELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv\nWHERE EXISTS (SELECT 1 FROM Cuoi c WHERE c.MAHV = hv.MAHV)\n  AND NOT EXISTS (SELECT 1 FROM Cuoi c WHERE c.MAHV = hv.MAHV AND c.KQUA = 'Khong Dat')\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlgv-dql-33",
+    "name": "DQL-33.sql",
+    "description": "Câu 33. Tìm học viên (mã học viên, họ tên) đã thi tất cả các môn học (các môn đã có kết quả thi trong KETQUATHI) và đều đạt (chỉ xét lần thi thứ 1).",
+    "query": "SELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv\nWHERE NOT EXISTS (\n    SELECT 1 FROM (SELECT DISTINCT MAMH FROM KETQUATHI) m\n    WHERE NOT EXISTS (SELECT 1 FROM KETQUATHI k\n                      WHERE k.MAHV = hv.MAHV AND k.MAMH = m.MAMH AND k.LANTHI = 1 AND k.KQUA = 'Dat'))\n  AND EXISTS (SELECT 1 FROM KETQUATHI k WHERE k.MAHV = hv.MAHV)\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlgv-dql-34",
+    "name": "DQL-34.sql",
+    "description": "Câu 34. Tìm học viên (mã học viên, họ tên) đã thi tất cả các môn học (các môn đã có kết quả thi trong KETQUATHI) và đều đạt (chỉ xét lần thi sau cùng).",
+    "query": "WITH Cuoi AS (\n    SELECT k.* FROM KETQUATHI k\n    WHERE k.LANTHI = (SELECT MAX(k2.LANTHI) FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = k.MAMH)\n)\nSELECT hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN\nFROM HOCVIEN hv\nWHERE NOT EXISTS (\n    SELECT 1 FROM (SELECT DISTINCT MAMH FROM KETQUATHI) m\n    WHERE NOT EXISTS (SELECT 1 FROM Cuoi c WHERE c.MAHV = hv.MAHV AND c.MAMH = m.MAMH AND c.KQUA = 'Dat'))\n  AND EXISTS (SELECT 1 FROM Cuoi c WHERE c.MAHV = hv.MAHV)\nORDER BY hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlgv-dql-35",
+    "name": "DQL-35.sql",
+    "description": "Câu 35. Tìm học viên (mã học viên, họ tên) có điểm thi cao nhất trong từng môn (lấy điểm ở lần thi sau cùng).",
+    "query": "WITH Cuoi AS (\n    SELECT k.* FROM KETQUATHI k\n    WHERE k.LANTHI = (SELECT MAX(k2.LANTHI) FROM KETQUATHI k2 WHERE k2.MAHV = k.MAHV AND k2.MAMH = k.MAMH)\n), Cao AS (\n    SELECT MAMH, MAX(DIEM) AS DIEM_MAX FROM Cuoi GROUP BY MAMH\n)\nSELECT c.MAMH, hv.MAHV, hv.HO + ' ' + hv.TEN AS HOTEN, c.DIEM\nFROM Cuoi c JOIN Cao ON Cao.MAMH = c.MAMH AND Cao.DIEM_MAX = c.DIEM JOIN HOCVIEN hv ON hv.MAHV = c.MAHV\nORDER BY c.MAMH, hv.MAHV;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   }
+  ]
+ },
+ "qlpt": {
+  "number": "QLPT",
+  "title": "Quản lý cho thuê phòng trọ (QLPT) – DDL, trigger và 20 câu truy vấn",
+  "difficulty": "Medium",
+  "topics": [
+   "Quản lý cho thuê phòng trọ",
+   "DDL",
+   "Trigger",
+   "DQL",
+   "Cơ sở dữ liệu quan hệ"
+  ],
+  "statement": "**Bài thực hành – Cơ sở dữ liệu quản lý cho thuê phòng trọ** (Cơ sở dữ liệu quan hệ – Khoa Hệ thống thông tin, UIT).\n\nLược đồ “QLPT” được mô tả ở phần *Mô tả cơ sở dữ liệu*. Bài gộp các câu hỏi của các đề thi thực hành HK1 2024–2025 (đề 101, 102, 201, 202), mỗi câu ghi rõ đề gốc. Bài gồm 3 phần: **DDL** (tạo bảng, ràng buộc CHECK), **Trigger** (ràng buộc toàn vẹn) và **DQL** (truy vấn).\n\nMỗi câu hỏi được gắn *dạng bài* và *mức độ* (Dễ / Trung bình / Khó).",
+  "libraryKey": "qlpt",
+  "relations": [
+   {
+    "tableName": "PHONGTRO",
+    "attributes": "MaPT (char(5)): Mã phòng trọ\nTenPT (nvarchar(50)): Tên phòng trọ\nDienTich (float): Diện tích phòng trọ (m²)\nLoaiPT (nvarchar(15)): Loại phòng trọ (Kiot, Có gác xép, Không gác xép)\nGiaPT (money): Giá thuê phòng trọ (VNĐ)\nTinhTrangPT (nvarchar(20)): Tình trạng phòng trọ (Trống, Đã cho thuê)",
+    "predicate": "Lưu trữ thông tin Phòng trọ"
+   },
+   {
+    "tableName": "CUDAN",
+    "attributes": "MaCD (char(5)): Mã cư dân\nHoTen (nvarchar(50)): Họ tên cư dân\nCCCD (nvarchar(12)): Số căn cước công dân\nDiaChi (nvarchar(100)): Địa chỉ thường trú của cư dân\nSoDT (varchar(15)): Số điện thoại liên lạc\nNgayThue (smalldatetime): Ngày bắt đầu thuê phòng\nTrangThaiCD (nvarchar(15)): Trạng thái cư dân (Đang ở, Đã rời đi)",
+    "predicate": "Lưu trữ thông tin Cư dân"
+   },
+   {
+    "tableName": "HOPDONG",
+    "attributes": "MaHD (char(5)): Mã hợp đồng\nMaCD (char(5)): Mã cư dân đại diện ký hợp đồng\nMaPT (char(5)): Mã phòng trọ\nNgayKy (smalldatetime): Ngày ký hợp đồng\nNgayHetHan (smalldatetime): Ngày hết hạn hợp đồng\nTrangThaiHD (nvarchar(20)): Trạng thái hợp đồng (Đang thuê, Đã hết hạn, Đã hủy)",
+    "predicate": "Lưu trữ thông tin Hợp đồng thuê phòng trọ"
+   },
+   {
+    "tableName": "DICHVU",
+    "attributes": "MaDV (char(5)): Mã dịch vụ\nTenDV (nvarchar(50)): Tên dịch vụ (Điện, Nước, Internet,...)\nDonGia (money): Đơn giá dịch vụ (VNĐ)",
+    "predicate": "Lưu trữ thông tin Dịch vụ"
+   },
+   {
+    "tableName": "PHIEUTINHTIEN",
+    "attributes": "MaPTT (char(5)): Mã phiếu tính tiền\nMaHD (char(5)): Mã hợp đồng\nSoTienDichVu (money): Số tiền của các dịch vụ đã sử dụng (VNĐ)\nSoTienThuePT (money): Số tiền thuê phòng (VNĐ)\nTongTienTT (money): Tổng tiền thanh toán = Số tiền của các dịch vụ đã sử dụng + số tiền thuê phòng\nNgayTinhTien (smalldatetime): Ngày tính tiền\nTinhTrangTT (nvarchar(20)): Tình trạng thanh toán (Chưa thanh toán, Đã thanh toán)\nPhuongThucTT (nvarchar(20)): Phương thức thanh toán (Chuyển khoản, Tiền mặt)",
+    "predicate": "Lưu trữ thông tin Phiếu tính tiền thuê phòng và các dịch vụ đã sử dụng"
+   },
+   {
+    "tableName": "CHITIETTTDV",
+    "attributes": "MaPTT (char(5)): Mã phiếu tính tiền\nMaDV (char(5)): Mã dịch vụ đã sử dụng\nChiSoDV (float): Chỉ số dịch vụ đã sử dụng\nThanhTien (money): Số tiền của dịch vụ đã sử dụng",
+    "predicate": "Lưu trữ thông tin chi tiết các dịch vụ đã sử dụng trong phiếu tính tiền"
+   }
+  ],
+  "ddl": [
+   {
+    "id": "qlpt-ddl-01",
+    "name": "DDL-01 Tạo bảng.sql",
+    "description": "Câu 1. Tạo các quan hệ của CSDL “QLPT” như bảng thuộc tính của đề. Khai báo khóa chính, khóa ngoại.",
+    "answer": "CREATE TABLE PHONGTRO (\n    MaPT CHAR(5) NOT NULL,\n    TenPT NVARCHAR(50),\n    DienTich FLOAT,\n    LoaiPT NVARCHAR(15),\n    GiaPT MONEY,\n    TinhTrangPT NVARCHAR(20),\n    CONSTRAINT PK_PHONGTRO PRIMARY KEY (MaPT)\n);\n\nCREATE TABLE CUDAN (\n    MaCD CHAR(5) NOT NULL,\n    HoTen NVARCHAR(50),\n    CCCD NVARCHAR(12),\n    DiaChi NVARCHAR(100),\n    SoDT VARCHAR(15),\n    NgayThue SMALLDATETIME,\n    TrangThaiCD NVARCHAR(15),\n    CONSTRAINT PK_CUDAN PRIMARY KEY (MaCD)\n);\n\nCREATE TABLE HOPDONG (\n    MaHD CHAR(5) NOT NULL,\n    MaCD CHAR(5),\n    MaPT CHAR(5),\n    NgayKy SMALLDATETIME,\n    NgayHetHan SMALLDATETIME,\n    TrangThaiHD NVARCHAR(20),\n    CONSTRAINT PK_HOPDONG PRIMARY KEY (MaHD),\n    CONSTRAINT FK_HOPDONG_CUDAN FOREIGN KEY (MaCD) REFERENCES CUDAN (MaCD),\n    CONSTRAINT FK_HOPDONG_PHONGTRO FOREIGN KEY (MaPT) REFERENCES PHONGTRO (MaPT)\n);\n\nCREATE TABLE DICHVU (\n    MaDV CHAR(5) NOT NULL,\n    TenDV NVARCHAR(50),\n    DonGia MONEY,\n    CONSTRAINT PK_DICHVU PRIMARY KEY (MaDV)\n);\n\nCREATE TABLE PHIEUTINHTIEN (\n    MaPTT CHAR(5) NOT NULL,\n    MaHD CHAR(5),\n    SoTienDichVu MONEY,\n    SoTienThuePT MONEY,\n    TongTienTT MONEY,\n    NgayTinhTien SMALLDATETIME,\n    TinhTrangTT NVARCHAR(20),\n    PhuongThucTT NVARCHAR(20),\n    CONSTRAINT PK_PHIEUTINHTIEN PRIMARY KEY (MaPTT),\n    CONSTRAINT FK_PHIEUTINHTIEN_HOPDONG FOREIGN KEY (MaHD) REFERENCES HOPDONG (MaHD)\n);\n\nCREATE TABLE CHITIETTTDV (\n    MaPTT CHAR(5) NOT NULL,\n    MaDV CHAR(5) NOT NULL,\n    ChiSoDV FLOAT,\n    ThanhTien MONEY,\n    CONSTRAINT PK_CHITIETTTDV PRIMARY KEY (MaPTT, MaDV),\n    CONSTRAINT FK_CHITIETTTDV_PHIEUTINHTIEN FOREIGN KEY (MaPTT) REFERENCES PHIEUTINHTIEN (MaPTT),\n    CONSTRAINT FK_CHITIETTTDV_DICHVU FOREIGN KEY (MaDV) REFERENCES DICHVU (MaDV)\n);",
+    "enabled": true,
+    "startFrom": "empty",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Tạo bảng (CREATE TABLE)"
+   },
+   {
+    "id": "qlpt-101-ddl-2-1",
+    "name": "DDL 101-2.1.sql",
+    "description": "[Đề 101] Câu 2.1. Diện tích của một căn phòng trọ có giá trị từ 10 đến 50 m².",
+    "answer": "ALTER TABLE PHONGTRO\nADD CONSTRAINT CK_PHONGTRO_DienTich CHECK (DienTich BETWEEN 10 AND 50);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlpt-101-ddl-2-2",
+    "name": "DDL 101-2.2.sql",
+    "description": "[Đề 101] Câu 2.2. Tình trạng thanh toán của phiếu tính tiền chỉ nhận một trong hai giá trị ‘Chưa thanh toán’ hoặc ‘Đã thanh toán’.",
+    "answer": "ALTER TABLE PHIEUTINHTIEN\nADD CONSTRAINT CK_PHIEUTINHTIEN_TinhTrangTT CHECK (TinhTrangTT IN (N'Chưa thanh toán', N'Đã thanh toán'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlpt-102-ddl-2-1",
+    "name": "DDL 102-2.1.sql",
+    "description": "[Đề 102] Câu 2.1. Giá thuê phòng trọ có giá trị trong khoảng từ 500,000 VNĐ đến 20,000,000 VNĐ.",
+    "answer": "ALTER TABLE PHONGTRO\nADD CONSTRAINT CK_PHONGTRO_GiaPT CHECK (GiaPT BETWEEN 500000 AND 20000000);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlpt-102-ddl-2-2",
+    "name": "DDL 102-2.2.sql",
+    "description": "[Đề 102] Câu 2.2. Trạng thái cư dân chỉ nhận một trong hai giá trị ‘Đang ở’ hoặc ‘Đã rời đi’.",
+    "answer": "ALTER TABLE CUDAN\nADD CONSTRAINT CK_CUDAN_TrangThaiCD CHECK (TrangThaiCD IN (N'Đang ở', N'Đã rời đi'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlpt-201-ddl-2-1",
+    "name": "DDL 201-2.1.sql",
+    "description": "[Đề 201] Câu 2.1. Đơn giá của các dịch vụ có giá trị từ 2,000 VNĐ đến 500,000 VNĐ.",
+    "answer": "ALTER TABLE DICHVU\nADD CONSTRAINT CK_DICHVU_DonGia CHECK (DonGia BETWEEN 2000 AND 500000);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlpt-201-ddl-2-2",
+    "name": "DDL 201-2.2.sql",
+    "description": "[Đề 201] Câu 2.2. Loại phòng trọ chỉ nhận một trong các giá trị ‘Kiot’, ‘Có gác xép’, ‘Không gác xép’.",
+    "answer": "ALTER TABLE PHONGTRO\nADD CONSTRAINT CK_PHONGTRO_LoaiPT CHECK (LoaiPT IN (N'Kiot', N'Có gác xép', N'Không gác xép'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlpt-202-ddl-2-1",
+    "name": "DDL 202-2.1.sql",
+    "description": "[Đề 202] Câu 2.1. Ngày ký hợp đồng không được lớn hơn ngày hết hạn hợp đồng.",
+    "answer": "ALTER TABLE HOPDONG\nADD CONSTRAINT CK_HOPDONG_NgayKy_NgayHetHan CHECK (NgayKy <= NgayHetHan);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlpt-202-ddl-2-2",
+    "name": "DDL 202-2.2.sql",
+    "description": "[Đề 202] Câu 2.2. Tình trạng phòng trọ chỉ nhận một trong hai giá trị ‘Trống’ hoặc ‘Đã cho thuê’.",
+    "answer": "ALTER TABLE PHONGTRO\nADD CONSTRAINT CK_PHONGTRO_TinhTrangPT CHECK (TinhTrangPT IN (N'Trống', N'Đã cho thuê'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   }
+  ],
+  "dml": [],
+  "trigger": [
+   {
+    "id": "qlpt-101-trg-2-3",
+    "name": "TRG 101-2.3.sql",
+    "description": "[Đề 101] Câu 2.3. Số tiền của mỗi dịch vụ đã sử dụng (ThanhTien) trong chi tiết tính tiền được tính bằng chỉ số đã sử dụng (ChiSoDV) nhân với đơn giá (DonGia) của dịch vụ đó. Hãy viết trigger để tạo ràng buộc trên cho thao tác thêm mới một chi tiết sử dụng dịch vụ.",
+    "answer": "CREATE TRIGGER trg_CHITIETTTDV_Insert ON CHITIETTTDV\nAFTER INSERT\nAS\nBEGIN\n    UPDATE ct\n    SET ct.ThanhTien = i.ChiSoDV * dv.DonGia\n    FROM CHITIETTTDV ct\n    JOIN inserted i ON ct.MaPTT = i.MaPTT AND ct.MaDV = i.MaDV\n    JOIN DICHVU dv ON dv.MaDV = i.MaDV\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "INSERT INTO CHITIETTTDV (MaPTT, MaDV, ChiSoDV, ThanhTien) VALUES ('PT012', 'DV003', 2, 0);",
+     "INSERT INTO CHITIETTTDV (MaPTT, MaDV, ChiSoDV, ThanhTien) VALUES ('PT014', 'DV001', 10, 1), ('PT014', 'DV002', 3, 1);"
+    ]
+   },
+   {
+    "id": "qlpt-102-trg-2-3",
+    "name": "TRG 102-2.3.sql",
+    "description": "[Đề 102] Câu 2.3. Số tiền của mỗi dịch vụ đã sử dụng (ThanhTien) trong chi tiết tính tiền được tính bằng chỉ số đã sử dụng (ChiSoDV) nhân với đơn giá (DonGia) của dịch vụ đó. Hãy viết trigger để tạo ràng buộc trên cho thao tác sửa một chi tiết sử dụng dịch vụ.",
+    "answer": "CREATE TRIGGER trg_CHITIETTTDV_Update ON CHITIETTTDV\nAFTER UPDATE\nAS\nBEGIN\n    UPDATE ct\n    SET ct.ThanhTien = i.ChiSoDV * dv.DonGia\n    FROM CHITIETTTDV ct\n    JOIN inserted i ON ct.MaPTT = i.MaPTT AND ct.MaDV = i.MaDV\n    JOIN DICHVU dv ON dv.MaDV = i.MaDV\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "UPDATE CHITIETTTDV SET ChiSoDV = 100 WHERE MaPTT = 'PT001' AND MaDV = 'DV001';",
+     "UPDATE CHITIETTTDV SET ChiSoDV = ChiSoDV + 1 WHERE MaPTT IN ('PT002', 'PT003');"
+    ]
+   },
+   {
+    "id": "qlpt-201-trg-2-3",
+    "name": "TRG 201-2.3.sql",
+    "description": "[Đề 201] Câu 2.3. Số tiền của các dịch vụ đã sử dụng (SoTienDichVu) trong phiếu tính tiền được tính bằng tổng thành tiền của các chi tiết sử dụng dịch vụ (ThanhTien) của phiếu tính tiền đó. Hãy viết trigger để tạo ràng buộc trên cho thao tác thêm mới một chi tiết sử dụng dịch vụ.",
+    "answer": "CREATE TRIGGER trg_CHITIETTTDV_Insert ON CHITIETTTDV\nAFTER INSERT\nAS\nBEGIN\n    UPDATE p\n    SET p.SoTienDichVu = (SELECT SUM(ct.ThanhTien) FROM CHITIETTTDV ct WHERE ct.MaPTT = p.MaPTT)\n    FROM PHIEUTINHTIEN p\n    WHERE p.MaPTT IN (SELECT MaPTT FROM inserted)\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "INSERT INTO CHITIETTTDV (MaPTT, MaDV, ChiSoDV, ThanhTien) VALUES ('PT012', 'DV003', 2, 300000);",
+     "INSERT INTO CHITIETTTDV (MaPTT, MaDV, ChiSoDV, ThanhTien) VALUES ('PT013', 'DV001', 10, 35000), ('PT014', 'DV002', 2, 36000);"
+    ]
+   },
+   {
+    "id": "qlpt-202-trg-2-3",
+    "name": "TRG 202-2.3.sql",
+    "description": "[Đề 202] Câu 2.3. Số tiền của các dịch vụ đã sử dụng (SoTienDichVu) trong phiếu tính tiền được tính bằng tổng thành tiền của các chi tiết sử dụng dịch vụ (ThanhTien) của phiếu tính tiền đó. Hãy viết trigger để tạo ràng buộc trên cho thao tác xóa một chi tiết sử dụng dịch vụ.",
+    "answer": "CREATE TRIGGER trg_CHITIETTTDV_Delete ON CHITIETTTDV\nAFTER DELETE\nAS\nBEGIN\n    UPDATE p\n    SET p.SoTienDichVu = ISNULL((SELECT SUM(ct.ThanhTien) FROM CHITIETTTDV ct WHERE ct.MaPTT = p.MaPTT), 0)\n    FROM PHIEUTINHTIEN p\n    WHERE p.MaPTT IN (SELECT MaPTT FROM deleted)\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "DELETE FROM CHITIETTTDV WHERE MaPTT = 'PT014';",
+     "DELETE FROM CHITIETTTDV WHERE MaPTT IN ('PT001', 'PT002') AND MaDV = 'DV001';"
+    ]
+   }
+  ],
+  "sql": [
+   {
+    "id": "qlpt-101-dql-3-1",
+    "name": "DQL 101-3.1.sql",
+    "description": "[Đề 101] Câu 3.1. Liệt kê thông tin các phòng trọ (mã, tên phòng) có giá thuê trên 5,000,000 VNĐ cùng với thông tin cư dân (mã, họ tên) đã ký hợp đồng thuê các phòng đó trong năm 2024.",
+    "query": "SELECT DISTINCT pt.MaPT, pt.TenPT, cd.MaCD, cd.HoTen\nFROM PHONGTRO pt\nJOIN HOPDONG hd ON hd.MaPT = pt.MaPT\nJOIN CUDAN cd ON cd.MaCD = hd.MaCD\nWHERE pt.GiaPT > 5000000 AND YEAR(hd.NgayKy) = 2024\nORDER BY pt.MaPT, cd.MaCD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlpt-101-dql-3-2",
+    "name": "DQL 101-3.2.sql",
+    "description": "[Đề 101] Câu 3.2. Liệt kê các dịch vụ (mã, tên dịch vụ) đã được thanh toán trong các phiếu tính tiền của cả hai tháng 11 và tháng 12 năm 2024 cho hợp đồng có mã ‘HD002’.",
+    "query": "SELECT dv.MaDV, dv.TenDV\nFROM DICHVU dv\nJOIN CHITIETTTDV ct ON ct.MaDV = dv.MaDV\nJOIN PHIEUTINHTIEN p ON p.MaPTT = ct.MaPTT\nWHERE p.MaHD = 'HD002' AND p.TinhTrangTT = N'Đã thanh toán' AND YEAR(p.NgayTinhTien) = 2024 AND MONTH(p.NgayTinhTien) = 11\nINTERSECT\nSELECT dv.MaDV, dv.TenDV\nFROM DICHVU dv\nJOIN CHITIETTTDV ct ON ct.MaDV = dv.MaDV\nJOIN PHIEUTINHTIEN p ON p.MaPTT = ct.MaPTT\nWHERE p.MaHD = 'HD002' AND p.TinhTrangTT = N'Đã thanh toán' AND YEAR(p.NgayTinhTien) = 2024 AND MONTH(p.NgayTinhTien) = 12;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlpt-101-dql-3-3",
+    "name": "DQL 101-3.3.sql",
+    "description": "[Đề 101] Câu 3.3. Tìm thông tin các phiếu tính tiền (mã phiếu tính tiền, mã hợp đồng) trong năm 2024 và đã sử dụng tất cả các dịch vụ có đơn giá từ 150,000 VNĐ trở xuống.",
+    "query": "SELECT p.MaPTT, p.MaHD\nFROM PHIEUTINHTIEN p\nWHERE YEAR(p.NgayTinhTien) = 2024\n  AND NOT EXISTS (\n      SELECT 1 FROM DICHVU dv\n      WHERE dv.DonGia <= 150000\n        AND NOT EXISTS (SELECT 1 FROM CHITIETTTDV ct WHERE ct.MaPTT = p.MaPTT AND ct.MaDV = dv.MaDV));",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlpt-101-dql-3-4",
+    "name": "DQL 101-3.4.sql",
+    "description": "[Đề 101] Câu 3.4. Với mỗi hợp đồng, hãy cho biết số lượng phiếu tính tiền đã được thanh toán bằng phương thức ‘Chuyển khoản’ trong năm 2024. Thông tin hiển thị: Mã hợp đồng, mã cư dân, số lượng.",
+    "query": "SELECT hd.MaHD, hd.MaCD, COUNT(p.MaPTT) AS SoLuong\nFROM HOPDONG hd\nLEFT JOIN PHIEUTINHTIEN p ON p.MaHD = hd.MaHD\n    AND p.TinhTrangTT = N'Đã thanh toán' AND p.PhuongThucTT = N'Chuyển khoản' AND YEAR(p.NgayTinhTien) = 2024\nGROUP BY hd.MaHD, hd.MaCD\nORDER BY hd.MaHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlpt-101-dql-3-5",
+    "name": "DQL 101-3.5.sql",
+    "description": "[Đề 101] Câu 3.5. Trong các cư dân có số lần ký hợp đồng nhiều nhất, tìm cư dân (mã, họ tên) có tổng số tiền đã thanh toán trong năm 2024 nhiều hơn 15,000,000 VNĐ.",
+    "query": "SELECT cd.MaCD, cd.HoTen\nFROM CUDAN cd\nWHERE cd.MaCD IN (\n        SELECT MaCD FROM HOPDONG GROUP BY MaCD\n        HAVING COUNT(*) >= ALL (SELECT COUNT(*) FROM HOPDONG GROUP BY MaCD))\n  AND (SELECT SUM(p.TongTienTT) FROM PHIEUTINHTIEN p JOIN HOPDONG h ON h.MaHD = p.MaHD\n       WHERE h.MaCD = cd.MaCD AND p.TinhTrangTT = N'Đã thanh toán' AND YEAR(p.NgayTinhTien) = 2024) > 15000000;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlpt-102-dql-3-1",
+    "name": "DQL 102-3.1.sql",
+    "description": "[Đề 102] Câu 3.1. Liệt kê thông tin các cư dân (mã, họ tên) cùng thông tin phòng trọ (mã, tên phòng) mà cư dân đó đã ký hợp đồng với trạng thái hợp đồng ‘Đã hết hạn’ trong năm 2024.",
+    "query": "SELECT DISTINCT cd.MaCD, cd.HoTen, pt.MaPT, pt.TenPT\nFROM CUDAN cd\nJOIN HOPDONG hd ON hd.MaCD = cd.MaCD\nJOIN PHONGTRO pt ON pt.MaPT = hd.MaPT\nWHERE hd.TrangThaiHD = N'Đã hết hạn' AND YEAR(hd.NgayKy) = 2024\nORDER BY cd.MaCD, pt.MaPT;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlpt-102-dql-3-2",
+    "name": "DQL 102-3.2.sql",
+    "description": "[Đề 102] Câu 3.2. Tìm các hợp đồng (mã hợp đồng, mã phòng trọ) đã thanh toán các phiếu tính tiền trong năm 2024 nhưng không sử dụng dịch vụ nào có chỉ số từ 5 trở lên trong những chi tiết của phiếu tính tiền đó.",
+    "query": "SELECT hd.MaHD, hd.MaPT\nFROM HOPDONG hd\nWHERE EXISTS (SELECT 1 FROM PHIEUTINHTIEN p\n              WHERE p.MaHD = hd.MaHD AND p.TinhTrangTT = N'Đã thanh toán' AND YEAR(p.NgayTinhTien) = 2024)\n  AND NOT EXISTS (SELECT 1 FROM PHIEUTINHTIEN p JOIN CHITIETTTDV ct ON ct.MaPTT = p.MaPTT\n                  WHERE p.MaHD = hd.MaHD AND p.TinhTrangTT = N'Đã thanh toán' AND YEAR(p.NgayTinhTien) = 2024 AND ct.ChiSoDV >= 5)\nORDER BY hd.MaHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlpt-102-dql-3-3",
+    "name": "DQL 102-3.3.sql",
+    "description": "[Đề 102] Câu 3.3. Tìm thông tin các dịch vụ (mã, tên dịch vụ) có đơn giá trên 10,000 VNĐ và có trong chi tiết của tất cả các phiếu tính tiền ngày 15/12/2024.",
+    "query": "SELECT dv.MaDV, dv.TenDV\nFROM DICHVU dv\nWHERE dv.DonGia > 10000\n  AND NOT EXISTS (\n      SELECT 1 FROM PHIEUTINHTIEN p\n      WHERE YEAR(p.NgayTinhTien) = 2024 AND MONTH(p.NgayTinhTien) = 12 AND DAY(p.NgayTinhTien) = 15\n        AND NOT EXISTS (SELECT 1 FROM CHITIETTTDV ct WHERE ct.MaPTT = p.MaPTT AND ct.MaDV = dv.MaDV));",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlpt-102-dql-3-4",
+    "name": "DQL 102-3.4.sql",
+    "description": "[Đề 102] Câu 3.4. Với mỗi hợp đồng đã hết hạn, hãy cho biết số lượng phiếu tính tiền trong năm 2024 đã được thanh toán. Thông tin hiển thị: Mã hợp đồng, mã cư dân, số lượng.",
+    "query": "SELECT hd.MaHD, hd.MaCD, COUNT(p.MaPTT) AS SoLuong\nFROM HOPDONG hd\nLEFT JOIN PHIEUTINHTIEN p ON p.MaHD = hd.MaHD AND p.TinhTrangTT = N'Đã thanh toán' AND YEAR(p.NgayTinhTien) = 2024\nWHERE hd.TrangThaiHD = N'Đã hết hạn'\nGROUP BY hd.MaHD, hd.MaCD\nORDER BY hd.MaHD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlpt-102-dql-3-5",
+    "name": "DQL 102-3.5.sql",
+    "description": "[Đề 102] Câu 3.5. Trong các cư dân có số lần ký hợp đồng ít nhất, tìm cư dân (mã, họ tên) có tổng số tiền đã thanh toán trong năm 2024 nhiều hơn 5,000,000 VNĐ.",
+    "query": "SELECT cd.MaCD, cd.HoTen\nFROM CUDAN cd\nWHERE cd.MaCD IN (\n        SELECT MaCD FROM HOPDONG GROUP BY MaCD\n        HAVING COUNT(*) <= ALL (SELECT COUNT(*) FROM HOPDONG GROUP BY MaCD))\n  AND (SELECT SUM(p.TongTienTT) FROM PHIEUTINHTIEN p JOIN HOPDONG h ON h.MaHD = p.MaHD\n       WHERE h.MaCD = cd.MaCD AND p.TinhTrangTT = N'Đã thanh toán' AND YEAR(p.NgayTinhTien) = 2024) > 5000000;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlpt-201-dql-3-1",
+    "name": "DQL 201-3.1.sql",
+    "description": "[Đề 201] Câu 3.1. Liệt kê thông tin các phiếu tính tiền (mã phiếu tính tiền, mã hợp đồng) trong năm 2024 cùng với thông tin chi tiết của dịch vụ (chỉ số, thành tiền) đã sử dụng có tên là ‘Điện’.",
+    "query": "SELECT p.MaPTT, p.MaHD, ct.ChiSoDV, ct.ThanhTien\nFROM PHIEUTINHTIEN p\nJOIN CHITIETTTDV ct ON ct.MaPTT = p.MaPTT\nJOIN DICHVU dv ON dv.MaDV = ct.MaDV\nWHERE YEAR(p.NgayTinhTien) = 2024 AND dv.TenDV = N'Điện'\nORDER BY p.MaPTT;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlpt-201-dql-3-2",
+    "name": "DQL 201-3.2.sql",
+    "description": "[Đề 201] Câu 3.2. Tìm các phòng trọ (mã, tên phòng trọ) thuộc loại ‘Không gác xép’ được ký hợp đồng trong năm 2024 nhưng chưa có phiếu tính tiền nào có tổng tiền thanh toán lớn hơn 4,000,000 VNĐ và thanh toán bằng phương thức ‘Chuyển khoản’.",
+    "query": "SELECT DISTINCT pt.MaPT, pt.TenPT\nFROM PHONGTRO pt\nJOIN HOPDONG hd ON hd.MaPT = pt.MaPT\nWHERE pt.LoaiPT = N'Không gác xép' AND YEAR(hd.NgayKy) = 2024\n  AND NOT EXISTS (\n      SELECT 1 FROM HOPDONG h2 JOIN PHIEUTINHTIEN p ON p.MaHD = h2.MaHD\n      WHERE h2.MaPT = pt.MaPT AND p.TongTienTT > 4000000 AND p.PhuongThucTT = N'Chuyển khoản')\nORDER BY pt.MaPT;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlpt-201-dql-3-3",
+    "name": "DQL 201-3.3.sql",
+    "description": "[Đề 201] Câu 3.3. Tìm thông tin cư dân (mã, họ tên) đang ở và đã ký hợp đồng thuê tất cả các phòng trọ thuộc loại ‘Kiot’ và diện tích bằng 40 m².",
+    "query": "SELECT cd.MaCD, cd.HoTen\nFROM CUDAN cd\nWHERE cd.TrangThaiCD = N'Đang ở'\n  AND NOT EXISTS (\n      SELECT 1 FROM PHONGTRO pt\n      WHERE pt.LoaiPT = N'Kiot' AND pt.DienTich = 40\n        AND NOT EXISTS (SELECT 1 FROM HOPDONG hd WHERE hd.MaCD = cd.MaCD AND hd.MaPT = pt.MaPT));",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlpt-201-dql-3-4",
+    "name": "DQL 201-3.4.sql",
+    "description": "[Đề 201] Câu 3.4. Với mỗi cư dân đã rời đi, hãy thống kê số lượng hợp đồng có ngày ký từ năm 2022 đến năm 2024. Thông tin hiển thị: Mã cư dân, họ tên cư dân, số lượng hợp đồng.",
+    "query": "SELECT cd.MaCD, cd.HoTen, COUNT(hd.MaHD) AS SoLuongHD\nFROM CUDAN cd\nLEFT JOIN HOPDONG hd ON hd.MaCD = cd.MaCD AND YEAR(hd.NgayKy) BETWEEN 2022 AND 2024\nWHERE cd.TrangThaiCD = N'Đã rời đi'\nGROUP BY cd.MaCD, cd.HoTen\nORDER BY cd.MaCD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlpt-201-dql-3-5",
+    "name": "DQL 201-3.5.sql",
+    "description": "[Đề 201] Câu 3.5. Trong các hợp đồng có số lượng phiếu tính tiền đã thanh toán từ 2 trở lên, tìm mã hợp đồng có tổng chỉ số đã sử dụng của dịch vụ có tên là ‘Điện’ ít nhất.",
+    "query": "WITH HopDongDu2 AS (\n    SELECT MaHD FROM PHIEUTINHTIEN WHERE TinhTrangTT = N'Đã thanh toán' GROUP BY MaHD HAVING COUNT(*) >= 2\n),\nDien AS (\n    SELECT p.MaHD, SUM(ct.ChiSoDV) AS TongChiSo\n    FROM PHIEUTINHTIEN p\n    JOIN CHITIETTTDV ct ON ct.MaPTT = p.MaPTT\n    JOIN DICHVU dv ON dv.MaDV = ct.MaDV\n    WHERE dv.TenDV = N'Điện' AND p.MaHD IN (SELECT MaHD FROM HopDongDu2)\n    GROUP BY p.MaHD\n)\nSELECT MaHD FROM Dien WHERE TongChiSo = (SELECT MIN(TongChiSo) FROM Dien);",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlpt-202-dql-3-1",
+    "name": "DQL 202-3.1.sql",
+    "description": "[Đề 202] Câu 3.1. Liệt kê thông tin các phòng trọ (mã, tên phòng trọ) có tình trạng ‘Đã cho thuê’ cùng thông tin phiếu tính tiền (mã phiếu tính tiền, tổng tiền thanh toán) trong năm 2024 của phòng trọ đó.",
+    "query": "SELECT pt.MaPT, pt.TenPT, p.MaPTT, p.TongTienTT\nFROM PHONGTRO pt\nJOIN HOPDONG hd ON hd.MaPT = pt.MaPT\nJOIN PHIEUTINHTIEN p ON p.MaHD = hd.MaHD\nWHERE pt.TinhTrangPT = N'Đã cho thuê' AND YEAR(p.NgayTinhTien) = 2024\nORDER BY pt.MaPT, p.MaPTT;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlpt-202-dql-3-2",
+    "name": "DQL 202-3.2.sql",
+    "description": "[Đề 202] Câu 3.2. Liệt kê các cư dân (mã, họ tên) đã ký hợp đồng thuê các phòng trọ có diện tích trên 20 m² thuộc cả hai loại ‘Kiot’ và ‘Có gác xép’ trong năm 2024.",
+    "query": "SELECT cd.MaCD, cd.HoTen\nFROM CUDAN cd\nJOIN HOPDONG hd ON hd.MaCD = cd.MaCD\nJOIN PHONGTRO pt ON pt.MaPT = hd.MaPT\nWHERE pt.DienTich > 20 AND YEAR(hd.NgayKy) = 2024 AND pt.LoaiPT = N'Kiot'\nINTERSECT\nSELECT cd.MaCD, cd.HoTen\nFROM CUDAN cd\nJOIN HOPDONG hd ON hd.MaCD = cd.MaCD\nJOIN PHONGTRO pt ON pt.MaPT = hd.MaPT\nWHERE pt.DienTich > 20 AND YEAR(hd.NgayKy) = 2024 AND pt.LoaiPT = N'Có gác xép';",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlpt-202-dql-3-3",
+    "name": "DQL 202-3.3.sql",
+    "description": "[Đề 202] Câu 3.3. Tìm thông tin các phiếu tính tiền (mã phiếu tính tiền, mã hợp đồng) có tổng tiền thanh toán trên 2,000,000 VNĐ, thanh toán bằng phương thức ‘Tiền mặt’ và đã sử dụng tất cả các dịch vụ có đơn giá từ 50,000 trở xuống.",
+    "query": "SELECT p.MaPTT, p.MaHD\nFROM PHIEUTINHTIEN p\nWHERE p.TongTienTT > 2000000 AND p.PhuongThucTT = N'Tiền mặt'\n  AND NOT EXISTS (\n      SELECT 1 FROM DICHVU dv\n      WHERE dv.DonGia <= 50000\n        AND NOT EXISTS (SELECT 1 FROM CHITIETTTDV ct WHERE ct.MaPTT = p.MaPTT AND ct.MaDV = dv.MaDV));",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlpt-202-dql-3-4",
+    "name": "DQL 202-3.4.sql",
+    "description": "[Đề 202] Câu 3.4. Với mỗi cư dân đang ở, hãy thống kê số lượng hợp đồng có trạng thái hợp đồng ‘Đã hết hạn’ và có ngày hết hạn trong năm 2024. Thông tin hiển thị: Mã cư dân, họ tên cư dân, số lượng hợp đồng.",
+    "query": "SELECT cd.MaCD, cd.HoTen, COUNT(hd.MaHD) AS SoLuongHD\nFROM CUDAN cd\nLEFT JOIN HOPDONG hd ON hd.MaCD = cd.MaCD AND hd.TrangThaiHD = N'Đã hết hạn' AND YEAR(hd.NgayHetHan) = 2024\nWHERE cd.TrangThaiCD = N'Đang ở'\nGROUP BY cd.MaCD, cd.HoTen\nORDER BY cd.MaCD;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlpt-202-dql-3-5",
+    "name": "DQL 202-3.5.sql",
+    "description": "[Đề 202] Câu 3.5. Trong các hợp đồng có tổng chỉ số đã sử dụng của dịch vụ có tên là ‘Điện’ ít nhất, tìm mã hợp đồng có số lượng phiếu tính tiền đã thanh toán từ 2 trở lên.",
+    "query": "WITH Dien AS (\n    SELECT p.MaHD, SUM(ct.ChiSoDV) AS TongChiSo\n    FROM PHIEUTINHTIEN p\n    JOIN CHITIETTTDV ct ON ct.MaPTT = p.MaPTT\n    JOIN DICHVU dv ON dv.MaDV = ct.MaDV\n    WHERE dv.TenDV = N'Điện'\n    GROUP BY p.MaHD\n)\nSELECT d.MaHD\nFROM Dien d\nWHERE d.TongChiSo = (SELECT MIN(TongChiSo) FROM Dien)\n  AND (SELECT COUNT(*) FROM PHIEUTINHTIEN p WHERE p.MaHD = d.MaHD AND p.TinhTrangTT = N'Đã thanh toán') >= 2;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   }
+  ]
+ },
+ "qlkb": {
+  "number": "QLKB",
+  "title": "Quản lý khám bệnh (QLKB) – DDL, trigger và 10 câu truy vấn",
+  "difficulty": "Medium",
+  "topics": [
+   "Quản lý khám bệnh",
+   "DDL",
+   "Trigger",
+   "DQL",
+   "Cơ sở dữ liệu quan hệ"
+  ],
+  "statement": "**Bài thực hành – Cơ sở dữ liệu quản lý khám bệnh** (Cơ sở dữ liệu quan hệ – Khoa Hệ thống thông tin, UIT).\n\nLược đồ “QLKB” được mô tả ở phần *Mô tả cơ sở dữ liệu*. Bài gộp các câu hỏi của các đề thi thực hành HK1 2024–2025 (đề 301, 302), mỗi câu ghi rõ đề gốc. Bài gồm 3 phần: **DDL** (tạo bảng, ràng buộc CHECK), **Trigger** (ràng buộc toàn vẹn) và **DQL** (truy vấn).\n\nMỗi câu hỏi được gắn *dạng bài* và *mức độ* (Dễ / Trung bình / Khó).",
+  "libraryKey": "qlkb",
+  "relations": [
+   {
+    "tableName": "BENHNHAN",
+    "attributes": "MaBN (char(5)): Mã bệnh nhân\nHoTenBN (nvarchar(50)): Họ tên bệnh nhân\nNgaySinh (smalldatetime): Ngày tháng năm sinh\nCCCD (nvarchar(12)): Số căn cước công dân\nSoBHYT (nvarchar(15)): Số bảo hiểm y tế\nBHYTChiTra (float): Tỉ lệ chi phí do BHYT chi trả\nDiaChi (nvarchar(100)): Địa chỉ cư trú của bệnh nhân",
+    "predicate": "Lưu trữ thông tin Bệnh nhân"
+   },
+   {
+    "tableName": "BACSI",
+    "attributes": "MaBS (char(5)): Mã bác sĩ\nHoTenBS (nvarchar(50)): Họ tên bác sĩ\nNgayBDLV (smalldatetime): Ngày bắt đầu làm việc\nChuyenKhoa (nvarchar(50)): Chuyên khoa công tác",
+    "predicate": "Lưu trữ thông tin Bác sĩ"
+   },
+   {
+    "tableName": "KHAMBENH",
+    "attributes": "MaKB (char(5)): Mã khám bệnh\nMaBN (char(5)): Mã bệnh nhân\nMaBS (char(5)): Mã bác sĩ\nNgayKham (smalldatetime): Ngày khám bệnh\nTrieuChung (nvarchar(255)): Triệu chứng của bệnh nhân\nKetLuan (nvarchar(255)): Kết luận của bác sĩ\nTaiKham (int): Thời gian tái khám (ngày)",
+    "predicate": "Lưu trữ thông tin Khám bệnh của bệnh nhân"
+   },
+   {
+    "tableName": "THUOC",
+    "attributes": "MaThuoc (char(5)): Mã thuốc\nTenThuoc (nvarchar(50)): Tên thuốc\nLoaiThuoc (nvarchar(50)): Loại thuốc\nDVT (nvarchar(20)): Đơn vị tính (viên, hộp, lọ)\nDonGia (money): Đơn giá của thuốc (VNĐ)",
+    "predicate": "Lưu trữ thông tin Thuốc"
+   },
+   {
+    "tableName": "DONTHUOC",
+    "attributes": "MaDT (char(5)): Mã đơn thuốc\nMaKB (char(5)): Mã khám bệnh\nTriGiaDT (money): Trị giá đơn thuốc (trước BHYT)\nBHYTChiTra (float): Tỉ lệ chi phí do BHYT chi trả\nNgayCapThuoc (smalldatetime): Ngày cấp phát thuốc\nTongTienTT (money): Tổng tiền bệnh nhân thanh toán (sau BHYT)\nTinhTrangDT (nvarchar(30)): Tình trạng đơn thuốc (Chưa thanh toán, Đã thanh toán)",
+    "predicate": "Lưu trữ thông tin Đơn thuốc của mỗi lần khám bệnh của bệnh nhân"
+   },
+   {
+    "tableName": "CHITIETDT",
+    "attributes": "MaDT (char(5)): Mã đơn thuốc\nMaThuoc (char(5)): Mã thuốc\nSoLuong (int): Số lượng thuốc cấp phát\nThanhTien (money): Tổng số tiền thuốc",
+    "predicate": "Lưu trữ thông tin chi tiết các thuốc được kê trong đơn thuốc"
+   }
+  ],
+  "ddl": [
+   {
+    "id": "qlkb-ddl-01",
+    "name": "DDL-01 Tạo bảng.sql",
+    "description": "Câu 1. Tạo các quan hệ của CSDL “QLKB” như bảng thuộc tính của đề. Khai báo khóa chính, khóa ngoại.",
+    "answer": "CREATE TABLE BENHNHAN (\n    MaBN CHAR(5) NOT NULL,\n    HoTenBN NVARCHAR(50),\n    NgaySinh SMALLDATETIME,\n    CCCD NVARCHAR(12),\n    SoBHYT NVARCHAR(15),\n    BHYTChiTra FLOAT,\n    DiaChi NVARCHAR(100),\n    CONSTRAINT PK_BENHNHAN PRIMARY KEY (MaBN)\n);\n\nCREATE TABLE BACSI (\n    MaBS CHAR(5) NOT NULL,\n    HoTenBS NVARCHAR(50),\n    NgayBDLV SMALLDATETIME,\n    ChuyenKhoa NVARCHAR(50),\n    CONSTRAINT PK_BACSI PRIMARY KEY (MaBS)\n);\n\nCREATE TABLE KHAMBENH (\n    MaKB CHAR(5) NOT NULL,\n    MaBN CHAR(5),\n    MaBS CHAR(5),\n    NgayKham SMALLDATETIME,\n    TrieuChung NVARCHAR(255),\n    KetLuan NVARCHAR(255),\n    TaiKham INT,\n    CONSTRAINT PK_KHAMBENH PRIMARY KEY (MaKB),\n    CONSTRAINT FK_KHAMBENH_BENHNHAN FOREIGN KEY (MaBN) REFERENCES BENHNHAN (MaBN),\n    CONSTRAINT FK_KHAMBENH_BACSI FOREIGN KEY (MaBS) REFERENCES BACSI (MaBS)\n);\n\nCREATE TABLE THUOC (\n    MaThuoc CHAR(5) NOT NULL,\n    TenThuoc NVARCHAR(50),\n    LoaiThuoc NVARCHAR(50),\n    DVT NVARCHAR(20),\n    DonGia MONEY,\n    CONSTRAINT PK_THUOC PRIMARY KEY (MaThuoc)\n);\n\nCREATE TABLE DONTHUOC (\n    MaDT CHAR(5) NOT NULL,\n    MaKB CHAR(5),\n    TriGiaDT MONEY,\n    BHYTChiTra FLOAT,\n    NgayCapThuoc SMALLDATETIME,\n    TongTienTT MONEY,\n    TinhTrangDT NVARCHAR(30),\n    CONSTRAINT PK_DONTHUOC PRIMARY KEY (MaDT),\n    CONSTRAINT FK_DONTHUOC_KHAMBENH FOREIGN KEY (MaKB) REFERENCES KHAMBENH (MaKB)\n);\n\nCREATE TABLE CHITIETDT (\n    MaDT CHAR(5) NOT NULL,\n    MaThuoc CHAR(5) NOT NULL,\n    SoLuong INT,\n    ThanhTien MONEY,\n    CONSTRAINT PK_CHITIETDT PRIMARY KEY (MaDT, MaThuoc),\n    CONSTRAINT FK_CHITIETDT_DONTHUOC FOREIGN KEY (MaDT) REFERENCES DONTHUOC (MaDT),\n    CONSTRAINT FK_CHITIETDT_THUOC FOREIGN KEY (MaThuoc) REFERENCES THUOC (MaThuoc)\n);",
+    "enabled": true,
+    "startFrom": "empty",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Tạo bảng (CREATE TABLE)"
+   },
+   {
+    "id": "qlkb-301-ddl-2-1",
+    "name": "DDL 301-2.1.sql",
+    "description": "[Đề 301] Câu 2.1. Tỷ lệ chi phí do bảo hiểm y tế chi trả của mỗi bệnh nhân có giá trị từ 0 đến 0.7.",
+    "answer": "ALTER TABLE BENHNHAN\nADD CONSTRAINT CK_BENHNHAN_BHYTChiTra CHECK (BHYTChiTra BETWEEN 0 AND 0.7);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlkb-301-ddl-2-2",
+    "name": "DDL 301-2.2.sql",
+    "description": "[Đề 301] Câu 2.2. Tình trạng thanh toán của đơn thuốc chỉ nhận một trong hai giá trị ‘Chưa thanh toán’ hoặc ‘Đã thanh toán’.",
+    "answer": "ALTER TABLE DONTHUOC\nADD CONSTRAINT CK_DONTHUOC_TinhTrangDT CHECK (TinhTrangDT IN (N'Chưa thanh toán', N'Đã thanh toán'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlkb-302-ddl-2-1",
+    "name": "DDL 302-2.1.sql",
+    "description": "[Đề 302] Câu 2.1. Thời gian tái khám của khám bệnh có giá trị từ 0 đến 365 ngày.",
+    "answer": "ALTER TABLE KHAMBENH\nADD CONSTRAINT CK_KHAMBENH_TaiKham CHECK (TaiKham BETWEEN 0 AND 365);",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   },
+   {
+    "id": "qlkb-302-ddl-2-2",
+    "name": "DDL 302-2.2.sql",
+    "description": "[Đề 302] Câu 2.2. Đơn vị tính của thuốc chỉ nhận một trong các giá trị ‘viên’, ‘hộp’, ‘lọ’, ‘vỉ’.",
+    "answer": "ALTER TABLE THUOC\nADD CONSTRAINT CK_THUOC_DVT CHECK (DVT IN (N'viên', N'hộp', N'lọ', N'vỉ'));",
+    "enabled": true,
+    "startFrom": "structure",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Dễ",
+    "category": "DDL - Ràng buộc CHECK"
+   }
+  ],
+  "dml": [],
+  "trigger": [
+   {
+    "id": "qlkb-301-trg-2-3",
+    "name": "TRG 301-2.3.sql",
+    "description": "[Đề 301] Câu 2.3. Trị giá của đơn thuốc (TriGiaDT) được tính bằng tổng thành tiền (ThanhTien) của các chi tiết thuộc đơn thuốc đó. Hãy viết trigger để tạo ràng buộc trên cho thao tác thêm mới một chi tiết đơn thuốc.",
+    "answer": "CREATE TRIGGER trg_CHITIETDT_Insert ON CHITIETDT\nAFTER INSERT\nAS\nBEGIN\n    UPDATE dt\n    SET dt.TriGiaDT = (SELECT SUM(ct.ThanhTien) FROM CHITIETDT ct WHERE ct.MaDT = dt.MaDT)\n    FROM DONTHUOC dt\n    WHERE dt.MaDT IN (SELECT MaDT FROM inserted)\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "INSERT INTO CHITIETDT (MaDT, MaThuoc, SoLuong, ThanhTien) VALUES ('DT012', 'TH003', 4, 6000);",
+     "INSERT INTO CHITIETDT (MaDT, MaThuoc, SoLuong, ThanhTien) VALUES ('DT013', 'TH003', 2, 3000), ('DT014', 'TH001', 5, 15000);"
+    ]
+   },
+   {
+    "id": "qlkb-302-trg-2-3",
+    "name": "TRG 302-2.3.sql",
+    "description": "[Đề 302] Câu 2.3. Trị giá của đơn thuốc (TriGiaDT) được tính bằng tổng thành tiền (ThanhTien) của các chi tiết thuộc đơn thuốc đó. Hãy viết trigger để tạo ràng buộc trên cho thao tác xóa một chi tiết đơn thuốc.",
+    "answer": "CREATE TRIGGER trg_CHITIETDT_Delete ON CHITIETDT\nAFTER DELETE\nAS\nBEGIN\n    UPDATE dt\n    SET dt.TriGiaDT = ISNULL((SELECT SUM(ct.ThanhTien) FROM CHITIETDT ct WHERE ct.MaDT = dt.MaDT), 0)\n    FROM DONTHUOC dt\n    WHERE dt.MaDT IN (SELECT MaDT FROM deleted)\nEND",
+    "enabled": true,
+    "startFrom": "provided",
+    "setupDdl": "",
+    "setupDml": "",
+    "difficulty": "Khó",
+    "category": "Trigger - Ràng buộc toàn vẹn liên bảng",
+    "probes": [
+     "DELETE FROM CHITIETDT WHERE MaDT = 'DT012';",
+     "DELETE FROM CHITIETDT WHERE MaThuoc = 'TH003' AND MaDT IN ('DT005', 'DT014');"
+    ]
+   }
+  ],
+  "sql": [
+   {
+    "id": "qlkb-301-dql-3-1",
+    "name": "DQL 301-3.1.sql",
+    "description": "[Đề 301] Câu 3.1. Liệt kê thông tin các bác sĩ (mã, họ tên) thuộc chuyên khoa ‘Tai mũi họng’ cùng với thông tin các bệnh nhân (mã, họ tên) mà bác sĩ đó khám bệnh trong năm 2024.",
+    "query": "SELECT DISTINCT bs.MaBS, bs.HoTenBS, bn.MaBN, bn.HoTenBN\nFROM BACSI bs\nJOIN KHAMBENH kb ON kb.MaBS = bs.MaBS\nJOIN BENHNHAN bn ON bn.MaBN = kb.MaBN\nWHERE bs.ChuyenKhoa = N'Tai mũi họng' AND YEAR(kb.NgayKham) = 2024\nORDER BY bs.MaBS, bn.MaBN;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlkb-301-dql-3-2",
+    "name": "DQL 301-3.2.sql",
+    "description": "[Đề 301] Câu 3.2. Liệt kê các bệnh nhân (mã, họ tên) đã được khám bệnh trong năm 2024 nhưng không có đơn thuốc nào đã thanh toán có tổng tiền thanh toán từ 100,000 VNĐ trở lên.",
+    "query": "SELECT DISTINCT bn.MaBN, bn.HoTenBN\nFROM BENHNHAN bn\nJOIN KHAMBENH kb ON kb.MaBN = bn.MaBN\nWHERE YEAR(kb.NgayKham) = 2024\n  AND NOT EXISTS (\n      SELECT 1 FROM KHAMBENH k2 JOIN DONTHUOC dt ON dt.MaKB = k2.MaKB\n      WHERE k2.MaBN = bn.MaBN AND dt.TinhTrangDT = N'Đã thanh toán' AND dt.TongTienTT >= 100000)\nORDER BY bn.MaBN;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlkb-301-dql-3-3",
+    "name": "DQL 301-3.3.sql",
+    "description": "[Đề 301] Câu 3.3. Tìm thông tin các đơn thuốc (mã đơn thuốc, mã khám bệnh) cấp trong năm 2024 đã được thanh toán và trong chi tiết đơn thuốc có tất cả các thuốc thuộc loại ‘Thuốc dị ứng’.",
+    "query": "SELECT dt.MaDT, dt.MaKB\nFROM DONTHUOC dt\nWHERE YEAR(dt.NgayCapThuoc) = 2024 AND dt.TinhTrangDT = N'Đã thanh toán'\n  AND NOT EXISTS (\n      SELECT 1 FROM THUOC t\n      WHERE t.LoaiThuoc = N'Thuốc dị ứng'\n        AND NOT EXISTS (SELECT 1 FROM CHITIETDT ct WHERE ct.MaDT = dt.MaDT AND ct.MaThuoc = t.MaThuoc));",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlkb-301-dql-3-4",
+    "name": "DQL 301-3.4.sql",
+    "description": "[Đề 301] Câu 3.4. Với mỗi bệnh nhân không có thẻ bảo hiểm y tế, hãy cho biết số lượng đơn thuốc cấp trong năm 2024 đã được thanh toán. Thông tin hiển thị: Mã bệnh nhân, họ tên bệnh nhân, số lượng.",
+    "query": "SELECT bn.MaBN, bn.HoTenBN, COUNT(dt.MaDT) AS SoLuong\nFROM BENHNHAN bn\nLEFT JOIN KHAMBENH kb ON kb.MaBN = bn.MaBN\nLEFT JOIN DONTHUOC dt ON dt.MaKB = kb.MaKB AND dt.TinhTrangDT = N'Đã thanh toán' AND YEAR(dt.NgayCapThuoc) = 2024\nWHERE bn.SoBHYT IS NULL\nGROUP BY bn.MaBN, bn.HoTenBN\nORDER BY bn.MaBN;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlkb-301-dql-3-5",
+    "name": "DQL 301-3.5.sql",
+    "description": "[Đề 301] Câu 3.5. Trong các bệnh nhân có số lần khám bệnh ít nhất, tìm bệnh nhân (mã, họ tên) có tổng số tiền đã thanh toán cho các đơn thuốc cấp trong năm 2024 ít hơn 100,000 VNĐ.",
+    "query": "SELECT bn.MaBN, bn.HoTenBN\nFROM BENHNHAN bn\nWHERE bn.MaBN IN (\n        SELECT MaBN FROM KHAMBENH GROUP BY MaBN\n        HAVING COUNT(*) <= ALL (SELECT COUNT(*) FROM KHAMBENH GROUP BY MaBN))\n  AND ISNULL((SELECT SUM(dt.TongTienTT) FROM KHAMBENH kb JOIN DONTHUOC dt ON dt.MaKB = kb.MaKB\n              WHERE kb.MaBN = bn.MaBN AND dt.TinhTrangDT = N'Đã thanh toán' AND YEAR(dt.NgayCapThuoc) = 2024), 0) < 100000\nORDER BY bn.MaBN;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   },
+   {
+    "id": "qlkb-302-dql-3-1",
+    "name": "DQL 302-3.1.sql",
+    "description": "[Đề 302] Câu 3.1. Liệt kê thông tin các bệnh nhân (mã, họ tên) có địa chỉ ở ‘Tp.HCM’ cùng thông tin đơn thuốc (mã đơn thuốc, tổng tiền thanh toán) cấp trong năm 2024 của bệnh nhân đó.",
+    "query": "SELECT bn.MaBN, bn.HoTenBN, dt.MaDT, dt.TongTienTT\nFROM BENHNHAN bn\nJOIN KHAMBENH kb ON kb.MaBN = bn.MaBN\nJOIN DONTHUOC dt ON dt.MaKB = kb.MaKB\nWHERE bn.DiaChi LIKE N'%Tp.HCM%' AND YEAR(dt.NgayCapThuoc) = 2024\nORDER BY bn.MaBN, dt.MaDT;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Kết nối nhiều bảng (JOIN)"
+   },
+   {
+    "id": "qlkb-302-dql-3-2",
+    "name": "DQL 302-3.2.sql",
+    "description": "[Đề 302] Câu 3.2. Liệt kê các bệnh nhân (mã, họ tên) có tỷ lệ chi phí do bảo hiểm y tế chi trả từ 0.1 trở lên và được khám bởi bác sĩ thuộc cả hai chuyên khoa ‘Nội khoa’ và ‘Tai mũi họng’ trong năm 2024.",
+    "query": "SELECT bn.MaBN, bn.HoTenBN\nFROM BENHNHAN bn\nJOIN KHAMBENH kb ON kb.MaBN = bn.MaBN\nJOIN BACSI bs ON bs.MaBS = kb.MaBS\nWHERE bn.BHYTChiTra >= 0.1 AND YEAR(kb.NgayKham) = 2024 AND bs.ChuyenKhoa = N'Nội khoa'\nINTERSECT\nSELECT bn.MaBN, bn.HoTenBN\nFROM BENHNHAN bn\nJOIN KHAMBENH kb ON kb.MaBN = bn.MaBN\nJOIN BACSI bs ON bs.MaBS = kb.MaBS\nWHERE bn.BHYTChiTra >= 0.1 AND YEAR(kb.NgayKham) = 2024 AND bs.ChuyenKhoa = N'Tai mũi họng';",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)"
+   },
+   {
+    "id": "qlkb-302-dql-3-3",
+    "name": "DQL 302-3.3.sql",
+    "description": "[Đề 302] Câu 3.3. Tìm thông tin các thuốc (mã, tên thuốc) thuộc loại ‘Thuốc giảm đau’ có trong chi tiết của tất cả các đơn thuốc cấp vào ngày 01/12/2024 và đã được thanh toán.",
+    "query": "SELECT t.MaThuoc, t.TenThuoc\nFROM THUOC t\nWHERE t.LoaiThuoc = N'Thuốc giảm đau'\n  AND NOT EXISTS (\n      SELECT 1 FROM DONTHUOC dt\n      WHERE YEAR(dt.NgayCapThuoc) = 2024 AND MONTH(dt.NgayCapThuoc) = 12 AND DAY(dt.NgayCapThuoc) = 1\n        AND dt.TinhTrangDT = N'Đã thanh toán'\n        AND NOT EXISTS (SELECT 1 FROM CHITIETDT ct WHERE ct.MaDT = dt.MaDT AND ct.MaThuoc = t.MaThuoc));",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Phép chia (DIVISION)"
+   },
+   {
+    "id": "qlkb-302-dql-3-4",
+    "name": "DQL 302-3.4.sql",
+    "description": "[Đề 302] Câu 3.4. Với mỗi bác sĩ, hãy cho biết số lượt bệnh nhân có thẻ bảo hiểm y tế mà bác sĩ đó đã khám trong năm 2024. Thông tin hiển thị: Mã bác sĩ, họ tên bác sĩ, số lượt.",
+    "query": "SELECT bs.MaBS, bs.HoTenBS, COUNT(kb.MaKB) AS SoLuot\nFROM BACSI bs\nLEFT JOIN KHAMBENH kb ON kb.MaBS = bs.MaBS AND YEAR(kb.NgayKham) = 2024\n    AND kb.MaBN IN (SELECT MaBN FROM BENHNHAN WHERE SoBHYT IS NOT NULL)\nGROUP BY bs.MaBS, bs.HoTenBS\nORDER BY bs.MaBS;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Trung bình",
+    "category": "DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)"
+   },
+   {
+    "id": "qlkb-302-dql-3-5",
+    "name": "DQL 302-3.5.sql",
+    "description": "[Đề 302] Câu 3.5. Trong các bệnh nhân có số lần khám bệnh nhiều nhất, tìm bệnh nhân (mã, họ tên) có tổng số tiền đã thanh toán cho các đơn thuốc cấp trong năm 2024 nhiều hơn 250,000 VNĐ.",
+    "query": "SELECT bn.MaBN, bn.HoTenBN\nFROM BENHNHAN bn\nWHERE bn.MaBN IN (\n        SELECT MaBN FROM KHAMBENH GROUP BY MaBN\n        HAVING COUNT(*) >= ALL (SELECT COUNT(*) FROM KHAMBENH GROUP BY MaBN))\n  AND (SELECT SUM(dt.TongTienTT) FROM KHAMBENH kb JOIN DONTHUOC dt ON dt.MaKB = kb.MaKB\n       WHERE kb.MaBN = bn.MaBN AND dt.TinhTrangDT = N'Đã thanh toán' AND YEAR(dt.NgayCapThuoc) = 2024) > 250000\nORDER BY bn.MaBN;",
+    "enabled": true,
+    "timeLimitMs": 5000,
+    "difficulty": "Khó",
+    "category": "DQL - Truy vấn con (SUBQUERY)"
+   }
+  ]
+ }
+}

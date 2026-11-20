@@ -11,7 +11,9 @@ use App\Models\Submission;
 use App\Models\TestCase;
 use App\Models\TestCaseScript;
 use App\Models\User;
+use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
+use App\Services\Grading\QuestionScoring;
 use App\Services\SqlServer\QueryRewriter;
 use App\Services\SqlServer\SandboxService;
 use Illuminate\Support\Facades\DB;
@@ -1262,10 +1264,12 @@ class ProblemWorkspaceService
                 );
             }
 
-            $activity = (in_array($source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true) && $context && $context !== 'Practice')
+            $activity = (in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true) && $context && $context !== 'Practice')
                 ? Assignment::find($context)
                 : null;
-            $scoreVisible = !$activity || (bool) $activity->show_scores_after_submit;
+            // `_forGrading`: bên chấm (ActivityAttemptGradingService) cần kết quả thật để tính điểm; việc che điểm
+            // với sinh viên do bên gọi/bên đọc lo. Không có cờ này thì ca thi ẩn điểm sẽ luôn bị chấm 0.
+            $scoreVisible = !empty($data['_forGrading']) || !$activity || (bool) $activity->show_scores_after_submit;
 
             return [
                 'id'              => $subId,
@@ -1374,7 +1378,7 @@ class ProblemWorkspaceService
         if (!$activity) {
             return;
         }
-        $isStudent = $user->role === User::ROLE_STUDENT || $user->role === 'student';
+        $isStudent = !app(StaffAccess::class)->isStaff($user);
         if (!$isStudent) {
             return;
         }
@@ -1473,10 +1477,10 @@ class ProblemWorkspaceService
         $source = (string) ($data['source'] ?? 'Practice');
         $context = (string) ($data['context'] ?? 'Practice');
 
-        $activity = (in_array($source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true) && $context && $context !== 'Practice')
+        $activity = (in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true) && $context && $context !== 'Practice')
             ? Assignment::find($context)
             : null;
-        if ($activity && $activity->exam_mode && ($user->role === User::ROLE_STUDENT || $user->role === 'student')) {
+        if ($activity && $activity->exam_mode && !app(StaffAccess::class)->isStaff($user)) {
             abort(403, 'Use Submit & Exit to submit the complete exam.');
         }
         $this->assertActivitySubmissionWindow($activity, $user);
@@ -1486,7 +1490,7 @@ class ProblemWorkspaceService
             $officialCount = Submission::where('user_id', $user->id)
                 ->where('context', $activity->id)
                 ->where('problem_id', $problem->id)
-                ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 })
@@ -1664,7 +1668,7 @@ class ProblemWorkspaceService
         $databaseType = (string) ($data['database'] ?? 'SQL Server');
         $schemaName = $this->sandbox()->studentSchemaName($user->id, $context, $problem->id);
 
-        $isActivity = in_array($source, ['Assignments', 'Contests', 'Assignment', 'Contest'], true)
+        $isActivity = in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true)
             && $context !== '' && $context !== 'Practice';
 
         $activity = $isActivity ? Assignment::find($context) : null;
@@ -1672,7 +1676,7 @@ class ProblemWorkspaceService
             ? AssignmentProblem::where('assignment_id', $activity->id)->where('problem_id', $problem->id)->first()
             : null;
 
-        if ($activity && $activity->exam_mode && ($user->role === User::ROLE_STUDENT || $user->role === 'student')) {
+        if ($activity && $activity->exam_mode && !app(StaffAccess::class)->isStaff($user)) {
             abort(403, 'Use Submit & Exit to submit the complete exam.');
         }
         $this->assertActivitySubmissionWindow($activity, $user);
@@ -1683,7 +1687,7 @@ class ProblemWorkspaceService
             $officialCount = Submission::where('user_id', $user->id)
                 ->where('context', $activity->id)
                 ->where('problem_id', $problem->id)
-                ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 })
@@ -1923,7 +1927,13 @@ class ProblemWorkspaceService
             }
         }
 
-        $score = $totalQuestions > 0 ? round($maximum * ($passedQuestions / $totalQuestions), 2) : 0;
+        $outcomes = [];
+        foreach ($sections as $section) {
+            foreach ($section['questions'] ?? [] as $question) {
+                $outcomes[] = ['part' => (string) $section['part'], 'id' => (string) $question['id'], 'passed' => ($question['status'] ?? '') === 'Accepted'];
+            }
+        }
+        $score = QuestionScoring::score($outcomes, $selection, $maximum);
         $overallResult = ($totalQuestions > 0 && $passedQuestions === $totalQuestions)
             ? 'Accepted'
             : ($passedQuestions > 0 ? 'Partial' : 'Wrong Answer');

@@ -1,7 +1,7 @@
 import {apiFetch} from "@/shared/api/apiClient";
 
 export type RegradeCandidate = {
-  submissionId: string; sessionId: string; sessionTitle: string; examinationId: string | null; isContest?: boolean;
+  submissionId: string; sessionId: string; sessionTitle: string; examinationId: string | null; isExamSession?: boolean;
   studentId: string; studentName: string; studentCode: string | null; className: string | null;
   problemTitle: string; score: number | null; maxScore: number | null; submittedAt: string | null;
   appealRequested: boolean; appealReviewed: boolean;
@@ -10,7 +10,7 @@ export type RegradeCandidate = {
   assignmentNote?: string | null; note?: string | null;
   excludedReviewerIds?: string[];
 };
-export type RegradeActivityOption = { id: string; title: string; isContest: boolean; examMode: boolean };
+export type RegradeActivityOption = { id: string; title: string; isExamSession: boolean; examMode: boolean };
 export type RegradeReviewer = {id: string; name: string; email: string};
 export type MyRegrade = {
   submissionId: string; sessionTitle: string | null; studentName: string; studentCode: string | null;

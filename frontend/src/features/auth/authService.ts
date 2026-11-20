@@ -6,14 +6,12 @@ export type StudentSession = {
   name: string;
   initials: string;
   email: string;
-  role: "student" | "instructor" | "faculty_office" | "admin";
-  technical_role?: string;
+  /** Loại danh tính (không phải quyền): quyền và khu vực lấy từ /api/auth/permissions. */
+  account_type: "student" | "staff";
+  /** Tên các vai trò đang giữ, chỉ để hiển thị. */
+  roles?: { id: string; name: string }[];
   examSessionId?: string | null;
 };
-
-export function homeForRole(role?: StudentSession["role"]) {
-  return role === "faculty_office" ? "/office/examinations" : role === "instructor" ? "/teacher/problems" : role === "admin" ? "/admin/overview" : "/dashboard";
-}
 
 export const SESSION_KEY = "sql-practice:session:v1";
 export const TOKEN_KEY = "sql-practice:access-token";
@@ -43,11 +41,27 @@ export const authService = {
     return persist(data.user, data.access_token);
   },
   
-  async demoLogin() {
-    const data = await apiFetch("/api/auth/demo", { method: "POST" });
-    return persist(data.user, data.access_token);
+  async requestPasswordReset(email: string) {
+    await apiFetch("/api/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email: email.trim() }),
+    });
   },
-  
+
+  async verifyResetOtp(email: string, otp: string) {
+    await apiFetch("/api/auth/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ email: email.trim(), otp }),
+    });
+  },
+
+  async resetPassword(email: string, otp: string, password: string) {
+    await apiFetch("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ email: email.trim(), otp, password }),
+    });
+  },
+
   async register(name: string, email: string, password: string) {
     if (!name.trim() || !validEmail(email) || password.length < 8) {
       throw new Error("Check the registration fields.");

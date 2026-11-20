@@ -90,7 +90,7 @@ export function ClassPicker({
 }: {
   selected: string[];
   onChange: (next: string[]) => void;
-  classes: { id: string; course?: string; students?: number; practice_class?: string; practiceClass?: string; lecturer?: string; practice_lecturer?: string }[];
+  classes: { id: string; course?: string; students?: number; practice_class?: string; practiceClass?: string; lecturer?: string }[];
   disabledClassIds?:string[];
   classNotices?:Record<string,string>;
   conflictStudentEmails?: string[];

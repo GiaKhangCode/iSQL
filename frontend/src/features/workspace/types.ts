@@ -1,4 +1,4 @@
-export type ContestSchema = {
+export type ExamSessionSchema = {
   schemaName: string;
   tableCount: number;
   tables: Array<{

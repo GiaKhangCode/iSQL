@@ -23,7 +23,7 @@ export interface CourseGrade {
 export interface ActivityHistoryItem {
   id: string;
   title: string;
-  kind: "exam" | "assignment" | "Examination" | "Contest" | "Assignment";
+  kind: "exam" | "assignment" | "Examination" | "ExamSession" | "Assignment";
   date?: string | null;
   submittedAt?: string | null;
   status?: string;
@@ -253,7 +253,7 @@ export function ProfilePage() {
                   <tbody>
                     {profile.history.map((row) => {
                       const rawDate = row.submittedAt || row.date;
-                      const isExamKind = row.kind === "exam" || row.kind === "Examination" || row.kind === "Contest";
+                      const isExamKind = row.kind === "exam" || row.kind === "Examination" || row.kind === "ExamSession";
                       const derivedStatus = row.status || (row.scorePublished ? "graded" : rawDate ? "unpublished" : "not_submitted");
                       const canViewDetails = derivedStatus === "graded" || Boolean(row.scorePublished);
                       return (
@@ -262,7 +262,7 @@ export function ProfilePage() {
                           <span className="activity-title">{row.title}</span>
                           <span className="activity-type">
                             {isExamKind
-                              ? (isVi ? "Kỳ thi / Cuộc thi" : "Examination / contest")
+                              ? (isVi ? "Kỳ thi / Ca thi" : "Examination / exam session")
                               : (isVi ? "Bài tập" : "Assignment")}
                           </span>
                         </td>

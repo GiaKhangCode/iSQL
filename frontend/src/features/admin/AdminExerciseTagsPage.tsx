@@ -30,7 +30,6 @@ export function AdminExerciseTagsPage() {
   const [formKind, setFormKind] = useState<"difficulty" | "category">("difficulty");
   const [formName, setFormName] = useState("");
   const [formPart, setFormPart] = useState<"ALL" | "DDL" | "DML" | "DQL" | "TRIGGER">("ALL");
-  const [formOrderIndex, setFormOrderIndex] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -58,13 +57,11 @@ export function AdminExerciseTagsPage() {
 
   const openCreateDialog = (defaultKind?: "difficulty" | "category") => {
     const kind = defaultKind || (filterKind === "category" ? "category" : "difficulty");
-    const countForKind = tags.filter((t) => t.kind === kind).length;
     setDialogMode("create");
     setEditingTag(null);
     setFormKind(kind);
     setFormName("");
     setFormPart("ALL");
-    setFormOrderIndex(countForKind + 1);
     setFormError("");
   };
 
@@ -74,7 +71,6 @@ export function AdminExerciseTagsPage() {
     setFormKind(tag.kind);
     setFormName(tag.name);
     setFormPart(tag.part);
-    setFormOrderIndex(tag.orderIndex);
     setFormError("");
   };
 
@@ -92,7 +88,6 @@ export function AdminExerciseTagsPage() {
           kind: formKind,
           name: formName.trim(),
           part: formKind === "category" ? formPart : "ALL",
-          orderIndex: formOrderIndex,
         });
         setSelectedId(created.id);
         setNotice(`Đã tạo thành công thẻ "${created.name}".`);
@@ -100,7 +95,6 @@ export function AdminExerciseTagsPage() {
         const updated = await exerciseTagsApi.updateTag(editingTag.id, {
           name: formName.trim(),
           part: formKind === "category" ? formPart : "ALL",
-          orderIndex: formOrderIndex,
         });
         setSelectedId(updated.id);
         setNotice(`Đã cập nhật thành công thẻ "${updated.name}".`);
@@ -151,10 +145,7 @@ export function AdminExerciseTagsPage() {
       if (a.kind !== b.kind) {
         return a.kind === "difficulty" ? -1 : 1;
       }
-      if (a.orderIndex !== b.orderIndex) {
-        return a.orderIndex - b.orderIndex;
-      }
-      return a.name.localeCompare(b.name);
+      return 0; // cùng loại: giữ nguyên thứ tự backend trả về (thứ tự tạo)
     });
   }, [tags, filterKind, filterPart, query]);
 
@@ -169,7 +160,7 @@ export function AdminExerciseTagsPage() {
   const selectedTag = filteredTags.find((t) => t.id === selectedId) || pageTags[0] || filteredTags[0];
 
   return (
-    <section className="teacher-page teacher-list-page compact-teacher-contests admin-courses-page admin-tags-page">
+    <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-courses-page admin-tags-page">
       <h1 className="sr-only"><TranslatedText>{tr("Exercise tags management")}</TranslatedText></h1>
       {notice && <p className="teacher-form-message" role="status"><TranslatedText>{notice}</TranslatedText></p>}
       <div className="teacher-list-detail-layout teacher-filter-layout">
@@ -273,7 +264,7 @@ export function AdminExerciseTagsPage() {
                             {tag.name}
                           </button>
                           <small className="teacher-row-subtext">
-                            Thứ tự: {tag.orderIndex} · {tag.kind === "difficulty" ? "Độ khó câu hỏi" : `Dạng: ${tag.part}`}
+                            {tag.kind === "difficulty" ? "Độ khó câu hỏi" : `Dạng: ${tag.part}`}
                           </small>
                         </td>
                         <td data-label={tr("LOẠI THẺ")}>
@@ -394,16 +385,8 @@ export function AdminExerciseTagsPage() {
                     <dd>{selectedTag.kind === "difficulty" ? "Tất cả các phần (DDL, DML, DQL, Trigger)" : selectedTag.part}</dd>
                   </div>
                   <div>
-                    <dt><TranslatedText>THỨ TỰ HIỂN THỊ</TranslatedText></dt>
-                    <dd>{selectedTag.orderIndex}</dd>
-                  </div>
-                  <div>
                     <dt><TranslatedText>TRẠNG THÁI</TranslatedText></dt>
                     <dd><Status value="Active" /></dd>
-                  </div>
-                  <div>
-                    <dt><TranslatedText>MÃ THẺ (ID)</TranslatedText></dt>
-                    <dd style={{ fontSize: "11px", wordBreak: "break-all", color: "var(--muted)" }}>{selectedTag.id}</dd>
                   </div>
                 </dl>
                 <div className="teacher-list-detail-actions">
@@ -507,27 +490,6 @@ export function AdminExerciseTagsPage() {
                 </Select>
               </label>
             )}
-
-            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
-                <TranslatedText>THỨ TỰ HIỂN THỊ</TranslatedText>
-              </span>
-              <input
-                type="number"
-                min={0}
-                value={formOrderIndex}
-                onChange={(e) => setFormOrderIndex(parseInt(e.target.value, 10) || 0)}
-                style={{
-                  height: 36,
-                  padding: "0 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border)",
-                  background: "var(--bg)",
-                  color: "var(--text)",
-                  fontSize: 13,
-                }}
-              />
-            </label>
 
             {formError && (
               <p style={{ margin: 0, color: "var(--danger, #ef4444)", fontSize: 13 }}>

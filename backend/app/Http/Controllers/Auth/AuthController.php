@@ -9,6 +9,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterLecturerRequest;
+use App\Models\ExamAdmission;
+use App\Services\ExamAdmissionService;
+use App\Services\ExamLoginService;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,11 +20,19 @@ use Exception;
 
 class AuthController extends Controller
 {
+    private const INVALID_CREDENTIALS = 'Email hoặc mật khẩu không chính xác.';
+
     protected UserService $userService;
 
-    public function __construct(UserService $userService)
+    protected ExamAdmissionService $examAdmissionService;
+
+    protected ExamLoginService $examLoginService;
+
+    public function __construct(UserService $userService, ExamAdmissionService $examAdmissionService, ExamLoginService $examLoginService)
     {
         $this->userService = $userService;
+        $this->examAdmissionService = $examAdmissionService;
+        $this->examLoginService = $examLoginService;
     }
 
     public function register(RegisterRequest $request): JsonResponse
@@ -74,50 +85,51 @@ class AuthController extends Controller
         }
 
         // 2. Check if this is a temporary exam credential (ExamAdmission)
-        /** @var \App\Http\Controllers\ExamLoginProctorController $proctorController */
-        $proctorController = app(\App\Http\Controllers\ExamLoginProctorController::class);
-
         // Case A: Temporary exam username (exact, case-insensitive, or visually normalized)
-        $admission = $proctorController->findAdmission($accountInput);
+        $admission = $this->examLoginService->findAdmission($accountInput);
         if ($admission) {
-            try {
-                return $proctorController->loginWithAdmission($request, $admission, $password);
-            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-                return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
-            } catch (\Throwable $e) {
-                \Log::error('Exam Admission Login Exception: ' . $e->getMessage(), ['exception' => $e]);
-                return response()->json(['detail' => $e->getMessage() ?: 'Đăng nhập ca thi thất bại.'], 400);
-            }
+            return $this->examLoginResponse($request, $admission, $password);
         }
 
         // Case B: Student entered their school email / MSSV + exam temporary password
-        $studentUser = \App\Models\User::where('email', $accountInput)
-            ->orWhereHas('studentIdentity', fn($q) => $q->where('student_code', $accountInput))
-            ->first();
-
-        if ($studentUser) {
-            $candidateAdmissions = \App\Models\ExamAdmission::where('student_id', $studentUser->id)
-                ->where('status', '!=', 'revoked')
-                ->orderByDesc('id')
-                ->get();
-
-            foreach ($candidateAdmissions as $candAdm) {
-                $passwordOk = \Illuminate\Support\Facades\Hash::check($password, $candAdm->hashed_password)
-                    || ($candAdm->initial_password !== null && hash_equals((string) $candAdm->initial_password, $password));
-                if ($passwordOk) {
-                    try {
-                        return $proctorController->loginWithAdmission($request, $candAdm, $password);
-                    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-                        return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
-                    } catch (\Throwable $e) {
-                        \Log::error('Exam Admission Login Exception: ' . $e->getMessage(), ['exception' => $e]);
-                        return response()->json(['detail' => $e->getMessage() ?: 'Đăng nhập ca thi thất bại.'], 400);
-                    }
-                }
-            }
+        $candidateAdmission = $this->examAdmissionService->findAdmissionByStudentCredentials($accountInput, $password);
+        if ($candidateAdmission) {
+            return $this->examLoginResponse($request, $candidateAdmission, $password);
         }
 
-        return response()->json(['detail' => 'Email hoặc mật khẩu không chính xác.'], 401);
+        // Không có tài khoản nào để so: vẫn tốn một lần băm để độ trễ không lộ tên nào tồn tại.
+        $this->examLoginService->spendHashTime($password);
+
+        return $this->invalidCredentials();
+    }
+
+    private function invalidCredentials(): JsonResponse
+    {
+        return response()->json(['detail' => self::INVALID_CREDENTIALS], 401);
+    }
+
+    /**
+     * Đăng nhập bằng tài khoản ca thi qua /auth/login. Sai tên hoặc mật khẩu ca thi (401) trả đúng thông báo
+     * chung như tài khoản không tồn tại, để không lộ tên ca thi nào có thật. Các lỗi sau khi mật khẩu đúng
+     * (ca chưa mở, đã đóng, sinh viên bị khóa...) giữ nguyên vì chỉ người có mật khẩu mới thấy.
+     */
+    private function examLoginResponse(Request $request, ExamAdmission $admission, string $password): JsonResponse
+    {
+        try {
+            return $this->examLoginService->toResponse(
+                $this->examLoginService->loginWithAdmission($request, $admission, $password)
+            );
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            if ($e->getStatusCode() === 401) {
+                return $this->invalidCredentials();
+            }
+
+            return response()->json(['detail' => $e->getMessage()], $e->getStatusCode());
+        } catch (\Throwable $e) {
+            \Log::error('Exam Admission Login Exception: ' . $e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['detail' => 'Đăng nhập ca thi thất bại.'], 400);
+        }
     }
 
     public function me(Request $request): JsonResponse

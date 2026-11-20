@@ -6,17 +6,19 @@ use App\Http\Controllers\Teacher\ProblemController;
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Trending and Solution / Stage Validation (defined before parameterised {id} routes)
     Route::get('/trending', [ProblemController::class, 'trending']);
-    Route::post('/validate', [ProblemController::class, 'validateSolution']);
-    Route::post('/validate-stage', [ProblemController::class, 'validateStage']);
+    Route::post('/validate', [ProblemController::class, 'validateSolution'])->middleware('capability:problem.create,library.manage');
+    Route::post('/validate-stage', [ProblemController::class, 'validateStage'])->middleware('capability:problem.create,library.manage');
 
     // List & Detail
     Route::get('/', [ProblemController::class, 'index']);
     Route::get('/{id}', [ProblemController::class, 'show']);
 
-    // Teacher / Admin CRUD
-    Route::post('/', [ProblemController::class, 'store']);
-    Route::put('/{id}', [ProblemController::class, 'update']);
-    Route::delete('/{id}', [ProblemController::class, 'destroy']);
+    // Soạn bài toán: quyền problem.create; phạm vi (của mình / được chia sẻ quyền sửa / siêu quản trị) do ProblemService quyết định.
+    Route::middleware('capability:problem.create')->group(function () {
+        Route::post('/', [ProblemController::class, 'store']);
+        Route::put('/{id}', [ProblemController::class, 'update']);
+        Route::delete('/{id}', [ProblemController::class, 'destroy']);
+    });
 
     // Running & Submissions
     Route::post('/{id}/run', [ProblemController::class, 'runQuery']);

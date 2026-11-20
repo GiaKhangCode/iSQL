@@ -4,17 +4,21 @@ namespace Tests\Feature;
 
 use App\Models\Assignment;
 use App\Models\ClassModel;
+use App\Models\Notification;
 use App\Models\Problem;
 use App\Models\Topic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
+use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 class AssignmentCrudTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
 
     protected User $instructor;
     protected User $student;
@@ -25,12 +29,13 @@ class AssignmentCrudTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->useDefaultRolePermissions();
 
         $this->instructor = User::create([
             'name'            => 'Teacher Assignment Test',
             'email'           => 'teacher_assign_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor',
+            ...AccountFixture::for('instructor'),
             'status'          => 'Active',
             'initials'        => 'TA',
         ]);
@@ -39,7 +44,7 @@ class AssignmentCrudTest extends TestCase
             'name'            => 'Student Test',
             'email'           => 'student_assign_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'ST',
         ]);
@@ -108,9 +113,40 @@ class AssignmentCrudTest extends TestCase
         $response = $this->getJson('/api/assignments/audience-count?audience_type=classes&class_ids[]=' . $this->class->id);
         $response->assertStatus(200);
         $response->assertJson([
-            'eligible_students' => 1,
-            'class_count'       => 1,
+            'eligibleStudents'    => 1,
+            'individualStudents'  => 0,
+            'overlappingStudents' => 0,
         ]);
+    }
+
+    public function test_publishing_assignment_notifies_students_of_the_class(): void
+    {
+        Sanctum::actingAs($this->instructor);
+
+        $response = $this->postJson('/api/assignments', [
+            'title'        => 'Bài thực hành thông báo',
+            'instructions' => '<p>Thử thông báo</p>',
+            'classIds'     => [$this->class->id],
+            'audienceType' => 'classes',
+            'opens'        => now()->toIso8601String(),
+            'closes'       => now()->addDays(7)->toIso8601String(),
+            'status'       => 'published',
+            'problems'     => [
+                ['id' => $this->problem1->id, 'points' => 10, 'order' => 1],
+            ],
+        ]);
+        $response->assertStatus(201);
+
+        $notifications = Notification::where('user_id', $this->student->id)->get();
+
+        $this->assertCount(1, $notifications);
+        $this->assertSame('Bài tập mới: Bài thực hành thông báo', $notifications[0]->title);
+        $this->assertSame('Assignment', $notifications[0]->type);
+        $this->assertSame('/assignments', $notifications[0]->link);
+        $this->assertFalse((bool) $notifications[0]->is_read);
+
+        // Giảng viên tạo bài không phải người nhận.
+        $this->assertSame(0, Notification::where('user_id', $this->instructor->id)->count());
     }
 
     public function test_instructor_can_create_assignment_with_frontend_payload(): void
@@ -269,7 +305,7 @@ class AssignmentCrudTest extends TestCase
             'name'            => 'Instructor B',
             'email'           => 'instructor_b_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor_practical',
+            ...AccountFixture::for('instructor_practical'),
             'status'          => 'Active',
             'initials'        => 'IB',
         ]);
@@ -314,7 +350,7 @@ class AssignmentCrudTest extends TestCase
             'name'            => 'Instructor B Oper',
             'email'           => 'instructor_b_oper_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor_theory',
+            ...AccountFixture::for('instructor_theory'),
             'status'          => 'Active',
             'initials'        => 'IB',
         ]);

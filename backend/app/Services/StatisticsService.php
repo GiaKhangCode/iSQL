@@ -13,6 +13,7 @@ use App\Models\Submission;
 use App\Models\SubmissionAppeal;
 use App\Models\SubmissionRegradeAssignment;
 use App\Models\User;
+use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -45,12 +46,8 @@ class StatisticsService
 
         // 1. Resolve classes in role scope
         $baseClassesQuery = ClassModel::query();
-        if (!$isOffice && !$user->isAdmin() && !$user->isFacultyOffice()) {
-            $baseClassesQuery->where(function ($q) use ($user) {
-                $q->where('instructor_id', $user->id)
-                    ->orWhere('practice_instructor_id', $user->id)
-                    ->orWhereHas('instructors', fn ($iq) => $iq->where('users.id', $user->id));
-            });
+        if (!$isOffice && !app(StaffAccess::class)->seesEverything($user)) {
+            $baseClassesQuery->where('instructor_id', $user->id);
         }
         $allScopedClasses = $baseClassesQuery->orderBy('course')->orderBy('id')->get();
 
@@ -78,10 +75,10 @@ class StatisticsService
         // 2. Resolve activities in role scope
         $activitiesQuery = Assignment::with(['classes:id', 'assignmentProblems']);
         if ($kind === 'assignments') {
-            $activitiesQuery->whereNull('examination_id')->where('is_contest', false)->where('exam_mode', false);
+            $activitiesQuery->whereNull('examination_id')->where('exam_mode', false);
         } elseif ($kind === 'exams') {
             $activitiesQuery->where(function ($q) {
-                $q->whereNotNull('examination_id')->orWhere('is_contest', true)->orWhere('exam_mode', true);
+                $q->whereNotNull('examination_id')->orWhere('exam_mode', true);
             });
         }
         if ($examinationId !== '') {
@@ -89,7 +86,7 @@ class StatisticsService
         }
 
         $candidateActivities = $activitiesQuery->orderByDesc('created_at')->get();
-        if (!$isOffice && !$user->isAdmin() && !$user->isFacultyOffice()) {
+        if (!$isOffice && !app(StaffAccess::class)->seesEverything($user)) {
             $ownedClassSet = array_flip($allScopedClasses->pluck('id')->all());
             $candidateActivities = $candidateActivities->filter(function (Assignment $a) use ($user, $ownedClassSet) {
                 if ((string) $a->instructor_id === (string) $user->id) {
@@ -129,7 +126,7 @@ class StatisticsService
         $subs = collect();
         if (!empty($selectedActivityIds)) {
             $subsQuery = Submission::whereIn('context', $selectedActivityIds)
-                ->whereIn('source', ['Assignments', 'Contests', 'Assignment', 'Contest'])
+                ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 });
@@ -527,7 +524,7 @@ class StatisticsService
                 'id'            => (string) $a->id,
                 'title'         => (string) $a->title,
                 'examinationId' => $a->examination_id ? (string) $a->examination_id : null,
-                'isExam'        => (bool) ($a->examination_id || $a->is_contest || $a->exam_mode),
+                'isExam'        => (bool) ($a->examination_id || $a->exam_mode),
             ])->all(),
             'kpis'           => [
                 'students'       => $totalStudentsInScope,

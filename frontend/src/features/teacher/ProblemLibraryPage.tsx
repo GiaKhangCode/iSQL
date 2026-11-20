@@ -101,7 +101,7 @@ export function ProblemLibraryPage() {
       ) : loadError ? <ErrorState title={t("Could not load problems")} message={t(loadError)} onRetry={() => window.location.reload()} /> : problems.length === 0 ? (
         <TeacherEmptyState
           title={t("No problems yet")}
-          description={t("Create your first SQL problem with a schema, seed data and a reference solution. You can reuse it in any assignment or contest.")}
+          description={t("Create your first SQL problem with a schema, seed data and a reference solution. You can reuse it in any assignment or exam session.")}
           primaryLabel={t("New problem")}
           primaryTo="/teacher/problems/new"
         />

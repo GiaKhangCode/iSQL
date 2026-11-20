@@ -14,19 +14,20 @@ class ExerciseTagService
      */
     protected function assertAdmin(User $user): void
     {
-        if (strtolower($user->role) !== 'admin' && $user->role !== User::ROLE_ADMIN) {
-            throw new HttpException(403, 'Only administrators can manage exercise tags.');
+        if (! app(\App\Services\Access\AccessControlService::class)->can($user, 'class.manage')) {
+            throw new HttpException(403, 'Bạn không có quyền quản lý thẻ bài tập.');
         }
     }
 
     /**
-     * Get all exercise tags ordered by kind, order_index, created_at
+     * Get all exercise tags: difficulties first, then by creation time (that is the display order).
+     * The id only breaks ties so the order is deterministic.
      */
     public function getAllTags(): array
     {
         $tags = ExerciseTag::orderByRaw("CASE WHEN kind = 'difficulty' THEN 1 ELSE 2 END")
-            ->orderBy('order_index', 'asc')
             ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
 
         return $tags->map->toArray()->all();
@@ -54,14 +55,11 @@ class ExerciseTagService
             $part = 'ALL';
         }
 
-        $orderIndex = (int) ($data['order_index'] ?? $data['orderIndex'] ?? 0);
-
         $tag = ExerciseTag::create([
-            'id'          => (string) Str::uuid(),
-            'kind'        => $kind,
-            'name'        => $name,
-            'part'        => $kind === 'category' ? $part : 'ALL',
-            'order_index' => $orderIndex,
+            'id'   => (string) Str::uuid(),
+            'kind' => $kind,
+            'name' => $name,
+            'part' => $kind === 'category' ? $part : 'ALL',
         ]);
 
         return $tag->toArray();
@@ -92,10 +90,6 @@ class ExerciseTagService
             if (in_array($part, ['ALL', 'DDL', 'DML', 'DQL', 'TRIGGER'], true)) {
                 $tag->part = $tag->kind === 'category' ? $part : 'ALL';
             }
-        }
-
-        if (array_key_exists('order_index', $data) || array_key_exists('orderIndex', $data)) {
-            $tag->order_index = (int) ($data['order_index'] ?? $data['orderIndex']);
         }
 
         $tag->save();
@@ -129,44 +123,48 @@ class ExerciseTagService
 
         $defaults = [
             // Difficulties
-            ['kind' => 'difficulty', 'name' => 'Dễ', 'part' => 'ALL', 'order_index' => 1],
-            ['kind' => 'difficulty', 'name' => 'Trung bình', 'part' => 'ALL', 'order_index' => 2],
-            ['kind' => 'difficulty', 'name' => 'Khó', 'part' => 'ALL', 'order_index' => 3],
+            ['kind' => 'difficulty', 'name' => 'Dễ', 'part' => 'ALL'],
+            ['kind' => 'difficulty', 'name' => 'Trung bình', 'part' => 'ALL'],
+            ['kind' => 'difficulty', 'name' => 'Khó', 'part' => 'ALL'],
 
             // Categories - DDL
-            ['kind' => 'category', 'name' => 'DDL - Tạo bảng (CREATE TABLE)', 'part' => 'DDL', 'order_index' => 1],
-            ['kind' => 'category', 'name' => 'DDL - Thay đổi cấu trúc (ALTER TABLE)', 'part' => 'DDL', 'order_index' => 2],
-            ['kind' => 'category', 'name' => 'DDL - Ràng buộc CHECK', 'part' => 'DDL', 'order_index' => 3],
-            ['kind' => 'category', 'name' => 'DDL - Khóa ngoại (FOREIGN KEY)', 'part' => 'DDL', 'order_index' => 4],
+            ['kind' => 'category', 'name' => 'DDL - Tạo bảng (CREATE TABLE)', 'part' => 'DDL'],
+            ['kind' => 'category', 'name' => 'DDL - Thay đổi cấu trúc (ALTER TABLE)', 'part' => 'DDL'],
+            ['kind' => 'category', 'name' => 'DDL - Ràng buộc CHECK', 'part' => 'DDL'],
+            ['kind' => 'category', 'name' => 'DDL - Khóa ngoại (FOREIGN KEY)', 'part' => 'DDL'],
 
             // Categories - DML
-            ['kind' => 'category', 'name' => 'DML - Thêm dòng dữ liệu (INSERT)', 'part' => 'DML', 'order_index' => 1],
-            ['kind' => 'category', 'name' => 'DML - Cập nhật dữ liệu (UPDATE)', 'part' => 'DML', 'order_index' => 2],
-            ['kind' => 'category', 'name' => 'DML - Xóa dòng dữ liệu (DELETE)', 'part' => 'DML', 'order_index' => 3],
-            ['kind' => 'category', 'name' => 'DML - Sao chép bảng (SELECT INTO)', 'part' => 'DML', 'order_index' => 4],
+            ['kind' => 'category', 'name' => 'DML - Thêm dòng dữ liệu (INSERT)', 'part' => 'DML'],
+            ['kind' => 'category', 'name' => 'DML - Cập nhật dữ liệu (UPDATE)', 'part' => 'DML'],
+            ['kind' => 'category', 'name' => 'DML - Xóa dòng dữ liệu (DELETE)', 'part' => 'DML'],
+            ['kind' => 'category', 'name' => 'DML - Sao chép bảng (SELECT INTO)', 'part' => 'DML'],
 
             // Categories - DQL
-            ['kind' => 'category', 'name' => 'DQL - Truy vấn cơ bản (SELECT/WHERE)', 'part' => 'DQL', 'order_index' => 1],
-            ['kind' => 'category', 'name' => 'DQL - Kết nối nhiều bảng (JOIN)', 'part' => 'DQL', 'order_index' => 2],
-            ['kind' => 'category', 'name' => 'DQL - Truy vấn con (SUBQUERY)', 'part' => 'DQL', 'order_index' => 3],
-            ['kind' => 'category', 'name' => 'DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)', 'part' => 'DQL', 'order_index' => 4],
-            ['kind' => 'category', 'name' => 'DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)', 'part' => 'DQL', 'order_index' => 5],
-            ['kind' => 'category', 'name' => 'DQL - Phép chia (DIVISION)', 'part' => 'DQL', 'order_index' => 6],
-            ['kind' => 'category', 'name' => 'DQL - Top N và xếp hạng (TOP, DENSE_RANK)', 'part' => 'DQL', 'order_index' => 7],
+            ['kind' => 'category', 'name' => 'DQL - Truy vấn cơ bản (SELECT/WHERE)', 'part' => 'DQL'],
+            ['kind' => 'category', 'name' => 'DQL - Kết nối nhiều bảng (JOIN)', 'part' => 'DQL'],
+            ['kind' => 'category', 'name' => 'DQL - Truy vấn con (SUBQUERY)', 'part' => 'DQL'],
+            ['kind' => 'category', 'name' => 'DQL - Gom nhóm & Tổng hợp (GROUP BY/HAVING)', 'part' => 'DQL'],
+            ['kind' => 'category', 'name' => 'DQL - Phép toán tập hợp (UNION, INTERSECT, EXCEPT)', 'part' => 'DQL'],
+            ['kind' => 'category', 'name' => 'DQL - Phép chia (DIVISION)', 'part' => 'DQL'],
+            ['kind' => 'category', 'name' => 'DQL - Top N và xếp hạng (TOP, DENSE_RANK)', 'part' => 'DQL'],
 
             // Categories - TRIGGER
-            ['kind' => 'category', 'name' => 'Trigger - Ràng buộc toàn vẹn liên bảng', 'part' => 'TRIGGER', 'order_index' => 1],
-            ['kind' => 'category', 'name' => 'Trigger - Kiểm tra điều kiện dữ liệu', 'part' => 'TRIGGER', 'order_index' => 2],
+            ['kind' => 'category', 'name' => 'Trigger - Ràng buộc toàn vẹn liên bảng', 'part' => 'TRIGGER'],
+            ['kind' => 'category', 'name' => 'Trigger - Kiểm tra điều kiện dữ liệu', 'part' => 'TRIGGER'],
         ];
 
-        foreach ($defaults as $item) {
-            ExerciseTag::create([
-                'id'          => (string) Str::uuid(),
-                'kind'        => $item['kind'],
-                'name'        => $item['name'],
-                'part'        => $item['part'],
-                'order_index' => $item['order_index'],
+        // created_at cách nhau từng giây (kết thúc ngay trước "bây giờ") để thứ tự soạn sẵn là thứ tự hiển thị:
+        // thẻ tạo sau đó luôn mới hơn mọi thẻ mặc định.
+        $start = now()->subSeconds(count($defaults));
+        foreach ($defaults as $i => $item) {
+            $tag = new ExerciseTag([
+                'id'   => (string) Str::uuid(),
+                'kind' => $item['kind'],
+                'name' => $item['name'],
+                'part' => $item['part'],
             ]);
+            $tag->created_at = $start->copy()->addSeconds($i);
+            $tag->save();
         }
     }
 }

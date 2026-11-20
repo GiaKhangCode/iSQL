@@ -4,7 +4,7 @@ import {writeFile,unlink} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-const result=await build({stdin:{contents:'export * from "./src/shared/lib/contest/audienceFiles";',resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'cjs',logLevel:'silent'});
+const result=await build({stdin:{contents:'export * from "./src/shared/lib/exam-session/audienceFiles";',resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'cjs',logLevel:'silent'});
 const file=join(tmpdir(),`audience-files-${process.pid}.cjs`);await writeFile(file,result.outputFiles[0].contents);
 try{
   const {readAudienceFile:read,createAudienceTemplate:template,audienceTemplateText}=createRequire(import.meta.url)(file);

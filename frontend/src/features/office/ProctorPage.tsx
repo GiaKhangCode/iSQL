@@ -20,6 +20,7 @@ import {
   Bell,
 } from "lucide-react";
 import {apiFetch} from "@/shared/api/apiClient";
+import {toStudentCheckResult, type StudentCheckResponse, type StudentCheckResult} from "@/shared/lib/proctor/studentCheck";
 import {useAuth} from "@/app/providers/AuthContext";
 import {RoleHeader} from "@/app/shells/RoleHeader";
 import {Dialog} from "@/shared/ui/ui";
@@ -58,7 +59,7 @@ export type Candidate = {
   studentCode?: string;
   name: string;
   email: string;
-  roomId: string;
+  roomId: string | null;
   admissionId: string | null;
   locked: boolean;
   isViolationLocked?: boolean;
@@ -68,7 +69,7 @@ export type Candidate = {
   finishReason?: string | null;
   incidentAt: string | null;
   attemptStatus: string;
-  browsers: { id: string; code: string; status: string; createdAt?: string; lastSeenAt: string }[];
+  browsers: { id: string; code: string; status: string; createdAt?: string | null; startedAt?: string | null; ipAddress?: string | null; userAgent?: string; lastSeenAt: string | null }[];
 };
 
 /** A proctor action stored on the server (GET /api/proctor/sessions/:id/notices). */
@@ -86,12 +87,12 @@ type ProctorNotice = {
 };
 
 export function ProctorPage() {
-  const {session} = useAuth();
+  const {session, preferredArea} = useAuth();
   if (!session) return <Navigate to="/login" replace />;
-  if (session.role === 'instructor') return <Navigate to="/teacher/exams" replace />;
+  if (preferredArea === 'teacher') return <Navigate to="/teacher/exams" replace />;
   return (
     <>
-      <RoleHeader role={session.role === 'faculty_office' ? 'office' : session.role === 'admin' ? 'admin' : 'student'} />
+      <RoleHeader role={preferredArea === 'office' ? 'office' : preferredArea === 'admin' ? 'admin' : 'student'} />
       <ProctorRoomsView />
     </>
   );
@@ -116,11 +117,10 @@ export function ProctorRoomsView({onBack}: {onBack?: () => void}) {
   const [error, setError] = useState("");
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
 
+  // Khớp backend: coi thi cần exam.proctor hoặc examination.manage (siêu quản trị có examination.manage).
   const canProctor = Boolean(
     permissions?.includes('exam.proctor') ||
-    session?.role === 'instructor' ||
-    session?.role === 'faculty_office' ||
-    session?.role === 'admin'
+    permissions?.includes('examination.manage')
   );
 
   useEffect(() => {
@@ -416,28 +416,7 @@ export function ProctorRoomsView({onBack}: {onBack?: () => void}) {
   );
 }
 
-export type StudentCheckResult = {
-  ok: boolean;
-  found: boolean;
-  eligible: boolean;
-  canTransfer?: boolean;
-  reason?: string;
-  student?: {
-    studentId: string;
-    studentCode: string;
-    name: string;
-    email: string;
-    className?: string | null;
-    classId?: string | null;
-  };
-  previousSession?: {
-    id?: string;
-    title: string;
-    sessionIndex?: number;
-    status: 'absent' | 'started' | 'submitted' | 'ongoing' | 'upcoming';
-    ended?: boolean;
-  };
-};
+export type {StudentCheckResult};
 
 function formatSessionTime(opens: string, closes: string) {
   const start = parseServerDateTime(opens);
@@ -621,14 +600,11 @@ export function ProctorExamDashboard({
     setCheckError("");
     setCheckResult(null);
     try {
-      const res = await apiFetch<StudentCheckResult>(`/api/proctor/sessions/${exam.sessionId}/students/check`, {
+      const res = await apiFetch<StudentCheckResponse>(`/api/proctor/sessions/${exam.sessionId}/students/check`, {
         method: 'POST',
         body: JSON.stringify({ student_code: code }),
       });
-      setCheckResult(res);
-      if (!res.ok && res.reason) {
-        setCheckError(res.reason);
-      }
+      setCheckResult(toStudentCheckResult(res));
     } catch (e) {
       const msg = e instanceof Error ? e.message : t("Không thể kiểm tra thông tin sinh viên.");
       setCheckError(msg);
@@ -643,15 +619,14 @@ export function ProctorExamDashboard({
     setAddBusy(true);
     const code = checkResult.student.studentCode;
     try {
-      const res = await apiFetch<{message?: string; name?: string; studentId?: string; studentCode?: string}>(
+      const res = await apiFetch<{ok: boolean; student?: StudentCheckResponse; credentials?: unknown}>(
         `/api/proctor/sessions/${exam.sessionId}/students/add`,
         {
           method: 'POST',
           body: JSON.stringify({ student_code: code }),
         }
       );
-      const studentName = res.name || checkResult.student.name || code;
-      const successMsg = res.message || t("Đã thêm sinh viên vào bài thi thành công.");
+      const successMsg = t("Đã thêm sinh viên vào bài thi thành công.");
 
       toast.show({
         title: t("Bổ sung thí sinh thành công"),

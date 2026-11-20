@@ -3,24 +3,27 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Problem;
-use App\Models\Submission;
-use App\Models\ClassModel;
+use App\Services\AdminOverviewService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class OverviewController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function __construct(private readonly AdminOverviewService $overviewService)
     {
-        return response()->json([
-            'total_users'       => User::count(),
-            'total_students'    => User::where('role', 'student')->count(),
-            'total_instructors' => User::where('role', 'instructor')->count(),
-            'total_problems'    => Problem::count(),
-            'total_submissions' => Submission::count(),
-            'total_classes'     => ClassModel::count(),
-        ]);
+    }
+
+    public function stats(): JsonResponse
+    {
+        return response()->json($this->overviewService->stats());
+    }
+
+    public function activities(): JsonResponse
+    {
+        return response()->json($this->overviewService->recentActivities());
+    }
+
+    public function errors(): JsonResponse
+    {
+        return response()->json($this->overviewService->recentGradingErrors());
     }
 }

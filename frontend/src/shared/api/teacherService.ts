@@ -209,7 +209,7 @@ export const teacherService = {
     return apiFetch("/api/assignments?scope=results");
   },
 
-  async getAudienceCount(audienceType: "classes" | "all_students", classIds: string[], studentEmails:string[]=[]): Promise<{ eligibleStudents: number; individualStudents?: number; overlappingStudents?: number; resolvedStudentEmails?:string[]; coveredIndividuals?:{id:string;name:string;email:string;studentNumber:string;classes:string[]}[] }> {
+  async getAudienceCount(audienceType: "classes", classIds: string[], studentEmails:string[]=[]): Promise<{ eligibleStudents: number; individualStudents?: number; overlappingStudents?: number; resolvedStudentEmails?:string[]; coveredIndividuals?:{id:string;name:string;email:string;studentNumber:string;classes:string[]}[] }> {
     if(studentEmails.length) return apiFetch("/api/assignments/audience-preview",{method:"POST",body:JSON.stringify({audienceType,classIds,studentEmails})});
     const params = new URLSearchParams({ audience_type: audienceType });
     classIds.forEach((id) => {
@@ -229,10 +229,10 @@ export const teacherService = {
     return apiFetch(`/api/assignments/${encodeURIComponent(id)}`);
   },
 
-  async uploadContestBanner(banner: Blob, source: Blob): Promise<{ bannerUrl: string; bannerSourceUrl: string }> {
+  async uploadExamSessionBanner(banner: Blob, source: Blob): Promise<{ bannerUrl: string; bannerSourceUrl: string }> {
     const body = new FormData();
-    body.append("banner", banner, "contest-banner.webp");
-    body.append("source", source, "contest-banner-source.webp");
+    body.append("banner", banner, "exam-session-banner.webp");
+    body.append("source", source, "exam-session-banner-source.webp");
     return apiFetch("/api/assignments/banners", { method: "POST", body });
   },
 

@@ -14,23 +14,6 @@ class UpdateUserRequest extends FormRequest
         return true;
     }
 
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('role')) {
-            $role = strtolower(trim((string) $this->input('role')));
-            if ($role === 'lecturer' || $role === 'instructor') {
-                $role = User::ROLE_INSTRUCTOR_PRACTICAL;
-            } elseif ($role === 'student') {
-                $role = User::ROLE_STUDENT;
-            } elseif ($role === 'admin') {
-                $role = User::ROLE_ADMIN;
-            } elseif ($role === 'faculty office' || $role === 'faculty_office' || $role === 'giáo vụ khoa') {
-                $role = User::ROLE_FACULTY_OFFICE;
-            }
-            $this->merge(['role' => $role]);
-        }
-    }
-
     public function rules(): array
     {
         $userId = $this->route('id');
@@ -40,7 +23,7 @@ class UpdateUserRequest extends FormRequest
             'password'   => 'sometimes|nullable|string|min:8',
             'name'       => 'sometimes|required|string|max:255',
             'initials'   => 'sometimes|nullable|string|max:10',
-            'role'       => ['sometimes', 'required', Rule::in(array_merge(User::ROLES, ['lecturer', 'instructor', 'student', 'admin', 'faculty office', 'faculty_office', 'giáo vụ khoa']))],
+            'account_type' => ['sometimes', 'required', Rule::in(User::ACCOUNT_TYPES)],
             'status'     => 'sometimes|required|in:Active,Inactive,Pending',
             'department' => 'sometimes|nullable|string|max:255',
         ];

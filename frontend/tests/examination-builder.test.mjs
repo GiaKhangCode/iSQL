@@ -13,15 +13,15 @@ globalThis.ResizeObserver=class{observe(){}disconnect(){}};globalThis.Intersecti
 const scrollCalls=[];
 window.scrollTo=options=>scrollCalls.push(options);window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});HTMLElement.prototype.scrollIntoView=()=>{};
 HTMLDialogElement.prototype.showModal=function(){this.open=true;};HTMLDialogElement.prototype.close=function(){this.open=false;};
-const template={title:'Final SQL',classIds:[],studentEmails:[],audienceType:'classes',isContest:true,shortDescription:'Final',description:'Final SQL',published:false,problems:[{id:'P',points:10,workspaceParts:['SQL']}],studentOptions:{examMode:true,maxSubmissions:1}};
+const template={title:'Final SQL',classIds:[],studentEmails:[],audienceType:'classes',isExamSession:true,shortDescription:'Final',description:'Final SQL',published:false,problems:[{id:'P',points:10,workspaceParts:['SQL']}],studentOptions:{examMode:true,maxSubmissions:1}};
 globalThis.__officeParent={id:'parent',title:'Final SQL',examDate:'2030-12-01',revision:5,template,sessions:[['07:30','09:00'],['09:30','11:00'],['13:30','15:00'],['15:30','17:00']].map(([starts,ends],index)=>({id:`slot${index+1}`,index:index+1,starts,ends,classIds:Array.from({length:8},(_,offset)=>`C${String(index*8+offset).padStart(2,'0')}`),studentEmails:index===0?['extra@gm.uit.edu.vn']:[],eligibleStudents:8,proctors:[],room:'',capacity:null}))};
 const saves=[];const ordinarySaves=[];let fail=false;
 globalThis.__officeSession={id:'office',role:'faculty_office'};
-globalThis.__officeApi={getAssignments:async()=>globalThis.__officeParent.sessions.map(slot=>({...slot,examinationId:'parent',sessionIndex:slot.index,isContest:true})),getClassMembers:async id=>[{id:"member-"+id,name:"Member "+id,email:id+"@school.edu",role:"student"}],getProblem:async()=>({questionCatalog:{SQL:[{id:'q1',name:'q1.sql',description:'Query'}]}}),getClasses:async()=>Array.from({length:32},(_,i)=>({id:`C${String(i).padStart(2,'0')}`,course:'SQL',status:'Active'})),getAllProblems:async()=>[{id:'P',title:'SQL',number:'1'}],getExamination:async()=>structuredClone(globalThis.__officeParent),getAudienceCount:async(_kind,ids,emails=[])=>({eligibleStudents:ids.length*2+emails.length}),
+globalThis.__officeApi={getAssignments:async()=>globalThis.__officeParent.sessions.map(slot=>({...slot,examinationId:'parent',sessionIndex:slot.index,isExamSession:true})),getClassMembers:async id=>[{id:"member-"+id,name:"Member "+id,email:id+"@school.edu",role:"student"}],getProblem:async()=>({questionCatalog:{SQL:[{id:'q1',name:'q1.sql',description:'Query'}]}}),getClasses:async()=>Array.from({length:32},(_,i)=>({id:`C${String(i).padStart(2,'0')}`,course:'SQL',status:'Active'})),getAllProblems:async()=>[{id:'P',title:'SQL',number:'1'}],getExamination:async()=>structuredClone(globalThis.__officeParent),getAudienceCount:async(_kind,ids,emails=[])=>({eligibleStudents:ids.length*2+emails.length}),
  searchAudienceStudents:async()=>({items:[{id:'s0',name:'Student 0',email:'student0@gm.uit.edu.vn',studentNumber:null}],total:1}),
  saveExamination:async(plan,id)=>{saves.push({id,plan:structuredClone(plan)});if(fail)throw new Error('Kỳ thi đã được sửa ở cửa sổ khác.');globalThis.__officeParent={...structuredClone(plan),id:'parent',revision:(plan.expectedRevision||0)+1};return globalThis.__officeParent;},
  getAssignment:async(id)=>({...structuredClone(template),opens:'2030-12-01T02:30:00Z',closes:'2030-12-01T04:00:00Z',problemList:template.problems,...(id.startsWith('slot')?{examinationId:'parent',sessionIndex:Number(id.slice(4)),classIds:globalThis.__officeParent.sessions[Number(id.slice(4))-1].classIds,studentOptions:globalThis.__officeParent.template.studentOptions}:{})}),updateAssignment:async(id,payload)=>{ordinarySaves.push({id,payload:structuredClone(payload)});if(id.startsWith('slot')){for(const slot of globalThis.__officeParent.sessions){if(slot.id===id)slot.classIds=[...payload.classIds];else slot.classIds=slot.classIds.filter(classId=>payload.classTransfers?.[classId]!==slot.id);}globalThis.__officeParent.revision++;}}};
-const built=await build({stdin:{contents:`import React from 'react';export {act} from 'react';export {Simulate} from 'react-dom/test-utils';export {createRoot} from 'react-dom/client';import {MemoryRouter,Routes,Route} from 'react-router-dom';import {ExaminationBuilderPage,ContestBuilderPage} from './src/features/teacher/builder/BuilderPages';import {ToastProvider} from './src/shared/ui/StackingToasts';import {OfficeRoute} from './src/app/routes/ProtectedRoute';export {distributeClasses,initialExaminationPlan,nextExamDate,sessionWeekday} from './src/data/examinations';export {homeForRole} from './src/features/auth/authService';export const page=(normal=false,session)=><ToastProvider><MemoryRouter key={(normal?'normal':'parent')+(session||'')} initialEntries={[normal?'/office/contests/'+(typeof normal==='string'?normal:'a')+'/edit':'/office/examinations/parent/edit'+(session?'?session='+session:'')]}><Routes><Route path='/office/examinations/:id/edit' element={<ExaminationBuilderPage/>}/><Route path='/office/contests/:id/edit' element={<ContestBuilderPage/>}/><Route path='/office/examinations/:id/admissions' element={<div data-admission-ready/>}/></Routes></MemoryRouter></ToastProvider>;export const createPage=()=> <MemoryRouter initialEntries={['/office/examinations/new']}><Routes><Route path='/office/examinations/new' element={<ExaminationBuilderPage/>}/></Routes></MemoryRouter>;export const guard=role=><MemoryRouter key={role} initialEntries={['/office/examinations']}><Routes><Route element={<OfficeRoute/>}><Route path='/office/examinations' element={<div data-view='office'/>}/></Route><Route path='/dashboard' element={<div data-view='student'/>}/><Route path='/teacher/problems' element={<div data-view='teacher'/>}/></Routes></MemoryRouter>;`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',define:{'import.meta.hot':'undefined','import.meta.env.VITE_API_URL':'""'},plugins:[{name:'office-builder',setup(b){
+const built=await build({stdin:{contents:`import React from 'react';export {act} from 'react';export {Simulate} from 'react-dom/test-utils';export {createRoot} from 'react-dom/client';import {MemoryRouter,Routes,Route} from 'react-router-dom';import {ExaminationBuilderPage,ExamSessionBuilderPage} from './src/features/teacher/builder/BuilderPages';import {ToastProvider} from './src/shared/ui/StackingToasts';import {OfficeRoute} from './src/app/routes/ProtectedRoute';export {distributeClasses,initialExaminationPlan,nextExamDate,sessionWeekday} from './src/data/examinations';export {homeForRole} from './src/features/auth/authService';export const page=(normal=false,session)=><ToastProvider><MemoryRouter key={(normal?'normal':'parent')+(session||'')} initialEntries={[normal?'/office/exam-sessions/'+(typeof normal==='string'?normal:'a')+'/edit':'/office/examinations/parent/edit'+(session?'?session='+session:'')]}><Routes><Route path='/office/examinations/:id/edit' element={<ExaminationBuilderPage/>}/><Route path='/office/exam-sessions/:id/edit' element={<ExamSessionBuilderPage/>}/><Route path='/office/examinations/:id/admissions' element={<div data-admission-ready/>}/></Routes></MemoryRouter></ToastProvider>;export const createPage=()=> <MemoryRouter initialEntries={['/office/examinations/new']}><Routes><Route path='/office/examinations/new' element={<ExaminationBuilderPage/>}/></Routes></MemoryRouter>;export const guard=role=><MemoryRouter key={role} initialEntries={['/office/examinations']}><Routes><Route element={<OfficeRoute/>}><Route path='/office/examinations' element={<div data-view='office'/>}/></Route><Route path='/dashboard' element={<div data-view='student'/>}/><Route path='/teacher/problems' element={<div data-view='teacher'/>}/></Routes></MemoryRouter>;`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',define:{'import.meta.hot':'undefined','import.meta.env.VITE_API_URL':'""'},plugins:[{name:'office-builder',setup(b){
  b.onLoad({filter:/shared[\\/]api[\\/]teacherService\.ts$/},()=>({contents:'export const teacherService=globalThis.__officeApi;',loader:'js'}));
  b.onLoad({filter:/[\\/]SessionRoomsPage\.tsx$/},()=>({contents:'import {forwardRef} from "react";export const SessionRoomsPage=forwardRef(()=> <div data-room-allocation/>);',loader:'jsx'}));
  b.onLoad({filter:/[\\/]AuthContext\.tsx$/},()=>({contents:'export const useAuth=()=>({session:globalThis.__officeSession,permissions:["examination.manage"],hasPermission:()=>true});',loader:'js'}));
@@ -47,12 +47,12 @@ try{
  assert.equal(sessionLinks().length,4,'All four sessions are simple edit links');
  assert.equal(document.querySelector('.examination-planner input[type=time]'),null,'Time is edited in the child session');
  assert.equal(sessionLinks()[1].getAttribute('href'),'/office/sessions/slot2/edit');
- assert.equal(document.querySelector('#contest-audience'),null,'The parent no longer has a participants section');
- assert.equal(document.querySelectorAll('.teacher-contest-page-nav button').length,3);
- assert.ok([...document.querySelectorAll('.teacher-contest-page-nav button')].some(node=>node.textContent==='Cấu hình chung'));
+ assert.equal(document.querySelector('#exam-session-audience'),null,'The parent no longer has a participants section');
+ assert.equal(document.querySelectorAll('.teacher-exam-session-page-nav button').length,3);
+ assert.ok([...document.querySelectorAll('.teacher-exam-session-page-nav button')].some(node=>node.textContent==='Cấu hình chung'));
  assert.ok(document.querySelector('#examination-settings .teacher-exam-mode-setting'));
- assert.ok(!document.querySelector('#contest-problems'),'The parent examination has no problem editor');
- assert.equal(document.querySelector('.teacher-class-browser'),null,'Class membership is edited on the Contests page');
+ assert.ok(!document.querySelector('#exam-session-problems'),'The parent examination has no problem editor');
+ assert.equal(document.querySelector('.teacher-class-browser'),null,'Class membership is edited on the Exam sessions page');
  assert.equal(document.querySelector('.student-email-picker'),null,'The parent has no individual-student editor');
  assert.equal(document.querySelector('[aria-label="Chế độ thi"]').disabled,true);
  assert.equal(document.querySelectorAll('.teacher-exam-mode-setting [role=switch]').length,3,'Shared submission settings remain on the parent');
@@ -60,7 +60,7 @@ try{
  await edit(document.querySelector('.teacher-violation-limit input'),'3');
  await click(document.querySelector('[aria-label="Hiện điểm sau khi nộp"]'));
  await edit(document.querySelector('.teacher-limit-value input'),'3');
- await click(document.querySelector('.teacher-contest-save-exit-actions .primary'));
+ await click(document.querySelector('.teacher-exam-session-save-exit-actions .primary'));
  assert.equal(saves[0].id,'parent');assert.equal(saves[0].plan.expectedRevision,5);
  assert.deepEqual(saves[0].plan.sessions.map(slot=>slot.classIds.length),[8,8,8,8]);
  assert.deepEqual(saves[0].plan.sessions[0].studentEmails,['extra@gm.uit.edu.vn']);
@@ -70,9 +70,9 @@ try{
  assert.equal(saves[0].plan.template.studentOptions.maxSubmissions,3);
  assert.deepEqual(saves[0].plan.template.problems,[],'The examination does not configure a shared problem set');
  assert.equal(saves[0].plan.sessions[0].ends,'09:00','Parent saves preserve the session schedule');
- await click(document.querySelector('.teacher-contest-save-exit-actions .primary'));
+ await click(document.querySelector('.teacher-exam-session-save-exit-actions .primary'));
  assert.equal(saves[1].plan.expectedRevision,6);
- fail=true;await edit(document.querySelector('.teacher-limit-value input'),'4');await click(document.querySelector('.teacher-contest-save-exit-actions .primary'));
+ fail=true;await edit(document.querySelector('.teacher-limit-value input'),'4');await click(document.querySelector('.teacher-exam-session-save-exit-actions .primary'));
  assert.equal(document.querySelector('.teacher-limit-value input').value,'4','Failed save retains common settings');assert.ok(document.body.textContent.includes('cửa sổ khác'));
  fail=false;await click(button('Công bố'));assert.ok(document.querySelector('[data-admission-ready]'),'Publishing opens the one-CSV admission step');
  await api.act(async()=>root.render(api.page(true)));
@@ -80,7 +80,7 @@ try{
  await api.act(async()=>{await new Promise(resolve=>setTimeout(resolve,250));});
  await click(document.querySelector('.teacher-student-results input'));
  await click(document.querySelector('.teacher-class-browser-column:first-child [role=tab][id$="-students"]'));
- await click(document.querySelector('.teacher-contest-save-exit-actions .primary'));
+ await click(document.querySelector('.teacher-exam-session-save-exit-actions .primary'));
  assert.deepEqual(ordinarySaves[0].payload.studentEmails,['student0@gm.uit.edu.vn']);
  assert.deepEqual(ordinarySaves[0].payload.classIds,[]);
  scrollCalls.length=0;
@@ -109,20 +109,20 @@ try{
  assert.notEqual(pendingRows[0].querySelector('.examination-session-date').textContent,pendingRows[4].querySelector('.examination-session-date').textContent);
  assert.ok(pendingRows[4].textContent.includes('07:30–09:00'));
  sessionStorage.removeItem('sqluit:examination-draft:v1:anonymous:new');
- assert.equal(document.querySelector('#contest-audience'),null,'The create page has no participant editor');
+ assert.equal(document.querySelector('#exam-session-audience'),null,'The create page has no participant editor');
  await api.act(async()=>root.render(api.page(false,1)));
- await edit(document.querySelector('#contest-setup input'),'Parent draft preserved');
+ await edit(document.querySelector('#exam-session-setup input'),'Parent draft preserved');
  await edit(document.querySelector('.teacher-limit-value input'),'5');
  for(const link of sessionLinks()){
   assert.equal(link.target,'_blank','Session buttons open a new browser tab');
   assert.ok(link.relList.contains('noopener'));
  }
  await click(sessionLinks()[1]);
- assert.equal(document.querySelector('#contest-setup input').value,'Parent draft preserved','Opening a session keeps the parent editor intact');
+ assert.equal(document.querySelector('#exam-session-setup input').value,'Parent draft preserved','Opening a session keeps the parent editor intact');
  await api.act(async()=>root.render(api.page('slot2')));
- assert.ok(!document.querySelector('#contest-description'),'Child sessions inherit the parent description');
+ assert.ok(!document.querySelector('#exam-session-description'),'Child sessions inherit the parent description');
  assert.ok(!document.querySelector('input[maxlength="180"]'),'Child sessions have no short description field');
- assert.ok(!document.querySelector('#contest-audience'),'Session participants are managed through room allocation');
+ assert.ok(!document.querySelector('#exam-session-audience'),'Session participants are managed through room allocation');
  assert.ok(![...document.querySelectorAll('.session-setup-tabs button')].some(node=>node.textContent==='Người tham gia'));
  assert.ok(!document.querySelector('.session-setup-tabs'),'The session editor has no obsolete setup tabs');
  assert.ok(![...document.querySelectorAll('button')].some(node=>/credential|tài khoản thi/i.test(node.textContent)),'The session editor has no credential-export entry in either language');
@@ -130,14 +130,14 @@ try{
  assert.ok(!document.querySelector('.teacher-class-browser'),'The old participant editor is not mounted in a session');
  assert.ok(!document.querySelector('.teacher-builder-audience'),'The session editor has no separate participant section');
  assert.ok(document.querySelector('#session-rooms [data-room-allocation]'));
- assert.deepEqual([...document.querySelectorAll('.teacher-contest-page-nav button')].map(node=>node.textContent),['Thông tin chung','Phân phòng','Lịch thi & nộp bài','Nội dung đề']);
- assert.ok(!document.querySelector('#contest-schedule').closest('[hidden]'),'The schedule is always visible');
- assert.ok(!document.querySelector('#contest-problems').closest('[hidden]'),'The question editor is always visible');
+ assert.deepEqual([...document.querySelectorAll('.teacher-exam-session-page-nav button')].map(node=>node.textContent),['Thông tin chung','Phân phòng','Lịch thi & nộp bài','Nội dung đề']);
+ assert.ok(!document.querySelector('#exam-session-schedule').closest('[hidden]'),'The schedule is always visible');
+ assert.ok(!document.querySelector('#exam-session-problems').closest('[hidden]'),'The question editor is always visible');
  assert.ok(button('Quay lại kỳ thi'),'Child sessions provide a return-to-parent action');
  const sessionSwitch=document.querySelector('[aria-label="Chuyển ca thi"]');
  assert.equal(sessionSwitch.options.length,4,'The switch lists sessions from the same examination');
  assert.equal(sessionSwitch.value,'slot2');
- await edit(document.querySelector('#contest-setup input'),'Unsaved child title');
+ await edit(document.querySelector('#exam-session-setup input'),'Unsaved child title');
  await api.act(async()=>api.Simulate.change(sessionSwitch,{target:{value:'slot3'}}));
  assert.ok(document.querySelector('dialog'),'Switching sessions protects unsaved changes');
  await click([...document.querySelectorAll('dialog button')].find(node=>node.textContent==='Hủy'));
@@ -151,18 +151,18 @@ try{
 
  assert.ok(!button('Công bố'),'The child no longer has a publish action');
  assert.ok(!document.querySelector('.teacher-exam-mode-setting'),'Child sessions have no shared settings panel');
- assert.equal(document.querySelector('.teacher-contest-schedule-fields').disabled,false,'Child session times are editable');
- await click(document.querySelector('.teacher-contest-save-exit-actions .primary'));
+ assert.equal(document.querySelector('.teacher-exam-session-schedule-fields').disabled,false,'Child session times are editable');
+ await click(document.querySelector('.teacher-exam-session-save-exit-actions .primary'));
  assert.ok(ordinarySaves.length,'Session information still saves');
  await click(button('Quay lại kỳ thi'));
- assert.equal(document.querySelector('#contest-setup input').value,'Parent draft preserved','Returning from a child restores unsaved parent information');
+ assert.equal(document.querySelector('#exam-session-setup input').value,'Parent draft preserved','Returning from a child restores unsaved parent information');
  assert.equal(document.querySelector('.teacher-limit-value input').value,'5','Returning restores shared configuration');
- await click(document.querySelector('.teacher-contest-save-exit-actions .primary'));
+ await click(document.querySelector('.teacher-exam-session-save-exit-actions .primary'));
  assert.equal(saves.at(-1).plan.title,'Parent draft preserved');
  assert.equal(saves.at(-1).plan.template.studentOptions.maxSubmissions,5);
 
  assert.equal(sessionStorage.getItem('sqluit:examination-draft:v1:anonymous:parent'),null,'Saving clears the local parent draft');
- await edit(document.querySelector('#contest-setup input'),'Keep this title');
+ await edit(document.querySelector('#exam-session-setup input'),'Keep this title');
  await click(button('Thêm ca thi'));
  const beforeRefreshCount=document.querySelectorAll('.examination-session-links > *').length;
  const beforeOptions=document.querySelector('.teacher-limit-value input').value;
@@ -170,16 +170,16 @@ try{
  globalThis.__officeParent.sessions[0].examDate='2030-12-01';
  globalThis.__officeParent.revision++;
  await click(button('Làm mới'));
- assert.equal(document.querySelector('#contest-setup input').value,'Keep this title','Refreshing schedules preserves unsaved parent information');
+ assert.equal(document.querySelector('#exam-session-setup input').value,'Keep this title','Refreshing schedules preserves unsaved parent information');
  assert.equal(document.querySelector('.teacher-limit-value input').value,beforeOptions);
  assert.equal(document.querySelectorAll('.examination-session-links > *').length,beforeRefreshCount,'Refreshing preserves newly added unsaved sessions');
  assert.ok(sessionLinks()[0].textContent.includes('08:00–09:00'),'Refresh loads the saved child time');
 
  await api.act(async()=>root.render(api.createPage()));
- await edit(document.querySelector('#contest-setup input'),'New examination draft');
+ await edit(document.querySelector('#exam-session-setup input'),'New examination draft');
  await api.act(async()=>root.render(api.page(true)));
  await api.act(async()=>root.render(api.createPage()));
- assert.equal(document.querySelector('#contest-setup input').value,'New examination draft','New examinations retain their draft across navigation');
+ assert.equal(document.querySelector('#exam-session-setup input').value,'New examination draft','New examinations retain their draft across navigation');
  console.log('PASS: faculty office/admin guards, incremental multi-day sessions, refresh preserving drafts, save-to-open tooltips and shared options, revision save/conflict retention and individual-email ordinary exams.');
 } finally {if(root)await api.act(async()=>root.unmount());await unlink(file);dom.window.close();}
 process.exit(0);

@@ -29,7 +29,7 @@ export function AssignmentsListPage() {
     async function loadAssignments() {
       try {
         const data = await teacherService.getAssignments();
-        setAssignments(data.filter((item: any) => !item.isContest));
+        setAssignments(data.filter((item: any) => !item.isExamSession));
       } catch(e) {
         setLoadError(e instanceof Error ? e.message : "Could not load assignments.");
       } finally {

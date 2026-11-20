@@ -33,6 +33,8 @@ import {
 } from "@/features/teacher/builder/BuilderProblemSettings";
 import { BuilderDatabaseReference } from "@/features/teacher/builder/BuilderDatabaseReference";
 import { BuilderManualQuestionPicker } from "@/features/teacher/builder/BuilderManualQuestionPicker";
+import { SCORING_CUSTOM, SCORING_EQUAL, type ScoringMode } from "@/features/teacher/builder/questionScoring";
+import { QuestionPointInput } from "@/features/teacher/builder/BuilderScoring";
 import { useExerciseTags } from "@/features/teacher/problem-editor/QuestionTagSelectors";
 import { toast } from "@/shared/ui/StackingToasts";
 import "@/styles/builder-problem-settings.css";
@@ -59,7 +61,10 @@ export function BuilderInlineSettings({
   locked = false,
   lockedQuestionSelection,
   lockedParts,
+  scoringMode = SCORING_EQUAL,
 }: {
+  /** "custom_questions": show a points box on every question (stored in `_questionPoints`). */
+  scoringMode?: ScoringMode;
   /** "manual": the teacher ticks the exact questions (assignments). "auto": question-group rules and random variants (exams). */
   selectionMode?: "auto" | "manual";
   problemId: string;
@@ -1107,6 +1112,7 @@ export function BuilderInlineSettings({
                   questionSelection={questionSelection}
                   lockedQuestionSelection={lockedQuestionSelection}
                   lockedParts={lockedParts}
+                  scoringMode={scoringMode}
                   onChange={(patch) => {
                     if (onBatchChange) {
                       onBatchChange(patch);
@@ -1763,6 +1769,16 @@ export function BuilderInlineSettings({
                                                 )}
                                                 {q.difficulty && (
                                                   <span className="builder-q-tag difficulty">{q.difficulty}</span>
+                                                )}
+                                                {scoringMode === SCORING_CUSTOM && (
+                                                  <QuestionPointInput
+                                                    selection={questionSelection}
+                                                    part={previewPart}
+                                                    questionId={q.id}
+                                                    questionName={q.name}
+                                                    disabled={locked}
+                                                    onChange={onQuestionSelectionChange}
+                                                  />
                                                 )}
 
                                                 <div className="builder-q-menu-container">

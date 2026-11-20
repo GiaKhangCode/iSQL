@@ -9,6 +9,10 @@ export interface RoleGroup {
   isSystem?: boolean;
   /** The administrator role always holds everything and cannot be edited. */
   readOnly?: boolean;
+  /** Interface areas the role opens (student | teacher | office | admin). Derived by the server from the permissions. */
+  areas?: string[];
+  /** Number of accounts holding the role. */
+  userCount?: number;
   permissions: string[];
 }
 
@@ -20,13 +24,14 @@ export interface RoleForm {
 
 export interface UserRoleAssignment {
   userId: string;
+  /** Loại tài khoản (student | staff), không phải tên vai trò. */
   actor: string;
   studentCode?: string | null;
   /** Additional (custom) roles assigned to the user. */
   roleGroupIds: string[];
   /** Permissions granted to this account alone, outside any role. */
   directPermissions: string[];
-  /** Everything the user can do now: account-type defaults plus all assigned roles. */
+  /** Everything the user can do now: all assigned roles plus direct permissions. */
   effectivePermissions: string[];
 }
 

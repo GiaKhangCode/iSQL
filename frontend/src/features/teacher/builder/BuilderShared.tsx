@@ -4,9 +4,10 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { CalendarDays } from "lucide-react";
 import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
-import { ContestDetailView } from "@/shared/components/ContestDetailView";
-import type { Contest, WorkspacePart } from "@/data/models";
+import { ExamSessionDetailView } from "@/shared/components/ExamSessionDetailView";
+import type { ExamSession, WorkspacePart } from "@/data/models";
 import type { QuestionSelection } from "@/features/teacher/builder/BuilderProblemSettings";
+import type { ScoringMode } from "@/features/teacher/builder/questionScoring";
 import { WORKSPACE_PARTS } from "@/shared/lib/workspace/workspaceParts";
 
 export type BuilderProblem = { id: string; points: number; workspaceParts?: WorkspacePart[]; questionSelection?: QuestionSelection; datasetVisibility?: Record<string, boolean>; databaseStructureVisible?: boolean; databaseDescriptionVisible?: boolean };
@@ -15,7 +16,7 @@ export type BuilderDraft = {
   title: string;
   classIds: string[];
   studentEmails: string[];
-  audienceType: "classes" | "all_students";
+  audienceType: "classes";
   shortDescription: string;
   description: string;
   rules: string;
@@ -28,6 +29,8 @@ export type BuilderDraft = {
   problems: BuilderProblem[];
   studentOptions: { comments: boolean; leaderboard: boolean; examMode: boolean; examViolationLimit?: number; showScoresAfterSubmit: boolean; maxSubmissions: number | null; hints?: boolean; aiAllowed?: boolean };
   published: boolean;
+  /** Cách tính điểm; thiếu = chia đều (nháp cũ trong sessionStorage không có trường này). */
+  scoringMode?: ScoringMode;
 };
 
 export const assignmentSeed: BuilderDraft = {
@@ -49,7 +52,7 @@ export const assignmentSeed: BuilderDraft = {
   published: false,
 };
 
-export const contestSeed: BuilderDraft = {
+export const examSessionSeed: BuilderDraft = {
   title: "",
   classIds: [],
   studentEmails: [],
@@ -226,9 +229,9 @@ export function DateTimeInput({ value, onChange, label }: { value: string; onCha
   </div>;
 }
 
-export function ActivityPreview({ draft, contest, classes, problems, bannerActions }: {
+export function ActivityPreview({ draft, examSession, classes, problems, bannerActions }: {
   draft: BuilderDraft;
-  contest: boolean;
+  examSession: boolean;
   classes: { id: string; course?: string }[];
   problems: { id: string; title: string; topic?: string; difficulty?: string }[];
   bannerActions?: ReactNode;
@@ -243,9 +246,9 @@ export function ActivityPreview({ draft, contest, classes, problems, bannerActio
   const [selectedClassId, setSelectedClassId] = useState(draft.classIds[0] || "");
   const classId = draft.classIds.includes(selectedClassId) ? selectedClassId : draft.classIds[0];
   const classLabel = classes.find((item) => item.id === classId)?.course || classId || "No class selected";
-  const audience = contest && draft.audienceType === "all_students" ? "All students" : classLabel;
+  const audience = classLabel;
   const totalPoints = Math.round(draft.problems.reduce((sum, item) => sum + (Number(item.points) || 0), 0) * 100) / 100;
-  const title = draft.title.trim() || (contest ? "Untitled contest" : "Untitled assignment");
+  const title = draft.title.trim() || (examSession ? "Untitled exam session" : "Untitled assignment");
 
   return <div className="teacher-activity-preview">
     <div className="teacher-preview-mode-bar">
@@ -256,11 +259,11 @@ export function ActivityPreview({ draft, contest, classes, problems, bannerActio
         </Select>
       </label>}
     </div>
-    {contest ? <>
-      <div className="teacher-preview-phase-tabs" role="group" aria-label={tr("Preview contest state")}>
+    {examSession ? <>
+      <div className="teacher-preview-phase-tabs" role="group" aria-label={tr("Preview exam session state")}>
         {(["Upcoming", "Live", "Closed"] as const).map((item) => <button type="button" key={item} className={phase === item ? "is-active" : ""} aria-pressed={phase === item} onClick={() => setPhase(item)}><TranslatedText>{tr(item)}</TranslatedText></button>)}
       </div>
-      <ContestDetailView preview bannerActions={bannerActions} phase={phase} now={previewNow} contest={{
+      <ExamSessionDetailView preview bannerActions={bannerActions} phase={phase} now={previewNow} examSession={{
         id: "preview", title, status: phase, scope: audience, audienceType: draft.audienceType,
         shortDescription: draft.shortDescription, description: draft.description, rules: draft.rules,
         bannerUrl: draft.bannerUrl, opensAt: draft.opens ? new Date(draft.opens).toISOString() : "", closesAt: draft.closes ? new Date(draft.closes).toISOString() : "",
@@ -276,7 +279,7 @@ export function ActivityPreview({ draft, contest, classes, problems, bannerActio
         totalPoints, score: draft.studentOptions.showScoresAfterSubmit ? 0 : null, rank: null, leaderboardEnabled: draft.studentOptions.leaderboard && draft.studentOptions.showScoresAfterSubmit,
         showScoresAfterSubmit: draft.studentOptions.showScoresAfterSubmit, maxSubmissions: draft.studentOptions.maxSubmissions,
         aiAllowed: false, leaderboard: [], submitters: 0,
-      } satisfies Contest} />
+      } satisfies ExamSession} />
     </> : <>
       <header className="assignment-work-heading"><h1>{title}</h1><p><TranslatedText>{tr(audience)}</TranslatedText></p></header>
       <dl className="assignment-summary">
@@ -285,7 +288,7 @@ export function ActivityPreview({ draft, contest, classes, problems, bannerActio
         <div><dt><TranslatedText>{tr("POINTS")}</TranslatedText></dt><dd>{totalPoints}</dd></div>
         <div><dt><TranslatedText>{tr("STATUS")}</TranslatedText></dt><dd><TranslatedText>{tr("Not started")}</TranslatedText></dd></div>
       </dl>
-      <section className="assignment-instructions"><h2><TranslatedText>{tr("Instructions")}</TranslatedText></h2><ProblemMarkdown className="contest-markdown">{draft.instructions || tr("No instructions yet.")}</ProblemMarkdown></section>
+      <section className="assignment-instructions"><h2><TranslatedText>{tr("Instructions")}</TranslatedText></h2><ProblemMarkdown className="exam-session-markdown">{draft.instructions || tr("No instructions yet.")}</ProblemMarkdown></section>
       <section className="assignment-problems-card"><div className="section-heading"><h2><TranslatedText>{tr("Problems")}</TranslatedText></h2><small className="muted">{draft.problems.length} <TranslatedText>{tr("problem")}</TranslatedText><TranslatedText>{draft.problems.length === 1 ? "" : tr("s")}</TranslatedText></small></div>
         {draft.problems.map((item, index) => {
           const problem = problems.find((row) => row.id === item.id);

@@ -10,6 +10,8 @@ export type ToastLog = {
   path: string;
   read?: boolean;
   starred?: boolean;
+  /** true = thông báo lấy từ server (có id thật trong DB); không có = toast chỉ tồn tại ở trình duyệt. */
+  server?: boolean;
 };
 
 export type ServerNotification = {
@@ -29,6 +31,18 @@ function commit(next: ToastLog[]) {
   entries = next;
   if (owner) storage.set(`toast-history:${owner}`, JSON.stringify(entries));
   listeners.forEach(listener => listener());
+}
+
+/**
+ * Gửi thay đổi lên server theo kiểu "lạc quan": giao diện đã đổi ngay, request chạy nền.
+ * Lỗi mạng/server không được làm hỏng giao diện nên không ném ra ngoài, nhưng vẫn ghi
+ * console.warn để còn biết đường gỡ lỗi (trước đây lỗi bị nuốt hoàn toàn).
+ * Cố ý KHÔNG hiện toast báo lỗi: toast mới sẽ lại được thêm vào chính danh sách chuông này.
+ */
+function syncToServer(endpoint: string, method: "PATCH" | "DELETE") {
+  void apiFetch(endpoint, { method }).catch(error => {
+    console.warn(`[notifications] ${method} ${endpoint} failed:`, error);
+  });
 }
 
 function getDismissed(ownerId: string): Set<string> {
@@ -75,7 +89,8 @@ export const toastHistory = {
             typeof item.path === "string" &&
             (item.description === undefined || typeof item.description === "string") &&
             (item.read === undefined || typeof item.read === "boolean") &&
-            (item.starred === undefined || typeof item.starred === "boolean")
+            (item.starred === undefined || typeof item.starred === "boolean") &&
+            (item.server === undefined || typeof item.server === "boolean")
         );
       }
     } catch {
@@ -108,6 +123,10 @@ export const toastHistory = {
       if (!item || !item.id || dismissed.has(item.id)) continue;
       const existing = currentMap.get(item.id);
       if (existing) {
+        if (!existing.server) {
+          existing.server = true;
+          changed = true;
+        }
         if (item.isRead && !existing.read) {
           existing.read = true;
           changed = true;
@@ -142,6 +161,7 @@ export const toastHistory = {
           path: item.link || "",
           read: Boolean(item.isRead),
           starred: false,
+          server: true,
         });
         changed = true;
       }
@@ -154,29 +174,32 @@ export const toastHistory = {
     }
   },
   markRead(id: string) {
+    const isServer = entries.some(item => item.id === id && item.server);
     commit(entries.map(item => (item.id === id ? { ...item, read: true } : item)));
-    void apiFetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PUT" }).catch(() => {});
+    if (isServer) syncToServer(`/api/notifications/${encodeURIComponent(id)}/read`, "PATCH");
   },
   toggleStar(id: string) {
     commit(entries.map(item => (item.id === id ? { ...item, starred: !item.starred } : item)));
   },
   remove(id: string) {
+    const isServer = entries.some(item => item.id === id && item.server);
     if (owner) {
       const dismissed = getDismissed(owner);
       dismissed.add(id);
       saveDismissed(owner, dismissed);
     }
     commit(entries.filter(item => item.id !== id));
-    void apiFetch(`/api/notifications/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+    if (isServer) syncToServer(`/api/notifications/${encodeURIComponent(id)}`, "DELETE");
   },
   clear() {
+    const hasServer = entries.some(item => item.server);
     if (owner) {
       const dismissed = getDismissed(owner);
       entries.forEach(e => dismissed.add(e.id));
       saveDismissed(owner, dismissed);
     }
     commit([]);
-    void apiFetch("/api/notifications/read-all", { method: "PUT" }).catch(() => {});
-    void apiFetch("/api/notifications", { method: "DELETE" }).catch(() => {});
+    // Xóa hết là đủ; gọi read-all trước khi xóa là thừa vì dữ liệu sắp biến mất.
+    if (hasServer) syncToServer("/api/notifications", "DELETE");
   },
 };

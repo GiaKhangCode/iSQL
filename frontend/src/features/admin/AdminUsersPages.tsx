@@ -8,7 +8,7 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Dialog, ErrorState, Status, Loading } from "@/shared/ui/ui";
-import { adminService, type AdminUser } from "@/features/admin/adminService";
+import { adminService, userRoleNames, type AdminUser, type RoleOption } from "@/features/admin/adminService";
 import { ListFilter, Upload, Download } from "lucide-react";
 import { TeacherListFilters } from "@/shared/components/TeacherListFilters";
 import { TeacherListPagination } from "@/shared/components/TeacherListPagination";
@@ -26,6 +26,7 @@ export function AdminUsersPage() {
   const dates = useListDateFilters();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All roles");
+  const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [page, setPage] = useState(1);
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null);
@@ -58,11 +59,13 @@ export function AdminUsersPage() {
     adminService.getLecturerRequests().then(requests => {
       setPendingRequestCount(requests.length);
     }).catch(console.error);
+
+    adminService.getRoleOptions().then(setRoleOptions).catch(() => setRoleOptions([]));
   }, []);
 
   const filteredRows = useMemo(() => users.filter((user) => {
     const matchesQuery = matchesListSearch(query, user.id, user.name, user.email);
-    return dates.matches(user) && matchesQuery && (roleFilter === "All roles" || user.role === roleFilter) && (statusFilter === "All statuses" || user.status === statusFilter);
+    return dates.matches(user) && matchesQuery && (roleFilter === "All roles" || (user.roles || []).some((role) => role.id === roleFilter)) && (statusFilter === "All statuses" || user.status === statusFilter);
   }), [users, query, roleFilter, statusFilter, dates.key]);
 
   const filtered = order.apply(filteredRows, item => item.id || "");
@@ -97,17 +100,17 @@ export function AdminUsersPage() {
     tableScrollRef.current?.scrollTo({ top: 0 });
   }, [currentPage, query, roleFilter, statusFilter]);
 
-  async function handleUpdateRole(userToUpdate: AdminUser, newRole: string) {
+  async function handleUpdateAccountType(userToUpdate: AdminUser, newType: AdminUser["account_type"]) {
     try {
-      const updated = await adminService.updateUser(userToUpdate.email, { ...userToUpdate, role: newRole });
+      const updated = await adminService.updateUser(userToUpdate.email, { account_type: newType });
       setUsers(all => all.map(u => u.email === updated.email ? updated : u));
     } catch (err: any) {
-      setNotice(err.message || "Failed to update role");
+      setNotice(err.message || "Failed to update account type");
     }
   }
 
   function exportCsv() {
-    const csv = ["Name,Email,Role,Status", ...users.map((u) => [u.name, u.email, u.role, u.status].join(","))].join("\n");
+    const csv = ["Name,Email,Account type,Roles,Status", ...users.map((u) => [u.name, u.email, u.account_type, `"${(u.roles || []).map((role) => role.name).join("; ")}"`, u.status].join(","))].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const link = document.createElement("a");
     link.href = url;
@@ -126,7 +129,7 @@ export function AdminUsersPage() {
 
   if (loading) {
     return (
-      <section className="teacher-page teacher-list-page compact-teacher-contests admin-users-page">
+      <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-users-page">
         <h1 className="sr-only"><TranslatedText>{tr("Users")}</TranslatedText></h1>
         <TeacherListLoading
           label={tr("Loading users…")}
@@ -140,7 +143,7 @@ export function AdminUsersPage() {
 
   if (loadError) {
     return (
-      <section className="teacher-page teacher-list-page compact-teacher-contests admin-users-page">
+      <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-users-page">
         <h1 className="sr-only"><TranslatedText>{tr("Users")}</TranslatedText></h1>
         <ErrorState
           title={tr("Could not load users")}
@@ -152,7 +155,7 @@ export function AdminUsersPage() {
   }
 
   return (
-    <section className="teacher-page teacher-list-page compact-teacher-contests admin-users-page">
+    <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-users-page">
       <h1 className="sr-only"><TranslatedText>{tr("Users")}</TranslatedText></h1>
       {pendingRequestCount > 0 && (
         <div className="admin-pending-banner">
@@ -177,7 +180,7 @@ export function AdminUsersPage() {
               id: user.id || String(index),
               title: user.name,
               value: user.email,
-              description: `${user.email} · ${tr(user.role)}`,
+              description: `${user.email} · ${userRoleNames(user)}`,
             }))}
             search={query}
             onSearchChange={setQuery}
@@ -216,10 +219,7 @@ export function AdminUsersPage() {
                 icon: <ListFilter size={17} aria-hidden="true" />,
                 options: [
                   { value: "All roles", label: tr("All roles") },
-                  { value: "Student", label: tr("Student") },
-                  { value: "Lecturer", label: tr("Lecturer") },
-                  { value: "Faculty office", label: tr("Faculty office") },
-                  { value: "Admin", label: tr("Admin") },
+                  ...roleOptions.map((option) => ({ value: option.id, label: option.name })),
                 ],
               },
               {
@@ -277,7 +277,7 @@ export function AdminUsersPage() {
                       </button>
                       <small className="teacher-row-subtext">{user.email}</small>
                     </td>
-                    <td data-label={tr("ROLE")}><TranslatedText>{tr(user.role)}</TranslatedText></td>
+                    <td data-label={tr("ROLE")}>{userRoleNames(user)}</td>
                     <td data-label={tr("STATUS")}><Status value={user.status} /></td>
                     <td data-label={tr("LAST ACTIVE")}>{user.lastActive || "—"}</td>
                   </TableRow>
@@ -330,31 +330,37 @@ export function AdminUsersPage() {
                 <p className="muted">{selected.email}</p>
                 <dl className="teacher-list-detail-facts">
                   <div>
-                    <dt><TranslatedText>{tr("Role")}</TranslatedText></dt>
+                    <dt><TranslatedText>{tr("Roles")}</TranslatedText></dt>
+                    <dd>
+                      {userRoleNames(selected)}
+                      {" · "}
+                      <Link to="/admin/roles"><TranslatedText>{tr("Manage roles")}</TranslatedText></Link>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt><TranslatedText>{tr("Account type")}</TranslatedText></dt>
                     <dd>
                       <Select
-                        value={pendingRole ?? selected.role}
+                        value={pendingRole ?? selected.account_type}
                         onChange={(e) => setPendingRole(e.target.value)}
                         className="admin-user-role-select"
                       >
-                        <option value="Student">{tr("Student")}</option>
-                        <option value="Lecturer">{tr("Lecturer")}</option>
-                        <option value="Faculty office">{tr("Faculty office")}</option>
-                        <option value="Admin">{tr("Admin")}</option>
+                        <option value="student">{tr("Student")}</option>
+                        <option value="staff">{tr("Staff")}</option>
                       </Select>
                     </dd>
                   </div>
-                  {pendingRole && pendingRole !== selected.role && (
+                  {pendingRole && pendingRole !== selected.account_type && (
                     <div className="admin-user-save-role-row">
                       <button
                         type="button"
                         className="button primary"
                         onClick={() => {
-                          handleUpdateRole(selected, pendingRole);
+                          handleUpdateAccountType(selected, pendingRole as AdminUser["account_type"]);
                           setPendingRole(null);
                         }}
                       >
-                        <TranslatedText>{tr("Save role")}</TranslatedText>
+                        <TranslatedText>{tr("Save account type")}</TranslatedText>
                       </button>
                     </div>
                   )}
@@ -419,7 +425,7 @@ export function AdminEditAccountPage() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [name, setName] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
-  const [role, setRole] = useState<AdminUser["role"]>("Student");
+  const [accountType, setAccountType] = useState<AdminUser["account_type"]>("student");
   const [status, setStatus] = useState<AdminUser["status"]>("Active");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -434,7 +440,7 @@ export function AdminEditAccountPage() {
         setCurrentUser(found);
         setName(found.name);
         setAccountEmail(found.email);
-        setRole(found.role);
+        setAccountType(found.account_type);
         setStatus(found.status);
       }
     }).catch(err => setLoadError(err instanceof Error ? err.message : "Could not load account.")).finally(() => setLoading(false));
@@ -456,7 +462,7 @@ export function AdminEditAccountPage() {
       await adminService.updateUser(currentUser.email, {
         name: nextName,
         email: nextEmail,
-        role,
+        account_type: accountType,
         status
       });
       navigate("/admin/users", { state: { selectedEmail: nextEmail, notice: `Account updated for ${nextName}.` } });
@@ -479,13 +485,14 @@ export function AdminEditAccountPage() {
     <div className="admin-edit-layout admin-account-edit-layout">
       <form className="admin-edit-form" onSubmit={save}>
         <div className="admin-account-form-header">
-          <div><h1><TranslatedText>{tr("Account information")}</TranslatedText></h1><p className="admin-muted"><TranslatedText>{tr("Update this user’s profile, role, and sign-in status.")}</TranslatedText></p></div>
+          <div><h1><TranslatedText>{tr("Account information")}</TranslatedText></h1><p className="admin-muted"><TranslatedText>{tr("Update this user’s profile, account type, and sign-in status.")}</TranslatedText></p></div>
           <Link className="button admin-button" to="/admin/users"><TranslatedText>{tr("Back to users")}</TranslatedText></Link>
         </div>
         <div className="admin-account-fields">
           <Field label={tr("FULL NAME")}><input value={name} onChange={(event) => setName(event.target.value)} required /></Field>
           <Field label={tr("EMAIL ADDRESS")}><input type="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} required /></Field>
-          <Field label={tr("ROLE")}><Select value={role} onChange={(event) => setRole(event.target.value as AdminUser["role"])}><option value="Student">{tr("Student")}</option><option value="Lecturer">{tr("Lecturer")}</option><option value="Faculty office">{tr("Faculty office")}</option><option value="Admin">{tr("Admin")}</option></Select></Field>
+          <Field label={tr("ACCOUNT TYPE")}><Select value={accountType} onChange={(event) => setAccountType(event.target.value as AdminUser["account_type"])}><option value="student">{tr("Student")}</option><option value="staff">{tr("Staff")}</option></Select></Field>
+          <Field label={tr("ROLES")}><p className="admin-muted" style={{ margin: 0 }}>{currentUser ? userRoleNames(currentUser) : "—"} · <Link to="/admin/roles"><TranslatedText>{tr("Manage roles")}</TranslatedText></Link></p></Field>
           <Field label={tr("ACCOUNT STATUS")}><Select value={status} onChange={(event) => setStatus(event.target.value as AdminUser["status"])}><option value="Active">{tr("Active")}</option><option value="Inactive">{tr("Inactive")}</option><option value="Pending">{tr("Pending")}</option></Select></Field>
         </div>
         {notice && <Notice><TranslatedText>{tr(notice)}</TranslatedText></Notice>}

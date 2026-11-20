@@ -3,7 +3,6 @@
 .workspace > .workspace-header { flex:none; }
 .workspace .workspace-main { flex:1; height:auto; }
 .workspace .workspace-identity { display:none; }
-.workspace-header .student-header-status { display:none; }
 .workspace-header-questions { display:grid; grid-template-columns:minmax(120px,1fr) auto; flex:0 1 260px; gap:4px 6px; min-width:160px; margin:0 12px; }
 .workspace-header-questions .problem-question-counter { grid-column:1 / -1; font-size:9px; line-height:12px; }
 .global-header.workspace-header .workspace-header-questions .workspace-question-picker { display:block; min-width:0; margin:0; }
@@ -87,7 +86,6 @@
   .workspace .workspace-header .workspace-problem-switcher select { height:34px; }
   .workspace .workspace-tools { order:5; width:100%; justify-content:flex-end; }
   .workspace .workspace-tools .focus-exit { margin-right:auto; }
-  .workspace .student-header-status { display:none; }
   .workspace .layout-popover { position:fixed; top:112px; right:12px; max-height:calc(100dvh - 124px); overflow:auto; }
 }
 .workspace-sql-checks { flex:none; padding:8px 14px; border-bottom:1px solid var(--border); background:var(--surface); color:var(--muted); font-size:11px; }

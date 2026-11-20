@@ -5,13 +5,13 @@ import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { useLoad } from "@/shared/hooks/useLoad";
 import { studentApi, type StudentAssignments } from "@/shared/api/studentApi";
-import type { Contest } from "@/data/models";
+import type { ExamSession } from "@/data/models";
 
 type ProblemOption = { id: string; title: string };
 type ProblemList = { items: ProblemOption[] };
 
 export function WorkspaceProblemSwitcher({ source, context, problemId, problemTitle }: {
-  source: "Assignments" | "Contests";
+  source: "Assignments" | "ExamSession";
   context: string;
   problemId: string;
   problemTitle: string;
@@ -26,9 +26,8 @@ export function WorkspaceProblemSwitcher({ source, context, problemId, problemTi
       const assignment = assignments.assignments.find((item) => item.id === context);
       return { items: (assignment?.problemIds || []).map((id) => ({ id, title: (assignments.problems || []).find((problem) => problem.id === id)?.title || "" })) };
     }
-    const contests: Contest[] = await studentApi.getContests();
-    const contest = contests.find((item) => item.id === context);
-    return { items: (contest?.problemIds || []).map((id) => ({ id, title: (contest?.problemDetails || []).find((problem) => problem.id === id)?.title || "" })) };
+    const examSession: ExamSession | undefined = await studentApi.getExamSessionOrExam(context);
+    return { items: (examSession?.problemIds || []).map((id) => ({ id, title: (examSession?.problemDetails || []).find((problem) => problem.id === id)?.title || "" })) };
   }, [source, context]);
 
   const items = useMemo(() => {

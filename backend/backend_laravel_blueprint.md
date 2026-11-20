@@ -83,11 +83,10 @@ iSQL-backend/
 │   │   │   ├── Teacher/
 │   │   │   │   ├── ProblemController.php         # CRUD Ngân hàng câu hỏi
 │   │   │   │   ├── AssignmentController.php      # CRUD Bài tập & Contest
-│   │   │   │   ├── ClassController.php           # Quản lý lớp học (GV)
-│   │   │   │   └── ReviewController.php          # Chấm bài thủ công
+│   │   │   │   └── ClassController.php           # Quản lý lớp học (GV)
 │   │   │   │
 │   │   │   ├── Student/
-│   │   │   │   ├── DashboardController.php       # Dashboard & streak sinh viên
+│   │   │   │   ├── DashboardController.php       # Dashboard sinh viên
 │   │   │   │   ├── AssignmentController.php      # Xem & làm bài tập
 │   │   │   │   ├── PracticeController.php        # Luyện tập SQL
 │   │   │   │   ├── PreferenceController.php      # Favorites, custom lists, theme
@@ -236,9 +235,9 @@ Schema::create('users', function (Blueprint $table) {
     $table->string('role', 50)->default('student');      // student | instructor | admin
     $table->string('status', 50)->default('Active');     // Active | Inactive | Pending
     $table->string('department', 255)->nullable();
-    $table->integer('current_streak')->default(0);
-    $table->integer('longest_streak')->default(0);
-    $table->timestamp('last_streak_date')->nullable();
+    $table->integer('current_streak')->default(0);      // không còn dùng (đã bỏ tính năng streak)
+    $table->integer('longest_streak')->default(0);      // không còn dùng
+    $table->timestamp('last_streak_date')->nullable();  // không còn dùng
     $table->timestamp('last_active')->nullable();
     $table->timestamps();                                // created_at, updated_at
 });
@@ -253,7 +252,7 @@ Schema::create('notifications', function (Blueprint $table) {
     $table->string('user_id', 50);
     $table->string('title', 255);
     $table->text('message');
-    $table->string('type', 50);                          // info | success | warning | error
+    $table->string('type', 50);                          // Nhãn nghiệp vụ, không phải mức độ: Assignment | Review | Info | content_share (frontend hiển thị chung một kiểu)
     $table->boolean('is_read')->default(false);
     $table->string('link', 255)->nullable();
     $table->timestamp('created_at')->useCurrent();
@@ -638,7 +637,11 @@ Schema::create('assignment_problems', function (Blueprint $table) {
 | GET | `/api/submissions/{id}` | `SubmissionController@show` |
 | PUT | `/api/submissions/{id}/review` | `SubmissionController@review` |
 | GET | `/api/notifications` | `NotificationController@index` |
-| POST | `/api/notifications/mark-read` | `NotificationController@markAllRead` |
+| GET | `/api/notifications/unread-count` | `NotificationController@unreadCount` |
+| PATCH | `/api/notifications/read-all` | `NotificationController@markAllRead` |
+| PATCH | `/api/notifications/{id}/read` | `NotificationController@markRead` |
+| DELETE | `/api/notifications/{id}` | `NotificationController@destroy` |
+| DELETE | `/api/notifications` | `NotificationController@destroyAll` |
 
 ---
 

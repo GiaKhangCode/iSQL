@@ -1,4 +1,4 @@
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) {
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) {
   --workspace-keyword: #0000ff;
   --workspace-name: #267f99;
   --workspace-function: #795e26;
@@ -11,7 +11,7 @@
   font-size:14px;
 }
 
-:root[data-theme="dark"] :is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) {
+:root[data-theme="dark"] :is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) {
   --workspace-keyword: #569cd6;
   --workspace-name: #9cdcfe;
   --workspace-function: #dcdcaa;
@@ -23,20 +23,20 @@
   --workspace-space-dot: #78a3c7;
 }
 
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-keyword { color:var(--workspace-keyword); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-name { color:var(--workspace-name); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-function { color:var(--workspace-function); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-number { color:var(--workspace-number); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-string { color:var(--workspace-string); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-comment { color:var(--workspace-comment); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-punctuation { color:var(--text); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-lineNumbers .cm-gutterElement { color:var(--workspace-line-number); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-activeLineGutter { color:var(--workspace-active-line-number); }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-activeLine {
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-keyword { color:var(--workspace-keyword); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-name { color:var(--workspace-name); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-function { color:var(--workspace-function); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-number { color:var(--workspace-number); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-string { color:var(--workspace-string); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-comment { color:var(--workspace-comment); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-ws-punctuation { color:var(--text); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-lineNumbers .cm-gutterElement { color:var(--workspace-line-number); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-activeLineGutter { color:var(--workspace-active-line-number); }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-activeLine {
   background-color:transparent;
   box-shadow:inset 0 1px 0 var(--border-subtle),inset 0 -1px 0 var(--border-subtle);
 }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-selected-space {
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-selected-space {
   background-image:radial-gradient(circle,var(--workspace-space-dot) 1px,transparent 1px);
   background-size:1ch 1em;
   background-position:left center;
@@ -44,11 +44,11 @@
 }
 
 /* Keep the native full-row selection hidden; the custom layer tracks selected text. */
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-selectionLayer .cm-selectionBackground { visibility:hidden; }
-:is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-contentSelectionBackground {
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-selectionLayer .cm-selectionBackground { visibility:hidden; }
+:is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-contentSelectionBackground {
   background-color:#add6ff;
   border-radius:3px;
 }
-:root[data-theme="dark"] :is(.workspace .sql-editor, .stage-code, .contest-editor-scroll, .contest-dml-seed-preview, .contest-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-contentSelectionBackground {
+:root[data-theme="dark"] :is(.workspace .sql-editor, .stage-code, .exam-session-editor-scroll, .exam-session-dml-seed-preview, .exam-session-query-editor-area, .review-sql-pair, .workspace-submission-code) .cm-contentSelectionBackground {
   background-color:#264f78;
 }

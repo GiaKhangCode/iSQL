@@ -18,13 +18,10 @@ Tài liệu này giải thích chi tiết vai trò, ý nghĩa, trách nhiệm v�
 │   ├── Models/           # Tầng dữ liệu Eloquent ORM (MySQL)
 │   ├── Providers/        # Khởi tạo và liên kết các dịch vụ lõi (Service Providers)
 │   └── Services/         # Tầng logic nghiệp vụ cốt lõi & CRUD Services
-│       ├── UserService.php           # Nghiệp vụ quản lý user, auth, duyệt giảng viên
-│       ├── ProblemService.php        # Nghiệp vụ CRUD câu hỏi, đồng bộ topics, test cases
-│       ├── AssignmentService.php     # Nghiệp vụ CRUD bài tập & contest, gán lớp, câu hỏi
-│       ├── ClassService.php          # Nghiệp vụ quản lý lớp học và ghi danh sinh viên
-│       ├── SubmissionQueueService.php# Quản lý hàng đợi chấm bài Redis
+│       ├── Access/                   # RBAC capability: AccessControlService, PermissionCatalog, StaffAccess...
 │       ├── SqlServer/                # Sandbox, QueryRewriter, SchemaInspector
-│       └── Grading/                  # DdlGrader, DmlGrader, SqlQueryGrader, ContestGrading
+│       ├── Grading/                  # DdlGrader, DmlGrader, SqlQueryGrader, ExamSessionGradingService
+│       └── *Service.php              # ~35 service theo miền nghiệp vụ (xem mục 1.3)
 ├── bootstrap/            # Khởi động ứng dụng (Application Bootstrapping & Cache)
 ├── config/               # Cấu hình tập trung toàn bộ hệ thống
 ├── database/             # Quản lý cấu trúc CSDL và nạp dữ liệu mẫu
@@ -55,30 +52,40 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 * **Tại sao cần có:** Tách biệt hoàn toàn việc nhận request và trả response ra khỏi logic tính toán nghiệp vụ (giúp code sạch, dễ viết Unit Test).
 * **Các thư mục con:**
   * **[Controllers/](./app/Http/Controllers)**: Bộ điều khiển nhận yêu cầu từ client, gọi các Service để xử lý và trả về JSON:
-    * [Auth/AuthController.php](./app/Http/Controllers/Auth/AuthController.php): Đăng nhập, đăng ký sinh viên, đăng ký giảng viên, cấp JWT/Sanctum token.
-    * [Admin/UserController.php](./app/Http/Controllers/Admin/UserController.php): Quản trị viên quản lý danh sách user, kích hoạt/khóa tài khoản, đổi vai trò.
-    * [Admin/ClassController.php](./app/Http/Controllers/Admin/ClassController.php): Quản lý danh sách lớp học toàn trường.
+    * **Quy tắc cứng:** controller không gọi model hay `DB::` (chỉ type-hint model và dùng hằng). Test [tests/Unit/ControllerLayerTest.php](./tests/Unit/ControllerLayerTest.php) quét thư mục này và báo đỏ khi vi phạm; danh sách ngoại lệ `LEGACY` đang rỗng.
+    * [Auth/AuthController.php](./app/Http/Controllers/Auth/AuthController.php): Đăng nhập (kể cả tài khoản ca thi qua `ExamLoginService`), đăng ký sinh viên, đăng ký giảng viên, quên mật khẩu qua OTP, cấp Sanctum token.
+    * [Auth/MyPermissionsController.php](./app/Http/Controllers/Auth/MyPermissionsController.php): `GET /api/auth/permissions`: quyền hiệu lực và khu vực giao diện (`student|teacher|office|admin`) suy ra từ quyền.
+    * [Admin/UserController.php](./app/Http/Controllers/Admin/UserController.php): Quản trị viên quản lý danh sách user, kích hoạt/khóa tài khoản, duyệt giảng viên, loại tài khoản (`account_type`).
+    * [Admin/AccessController.php](./app/Http/Controllers/Admin/AccessController.php): Quản trị vai trò, quyền và gán vai trò cho tài khoản (`/api/admin/access*`).
+    * [Admin/ClassController.php](./app/Http/Controllers/Admin/ClassController.php): Quản lý danh sách lớp học toàn trường, phân công giảng viên.
+    * [Admin/CourseController.php](./app/Http/Controllers/Admin/CourseController.php), [Admin/AcademicTermController.php](./app/Http/Controllers/Admin/AcademicTermController.php), [Admin/ExerciseTagController.php](./app/Http/Controllers/Admin/ExerciseTagController.php): Danh mục môn học, học kỳ, thẻ bài tập.
     * [Admin/OverviewController.php](./app/Http/Controllers/Admin/OverviewController.php): Thống kê tổng quan số lượng sinh viên, giảng viên, bài nộp.
     * [Teacher/ProblemController.php](./app/Http/Controllers/Teacher/ProblemController.php): Giảng viên CRUD ngân hàng câu hỏi, test truy vấn.
-    * [Teacher/AssignmentController.php](./app/Http/Controllers/Teacher/AssignmentController.php): Giảng viên tạo bài tập & kỳ thi contest.
-    * [Teacher/ClassController.php](./app/Http/Controllers/Teacher/ClassController.php): Giảng viên quản lý lớp học mình phụ trách.
-    * [Teacher/ReviewController.php](./app/Http/Controllers/Teacher/ReviewController.php): Chấm điểm thủ công và nhận xét bài nộp.
-    * [Student/DashboardController.php](./app/Http/Controllers/Student/DashboardController.php): Dashboard sinh viên, streak ngày làm bài, lịch sử gần đây.
+    * [Teacher/AssignmentController.php](./app/Http/Controllers/Teacher/AssignmentController.php): Giảng viên tạo bài tập và giao cho lớp.
+    * [Teacher/ClassController.php](./app/Http/Controllers/Teacher/ClassController.php): Giảng viên xem lớp mình dạy (chỉ đọc; tạo lớp, thêm sinh viên, phân giảng viên thuộc quyền `class.manage` của admin).
+    * [ClassRosterController.php](./app/Http/Controllers/ClassRosterController.php): Danh sách sinh viên của lớp, import, đặt lại mật khẩu sinh viên.
+    * [Teacher/DatabaseLibraryController.php](./app/Http/Controllers/Teacher/DatabaseLibraryController.php), [ContentSharingController.php](./app/Http/Controllers/ContentSharingController.php): Thư viện CSDL mẫu và chia sẻ bài toán/thư viện giữa giảng viên.
+    * [ExaminationController.php](./app/Http/Controllers/ExaminationController.php), [ExamSessionController.php](./app/Http/Controllers/ExamSessionController.php), [ExamAdmissionController.php](./app/Http/Controllers/ExamAdmissionController.php): Kỳ thi, ca thi (kế hoạch, giám thị) và tài khoản/phòng thi.
+    * [ExamLoginProctorController.php](./app/Http/Controllers/ExamLoginProctorController.php): Đăng nhập ca thi trực tiếp và phòng giám thị (trạng thái phòng, mở khóa, kiểm tra/thêm sinh viên, duyệt trình duyệt).
+    * [RegradeAssignmentController.php](./app/Http/Controllers/RegradeAssignmentController.php), [StatisticsController.php](./app/Http/Controllers/StatisticsController.php): Phân công phúc khảo; thống kê cho giảng viên và giáo vụ.
+    * [Student/DashboardController.php](./app/Http/Controllers/Student/DashboardController.php): Dashboard sinh viên: số bài đã giải, bài đang làm, biểu đồ hoạt động theo ngày, lịch sử gần đây.
     * [Student/AssignmentController.php](./app/Http/Controllers/Student/AssignmentController.php): Danh sách bài tập được giao cho sinh viên.
     * [Student/PracticeController.php](./app/Http/Controllers/Student/PracticeController.php): Danh sách bài tập luyện tập công khai.
     * [Student/PreferenceController.php](./app/Http/Controllers/Student/PreferenceController.php): Quản lý bài tập yêu thích và danh sách tự tạo.
     * [Student/PersonalDbController.php](./app/Http/Controllers/Student/PersonalDbController.php): Thao tác với database cá nhân để luyện tập.
-    * [Contest/ExamController.php](./app/Http/Controllers/Contest/ExamController.php): Sandbox thi SQL Server (setup database, chạy DDL, seed DML, chạy query, nộp bài).
-    * [SubmissionController.php](./app/Http/Controllers/SubmissionController.php): Tra cứu lịch sử nộp bài của sinh viên và chi tiết bài làm.
+    * [Student/ActivityAttemptController.php](./app/Http/Controllers/Student/ActivityAttemptController.php): Lượt làm bài của sinh viên (lưu nháp, ghi vi phạm, kết thúc và chấm).
+    * [ExamSession/ExamController.php](./app/Http/Controllers/ExamSession/ExamController.php): Sandbox thi SQL Server của ca thi (`/api/exam-sessions/{id}/*`: setup database, chạy DDL, seed DML, chạy query, nộp bài).
+    * [SubmissionController.php](./app/Http/Controllers/SubmissionController.php): Chỉ đọc đầu vào rồi gọi 6 service `Submission*`/`StudentProfile`: tra cứu bài nộp, chi tiết, chấm/công bố điểm, phúc khảo, hồ sơ sinh viên.
     * [NotificationController.php](./app/Http/Controllers/NotificationController.php): Xem thông báo và đánh dấu tất cả là đã đọc.
   * **[Middleware/](./app/Http/Middleware)**: "Lớp lọc" trung gian giữa client và controller:
-    * [RoleMiddleware.php](./app/Http/Middleware/RoleMiddleware.php): Kiểm tra phân quyền truy cập (`student`, `instructor`, `admin`).
+    * [CapabilityMiddleware.php](./app/Http/Middleware/CapabilityMiddleware.php): Alias `capability:<code>[,<code>]`, cho qua khi người dùng có **bất kỳ** mã quyền nào trong danh sách (các mã nằm ở `PermissionCatalog`). Phạm vi dữ liệu (lớp nào, bài của ai) do service quyết định, không phải middleware.
     * [EnsureActiveAccount.php](./app/Http/Middleware/EnsureActiveAccount.php): Chặn những tài khoản đang ở trạng thái `Pending` (chờ duyệt) hoặc `Inactive`.
     * *Tại sao cần:* Ngăn chặn request không hợp lệ ngay từ cửa sổ, bảo mật API mà không cần lặp lại code kiểm tra trong từng hàm Controller.
   * **[Requests/](./app/Http/Requests)**: Tầng xác thực dữ liệu đầu vào (Form Request Validation):
     * [LoginRequest.php](./app/Http/Requests/Auth/LoginRequest.php), [RegisterRequest.php](./app/Http/Requests/Auth/RegisterRequest.php), [RegisterLecturerRequest.php](./app/Http/Requests/Auth/RegisterLecturerRequest.php): Kiểm tra định dạng email, password khi xác thực.
+    * Thư mục con theo khu vực: `Admin/` (lớp, người dùng, vai trò, danh mục), `Teacher/` (roster, thư viện CSDL, chia sẻ), `Student/` (dashboard); ngoài ra `AssignRegradeRequest`, `RegradeCandidatesRequest`.
     * [ProblemRequest.php](./app/Http/Requests/ProblemRequest.php): Kiểm tra tiêu đề, độ khó, mô tả câu hỏi.
-    * [AssignmentRequest.php](./app/Http/Requests/AssignmentRequest.php): Kiểm tra cấu hình bài thi (thời gian mở/đóng, điểm DDL/DML/SQL).
+    * [AssignmentRequest.php](./app/Http/Requests/AssignmentRequest.php): Kiểm tra cấu hình bài tập (thời gian mở/đóng, lớp được giao).
     * [RunQueryRequest.php](./app/Http/Requests/RunQueryRequest.php), [SubmitExamRequest.php](./app/Http/Requests/SubmitExamRequest.php): Kiểm tra câu query gửi lên.
     * *Tại sao cần:* Tự động kiểm tra dữ liệu gửi lên trước khi Controller chạy. Nếu sai, tự động trả về lỗi `422 Unprocessable Entity` kèm thông báo lỗi rõ ràng.
 
@@ -86,11 +93,11 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 * **Vai trò:** Đại diện cho các bảng dữ liệu trong MySQL thông qua Eloquent ORM.
 * **Tại sao cần có:** Giúp thao tác với database dưới dạng hướng đối tượng (OOP) thay vì phải viết các câu lệnh SQL dài dòng thủ công.
 * **Các file tiêu biểu:**
-  * [User.php](./app/Models/User.php): Tài khoản người dùng (Admin, Instructor, Student), lưu streak, hash password.
+  * [User.php](./app/Models/User.php): Tài khoản người dùng. `account_type` (`student|staff`) chỉ là loại danh tính, không phải quyền (cột `users.role` đã bị bỏ); quyền đến từ [AccessRole.php](./app/Models/AccessRole.php) (bảng `access_roles`...) qua `AccessControlService`.
   * [Problem.php](./app/Models/Problem.php): Ngân hàng câu hỏi SQL.
   * [Topic.php](./app/Models/Topic.php): Chủ đề SQL (SELECT, JOIN, Subqueries...).
   * [TestCase.php](./app/Models/TestCase.php) & [TestCaseScript.php](./app/Models/TestCaseScript.php): Kịch bản test case và script tạo bảng mẫu.
-  * [Assignment.php](./app/Models/Assignment.php): Bài tập và kỳ thi contest toàn diện.
+  * [Assignment.php](./app/Models/Assignment.php): Bài tập và ca thi. Ca thi của một kỳ thi ([Examination.php](./app/Models/Examination.php)) cũng nằm trong bảng `assignments`, nhận biết bằng `examination_id IS NOT NULL` (`is_exam_session`). Cuộc thi độc lập đã bị loại bỏ.
   * [ClassModel.php](./app/Models/ClassModel.php) & [ClassEnrollment.php](./app/Models/ClassEnrollment.php): Quản lý lớp học và danh sách sinh viên đăng ký.
   * [Submission.php](./app/Models/Submission.php): Lịch sử bài làm, câu query đã nộp, điểm số và phản hồi.
   * [ProblemDraft.php](./app/Models/ProblemDraft.php): Bản nháp câu truy vấn sinh viên đang viết dở.
@@ -102,11 +109,14 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 #### 1.3 [app/Services/](./app/Services)
 * **Vai trò:** Tầng xử lý logic nghiệp vụ cốt lõi (Business Logic Layer) theo chuẩn **Service Pattern**.
 * **Tại sao cần có:** Tách toàn bộ logic nghiệp vụ và giao dịch database ra khỏi Controller ("Thin Controller"). Controller chỉ làm nhiệm vụ nhận request và trả JSON, còn Service chịu trách nhiệm xử lý logic, transaction và tái sử dụng ở nhiều nơi.
-* **Các Service nghiệp vụ CRUD (Domain Services):**
-  * [UserService.php](./app/Services/UserService.php): Xử lý toàn bộ logic tài khoản, xác thực mật khẩu hash, đăng ký sinh viên/giảng viên, duyệt trạng thái tài khoản (`Active`/`Pending`) và phân quyền.
-  * [ProblemService.php](./app/Services/ProblemService.php): Xử lý CRUD câu hỏi, đồng bộ quan hệ nhiều-nhiều với Topics, bọc transaction khi tạo/xóa câu hỏi kèm test cases.
-  * [AssignmentService.php](./app/Services/AssignmentService.php): Xử lý CRUD bài tập & kỳ thi contest, đồng bộ lớp học được gán và danh sách câu hỏi trong `DB::transaction`, lọc danh sách bài tập theo lớp sinh viên đã ghi danh.
-  * [ClassService.php](./app/Services/ClassService.php): Quản lý tạo lớp học, phân công giảng viên và ghi danh sinh viên vào lớp (`ClassEnrollment`).
+* **Các Service nghiệp vụ (Domain Services):** mỗi controller chỉ gọi service; service giữ truy vấn và `DB::transaction`.
+  * **Người dùng & phân quyền:** [UserService.php](./app/Services/UserService.php) (tài khoản, đăng ký, duyệt giảng viên, loại tài khoản) và [Access/](./app/Services/Access): `AccessControlService` (`can`, `canAny`, quyền hiệu lực = hợp vai trò + quyền gán trực tiếp), `AccessRoleService` (CRUD vai trò), `AccessRoleAssigner` (gán vai trò khi tạo tài khoản), `PermissionCatalog` (danh mục mã quyền, suy khu vực giao diện), `StaffAccess` (nhân sự chấm/xem kết quả/coi thi).
+  * **Lớp học & danh mục:** [ClassService.php](./app/Services/ClassService.php) (lớp, phân công giảng viên, điều kiện `class.teach`), `ClassRosterService` + `RosterImportParser` (danh sách sinh viên, import), `CatalogService` (môn học, học kỳ), `ExerciseTagService`.
+  * **Bài toán & bài tập:** [ProblemService.php](./app/Services/ProblemService.php), `ProblemWorkspaceService` (workspace tự do và chạy/nộp truy vấn), [AssignmentService.php](./app/Services/AssignmentService.php), `DatabaseLibraryService`, `ContentSharingService`, `PreferenceService` (yêu thích).
+  * **Kỳ thi & coi thi:** `ExaminationService`, `ExamSessionService`, `ExamAdmissionService`, `ExamLoginService` (đăng nhập tài khoản ca thi, cookie trình duyệt), `ProctorAccessService` (quyền vào ca/phòng), `ProctorRoomService` (trạng thái phòng, mở khóa, thêm sinh viên), `ProctorNoticeService`.
+  * **Làm bài & chấm:** `ActivityAttemptService` (nháp, vi phạm, kết thúc lượt), `ActivityAttemptGradingService` (chấm SQL/DDL/DML của lượt làm), `SubmissionQueueService`.
+  * **Bài nộp:** `SubmissionAccessService` (ai xem/chấm), `SubmissionViewService` (dựng JSON, che điểm khi hoạt động ẩn điểm), `SubmissionQueryService`, `SubmissionGradingService` (chấm tay, công bố điểm), `SubmissionAppealService` (phúc khảo), `SubmissionReviewService`, `StudentProfileService`, `RegradeAssignmentService`.
+  * **Báo cáo & phụ trợ:** `StudentDashboardService`, `StatisticsService`, `AdminOverviewService`, `NotificationService`, `ActivityLogService`.
 * **Các Service hạ tầng & chấm thi (Infrastructure & Grading Services):**
   * **[SqlServer/](./app/Services/SqlServer)**:
     * [SandboxService.php](./app/Services/SqlServer/SandboxService.php): Tạo và xóa schema riêng biệt trên Azure SQL Server cho từng sinh viên làm bài thi.
@@ -116,7 +126,7 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
     * [DdlGrader.php](./app/Services/Grading/DdlGrader.php): Chấm điểm cấu trúc bảng sinh viên tạo so với schema chuẩn của giảng viên (30%).
     * [DmlGrader.php](./app/Services/Grading/DmlGrader.php): Kiểm tra xem dữ liệu mẫu nạp vào có bị lỗi ràng buộc khóa ngoại không (20%).
     * [SqlQueryGrader.php](./app/Services/Grading/SqlQueryGrader.php): Thực thi câu truy vấn của sinh viên và so sánh bảng kết quả với đáp án của giáo viên (50%).
-    * [ContestGradingService.php](./app/Services/Grading/ContestGradingService.php): Nhạc trưởng tổng hợp 3 phần thi để tính điểm tổng.
+    * [ExamSessionGradingService.php](./app/Services/Grading/ExamSessionGradingService.php): Nhạc trưởng tổng hợp 3 phần thi của ca thi để tính điểm tổng.
   * [SubmissionQueueService.php](./app/Services/SubmissionQueueService.php): Điều phối việc đẩy bài nộp vào hàng đợi Redis để chấm điểm ngầm.
 
 #### 1.4 [app/Jobs/](./app/Jobs)
@@ -124,7 +134,7 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 * **Tại sao cần có:** Khi hàng trăm sinh viên cùng nhấn "Nộp bài thi" cùng một lúc, việc kết nối sang SQL Server để chấm bài sẽ mất từ vài giây đến nửa phút. Nếu chạy trực tiếp trên Controller, server sẽ nghẽn và sinh viên bị timeout. Bằng cách đẩy vào `Jobs`, server phản hồi ngay lập tức cho sinh viên ("Đã nhận bài"), sau đó Queue Worker (`Redis`) sẽ lấy từng Job ra xử lý ngầm.
 * **Các file tiêu biểu:**
   * [GradeSubmissionJob.php](./app/Jobs/GradeSubmissionJob.php): Chấm điểm bài làm luyện tập.
-  * [GradeContestExamJob.php](./app/Jobs/GradeContestExamJob.php): Chấm điểm bài thi kỳ thi toàn diện (DDL + DML + SQL).
+  * [GradeExamSessionJob.php](./app/Jobs/GradeExamSessionJob.php): Chấm điểm bài thi của ca thi (DDL + DML + SQL). Đã đổi tên từ `GradeContestExamJob`; xả hàng đợi `grading` trước khi triển khai vì job cũ trong Redis sẽ lỗi.
 
 #### 1.5 [app/Console/](./app/Console)
 * **Vai trò:** Nơi chứa các lệnh dòng lệnh tùy biến (`php artisan custom:command`) hoặc cronjob định kỳ.
@@ -144,7 +154,7 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 
 * **Vai trò:** Nơi chứa mã nguồn khởi tạo nền tảng của Laravel.
 * **File quan trọng:**
-  * [bootstrap/app.php](./bootstrap/app.php): File trung tâm của Laravel 11, cấu hình routing (`web`, `api`, `commands`), đăng ký Middleware alias (`role`, `active`), và bộ xử lý ngoại lệ.
+  * [bootstrap/app.php](./bootstrap/app.php): File trung tâm của Laravel 11, cấu hình routing (`web`, `api`, `commands`), đăng ký Middleware alias (`active`, `capability`), và bộ xử lý ngoại lệ.
   * [bootstrap/providers.php](./bootstrap/providers.php): Đăng ký danh sách các Service Provider khởi chạy cùng ứng dụng.
 * **Tại sao cần có:** Đảm bảo toàn bộ framework được nạp theo đúng trình tự trước khi xử lý request đầu tiên.
 
@@ -219,9 +229,10 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
   * [routes/student.php](./routes/student.php): `/api/student/*`.
   * [routes/problems.php](./routes/problems.php): `/api/problems/*`.
   * [routes/assignments.php](./routes/assignments.php): `/api/assignments/*`.
-  * [routes/contests.php](./routes/contests.php): `/api/contests/*`.
+  * [routes/exam_sessions.php](./routes/exam_sessions.php): `/api/exam-sessions/{id}/*` (sandbox làm bài của ca thi). Các route quản lý kỳ thi/ca thi/coi thi/phúc khảo/thống kê khai báo thẳng trong `routes/api.php`.
   * [routes/submissions.php](./routes/submissions.php): `/api/submissions/*`.
   * [routes/notifications.php](./routes/notifications.php): `/api/notifications/*`.
+  * [routes/sharing.php](./routes/sharing.php): `/api/sharing/*` (chia sẻ bài toán/thư viện CSDL).
   * [routes/web.php](./routes/web.php): Route giao diện web mặc định.
   * [routes/console.php](./routes/console.php): Định nghĩa các lệnh console closure.
 
@@ -244,10 +255,12 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 * **Các thư mục con:**
   * **[Feature/](./tests/Feature)**: Kiểm thử tích hợp từ đầu đến cuối (Integration/API Test) bằng cách giả lập gửi request HTTP:
     * [AuthTest.php](./tests/Feature/AuthTest.php): Kiểm thử luồng đăng nhập, bắt lỗi thiếu thông tin.
-    * [ContestExamFlowTest.php](./tests/Feature/ContestExamFlowTest.php): Kiểm thử quy trình thi SQL của sinh viên.
+    * [ExamSessionFlowTest.php](./tests/Feature/ExamSessionFlowTest.php): Kiểm thử quy trình thi SQL của sinh viên trong ca thi.
+    * Mỗi service tách khỏi controller có file test đặc tả riêng (ví dụ `ActivityAttemptTest`, `ProctorRoomTest`, `SubmissionDetailTest`, `RegradeAssignmentTest`) và các file `*PermissionTest` chứng minh quyền không đọc `users.role`. Các trait dựng dữ liệu dùng chung nằm ở [tests/Concerns/](./tests/Concerns) (`AccountFixture`, `GradingFixtures`, `ProctorFixtures`, `UsesDefaultRolePermissions`). Test chạy trên DB dev thật với `DatabaseTransactions`.
     * [ProblemCrudTest.php](./tests/Feature/ProblemCrudTest.php): Kiểm thử CRUD ngân hàng câu hỏi.
     * [SubmissionTest.php](./tests/Feature/SubmissionTest.php): Kiểm thử nộp và tra cứu bài nộp.
   * **[Unit/](./tests/Unit)**: Kiểm thử độc lập từng phương thức thuật toán nhỏ:
+    * [ControllerLayerTest.php](./tests/Unit/ControllerLayerTest.php): Quét `app/Http/Controllers` và báo đỏ nếu controller gọi `Model::method(`, `DB::...` hoặc `new Model(`.
     * [QueryRewriterTest.php](./tests/Unit/QueryRewriterTest.php): Kiểm tra thuật toán regex gắn schema vào câu truy vấn có hoạt động chuẩn xác không.
     * [DdlGraderTest.php](./tests/Unit/DdlGraderTest.php): Kiểm tra cấu trúc phản hồi chấm DDL.
     * [SqlQueryGraderTest.php](./tests/Unit/SqlQueryGraderTest.php): Kiểm tra khởi tạo dịch vụ chấm truy vấn SQL.

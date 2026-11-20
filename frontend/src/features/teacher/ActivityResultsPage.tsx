@@ -34,11 +34,10 @@ export function ActivityResultsPage() {
     return { activity, submissions };
   }, [activityId]);
 
-  const { session } = useAuth();
-  const canAssignRegrade =
-    session?.role === "admin" ||
-    session?.role === "faculty_office" ||
-    session?.technical_role === "department_head";
+  const { permissions } = useAuth();
+  // Khớp backend: phân công phúc khảo cần examination.manage; xem cả kỳ thi cần examination.manage hoặc results.view_all.
+  const canAssignRegrade = Boolean(permissions?.includes("examination.manage"));
+  const seesWholeExam = canAssignRegrade || Boolean(permissions?.includes("results.view_all"));
   const [publishing, setPublishing] = useState(false);
   const [publication, setPublication] = useState("");
   const [regradeOpen, setRegradeOpen] = useState(false);
@@ -80,7 +79,7 @@ export function ActivityResultsPage() {
 
   const fromTeacherExams = location.pathname.startsWith("/teacher/exams/");
   const reviewBase = fromTeacherExams ? "/teacher/exams/review" : `${root}/results/review`;
-  const isExam = Boolean(data?.activity?.examinationId || data?.activity?.isContest || location.pathname.includes("/exams/"));
+  const isExam = Boolean(data?.activity?.examinationId || data?.activity?.isExamSession || location.pathname.includes("/exams/"));
   const exitPath = fromTeacherExams ? "/teacher/exams" : `${root}/results${isExam ? "?kind=exams" : ""}`;
 
   const search = params.get("search") || "";
@@ -200,7 +199,7 @@ export function ActivityResultsPage() {
                 <td><button type="button" className="submission-select-button" aria-pressed={rowKey(row) === (selected && rowKey(selected))} onClick={() => setSelectedKey(rowKey(row))}><strong>{row.studentCode || "—"}</strong><br/>{row.student}{hasMultipleProblems && <><br/><small className="muted">{row.problem}</small></>}</button></td>
                 <td>{row.className || "—"}</td><td>{formatPoints(row.score)}{row.score != null && <small> / {formatPoints(row.maxScore)}</small>}</td><td><Status value={row.status}/></td>
                 <td>{<Link className="button teacher-small-button" state={{returnTo:location.pathname + location.search}} to={workLink(row)}>Xem bài làm</Link>}</td>
-              </TableRow>)}{!rows.length && <tr><td colSpan={5} className="teacher-empty-row">{isExam && data.submissions.length === 0 ? (session?.role === "instructor" && session?.technical_role !== "department_head" ? "Không có sinh viên thuộc lớp thực hành của bạn tham gia kỳ thi này." : "Chưa có sinh viên nào trong kỳ thi này.") : "Không có sinh viên phù hợp bộ lọc."}</td></tr>}</tbody>
+              </TableRow>)}{!rows.length && <tr><td colSpan={5} className="teacher-empty-row">{isExam && data.submissions.length === 0 ? (!seesWholeExam ? "Không có sinh viên thuộc lớp thực hành của bạn tham gia kỳ thi này." : "Chưa có sinh viên nào trong kỳ thi này.") : "Không có sinh viên phù hợp bộ lọc."}</td></tr>}</tbody>
             </Table>
           </div>
           <TeacherListPagination summary={<>Hiển thị {rows.length ? first + 1 : 0}–{Math.min(first + 15, rows.length)} / {rows.length}</>} paginationLabel="Danh sách sinh viên" pageIndicator={<>Trang {page} trên {totalPages}</>} previousLabel="← Trước" nextLabel="Tiếp →" page={page} pageCount={totalPages} onPageChange={value => setFilter("page", String(value))}/>
@@ -228,7 +227,7 @@ export function ActivityResultsPage() {
               {regradeNotice && <p role="status" className="muted tiny" style={{ marginTop: 8 }}>{regradeNotice}</p>}
             </div>
             <footer className="grading-detail-footer" style={{ display: "grid", gap: 8 }}>
-              {canAssignRegrade && Boolean(data.activity?.isContest || data.activity?.examinationId || data.activity?.studentOptions?.examMode || isExam) && (
+              {canAssignRegrade && Boolean(data.activity?.isExamSession || data.activity?.examinationId || data.activity?.studentOptions?.examMode || isExam) && (
                 <button
                   type="button"
                   className="button"

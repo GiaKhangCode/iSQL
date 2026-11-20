@@ -87,8 +87,8 @@ export function ClassesPage() {
   const selectedClass = pageClasses.find((classInfo) => classInfo.id === selectedClassId) || pageClasses[0] || null;
   useEffect(() => { setPage(1); setSelectedClassId(""); }, [search, term, statusFilter]);
   useEffect(() => { tableScrollRef.current?.scrollTo({ top: 0 }); }, [currentPage, search, term, statusFilter]);
-  const assignments = classActivities.filter(item => !item.isContest);
-  const contests = classActivities.filter(item => item.isContest);
+  const assignments = classActivities.filter(item => !item.isExamSession);
+  const examSessionList = classActivities.filter(item => item.isExamSession);
   const filteredStudents = useMemo(() => detailMembers.filter((student) =>
     `${student.name} ${student.id}`.toLowerCase().includes(studentSearch.toLowerCase()),
   ), [detailMembers, studentSearch]);
@@ -214,7 +214,7 @@ export function ClassesPage() {
                 {selectedClass.startDate} <TranslatedText>{tr("to")}</TranslatedText> {selectedClass.endDate}
               </p>
             )}
-            <p className="teacher-class-detail-counts">{selectedClass.students} <TranslatedText>{tr("students ·")}</TranslatedText> {assignments.length} <TranslatedText>{tr("assignments ·")}</TranslatedText> {contests.length} <TranslatedText>{tr("contests")}</TranslatedText></p>
+            <p className="teacher-class-detail-counts">{selectedClass.students} <TranslatedText>{tr("students ·")}</TranslatedText> {assignments.length} <TranslatedText>{tr("assignments ·")}</TranslatedText> {examSessionList.length} <TranslatedText>{tr("exam-sessions")}</TranslatedText></p>
             {detailError && <p role="alert" className="teacher-state-failed"><TranslatedText>{tr(detailError)}</TranslatedText></p>}
 
             <div className="teacher-class-detail-tabs" role="tablist" aria-label={tr("Class details")}>

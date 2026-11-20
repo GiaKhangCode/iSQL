@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\StatisticsService;
+use App\Services\Access\StaffAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -11,17 +12,14 @@ class StatisticsController extends Controller
 {
     public function __construct(
         protected StatisticsService $statisticsService,
+        protected StaffAccess $staff,
     ) {
     }
 
     public function teacher(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_if(
-            $user->role === User::ROLE_STUDENT || $user->role === 'student',
-            403,
-            'Sinh viên không có quyền xem thống kê giảng viên.'
-        );
+        abort_unless($this->staff->isStaff($user), 403, 'Bạn không có quyền xem thống kê giảng viên.');
 
         $filters = [
             'kind'        => $request->query('kind', 'assignments'),
@@ -38,11 +36,7 @@ class StatisticsController extends Controller
     public function office(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless(
-            $user->isAdmin() || $user->isFacultyOffice() || $user->role === User::ROLE_DEPARTMENT_HEAD,
-            403,
-            'Chỉ Giáo vụ khoa hoặc Quản trị viên mới có quyền xem Dashboard tổng quát.'
-        );
+        abort_unless($this->staff->seesEverything($user), 403, 'Bạn không có quyền xem Dashboard tổng quát.');
 
         $filters = [
             'kind'          => $request->query('kind', 'all'),

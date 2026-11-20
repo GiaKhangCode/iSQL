@@ -50,6 +50,11 @@ export type Problem = {
 
 export type Assignment = {
   createdAt?: string | null;
+  /** ISO time the assignment opens; before it, problemIds is empty and only problemCount is known. */
+  opens?: string | null;
+  /** ISO deadline (date/time below are the same instant split for display). */
+  closes?: string | null;
+  problemCount?: number;
   examMode?: boolean;
   showScoresAfterSubmit?: boolean;
   maxSubmissions?: number | null;
@@ -65,7 +70,7 @@ export type Assignment = {
   problemProgress: Record<string, Progress>;
 };
 
-export type Contest = {
+export type ExamSession = {
   admissionRequired?: boolean;
   admissionUnlocked?: boolean;
   attemptStatus?: "active" | "submitted" | null;
@@ -89,7 +94,7 @@ export type Contest = {
   endTime: string;
   endDate?: string;
   scope: string;
-  audienceType: "classes" | "all_students";
+  audienceType: "classes";
   shortDescription: string;
   description: string;
   rules: string;
@@ -124,7 +129,7 @@ export type Submission = {
   sections?: QueryResult[];
   id: string;
   problemId: string;
-  source: "Practice" | "Assignments" | "Contests";
+  source: "Practice" | "Assignments" | "ExamSession";
   context: string;
   contextTitle?: string;
   result: Verdict;
@@ -148,7 +153,7 @@ export type Deadline = {
   title: string;
   date: string;
   time: string;
-  kind: "Assignment" | "Contest";
+  kind: "Assignment" | "ExamSession";
   context: string;
   to: string;
 };

@@ -742,7 +742,6 @@
 .problem-workspace .workspace-header .problem-workspace-tabs button { flex:none; gap:7px; padding:7px 8px; border-color:transparent; font-size:11px; }
 .problem-workspace .workspace-header .problem-workspace-tabs button.active { background:var(--accent-subtle); border-color:var(--accent); }
 .problem-workspace .workspace-header .problem-workspace-tabs button > b { font-size:11px; }
-.problem-workspace .workspace-header .student-header-status { display:none; }
 .problem-workspace .workspace-header .role-account { flex:none; margin-left:0; }
 .problem-workspace .workspace-header .account-identity { display:flex; flex-direction:column; order:-1; text-align:right; }
 .workspace-tab-group { display:inline-flex; flex:none; align-items:center; gap:0; }
@@ -828,7 +827,6 @@
  .problem-workspace .workspace-header .workspace-problem-switcher > span { display:none; }
  .problem-workspace .workspace-header .workspace-problem-switcher select { height:34px; }
  .problem-workspace .workspace-header .problem-workspace-tabs { position:static; order:5; flex:1 0 100%; height:auto; justify-content:flex-start; padding:0; box-shadow:none; }
- .problem-workspace .workspace-header .student-header-status { margin-left:auto; }
 }
 
 .teacher-solution-description, .workspace-question-picker { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; font-size: 13px; }

@@ -1,0 +1,17 @@
+/* Chế độ chấm (chia đều / tùy chỉnh) và ô nhập điểm từng câu. */
+.builder-scoring-mode { display:inline-flex; gap:2px; padding:2px; border:1px solid var(--border-subtle); border-radius:7px; background:var(--subtle); }
+.builder-scoring-mode button { min-height:26px; padding:4px 10px; border:0; border-radius:5px; background:transparent; color:var(--muted); font-size:11px; font-weight:600; cursor:pointer; }
+.builder-scoring-mode button.is-active { background:var(--surface); color:var(--accent); box-shadow:0 1px 2px color-mix(in srgb,var(--text) 12%,transparent); }
+.builder-scoring-mode button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.builder-scoring-mode button:disabled { opacity:.5; cursor:default; }
+
+.builder-custom-total { padding:5px 9px; border-radius:6px; background:var(--accent-subtle); color:var(--accent); font-size:11px; }
+.builder-custom-total.is-off { background:color-mix(in srgb,var(--danger, #d64545) 12%,transparent); color:var(--danger, #d64545); }
+
+.builder-question-points { display:inline-flex; flex:none; align-items:center; gap:4px; font-size:11px; color:var(--muted); }
+.builder-question-points input { width:52px; min-height:26px; padding:3px 6px; border:1px solid var(--border); border-radius:5px; background:var(--surface); color:var(--text); font:inherit; font-variant-numeric:tabular-nums; text-align:right; }
+.builder-question-points input:focus-visible { outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent); }
+.builder-question-points.is-missing input { border-color:var(--danger, #d64545); }
+.builder-manual-picker-question-row { display:flex; align-items:flex-start; gap:8px; }
+.builder-manual-picker-question-row > label { flex:1 1 auto; min-width:0; }
+.builder-manual-picker-question-row > .builder-question-points { margin-top:2px; }

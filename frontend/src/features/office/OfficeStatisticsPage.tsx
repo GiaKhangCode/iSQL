@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Award, BarChart3, CheckCircle2, ClipboardList, ShieldAlert, TrendingUp, Users } from "lucide-react";
 import { teacherService, type TeacherStatistics } from "@/shared/api/teacherService";
 import { useLoad } from "@/shared/hooks/useLoad";
 import { Select } from "@/shared/ui/Select";
@@ -61,42 +60,40 @@ export function OfficeStatisticsPage() {
     setDateTo("");
   };
 
+  const filtersActive = kind !== "all" || !!(term || course || examinationId || dateFrom || dateTo) || classIds.length > 0 || activityIds.length > 0;
+
   const office = data?.officeOverview;
   const regrade = office?.regradeSummary;
 
   return (
     <section className="teacher-page statistics-page">
-      <div className="statistics-header">
-        <div>
-          <h1>Dashboard Tổng quan Giáo vụ khoa</h1>
-          <p>Giám sát chất lượng đào tạo toàn khoa, tiến độ chấm thi, xử lý phúc khảo và lưu lượng hệ thống.</p>
-        </div>
-        <button type="button" className="button" onClick={resetAll}>
-          Đặt lại bộ lọc
-        </button>
-      </div>
-
-      <div className="statistics-filters" role="group" aria-label="Bộ lọc thống kê giáo vụ khoa">
-        <div className="statistics-kind" role="group" aria-label="Phạm vi hoạt động">
-          {([
-            ["all", "Tất cả"],
-            ["exams", "Kỳ thi / Cuộc thi"],
-            ["assignments", "Bài tập"],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={kind === value}
-              onClick={() => {
-                setKind(value);
-                setActivityIds([]);
-              }}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="statistics-filters office-filters" role="group" aria-label="Bộ lọc thống kê giáo vụ khoa">
+        <div className="office-filters-top">
+          <div className="statistics-kind" role="group" aria-label="Phạm vi hoạt động">
+            {([
+              ["all", "Tất cả"],
+              ["exams", "Kỳ thi / Ca thi"],
+              ["assignments", "Bài tập"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={kind === value}
+                onClick={() => {
+                  setKind(value);
+                  setActivityIds([]);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="office-filters-reset" onClick={resetAll} disabled={!filtersActive}>
+            Đặt lại bộ lọc
+          </button>
         </div>
 
+        <div className="office-filters-grid">
         <label className="statistics-field">
           <span>Học kỳ</span>
           <Select
@@ -176,6 +173,7 @@ export function OfficeStatisticsPage() {
           <span>Đến ngày</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </label>
+        </div>
       </div>
 
       {error ? (
@@ -187,16 +185,7 @@ export function OfficeStatisticsPage() {
           <OfficeKpis data={data} />
 
           {/* Mục 1: Chất lượng & Phân hóa kết quả toàn khoa */}
-          <section className="statistics-section" aria-labelledby="office-sec-1">
-            <div className="statistics-section-head">
-              <span className="statistics-section-badge" aria-hidden="true">
-                <BarChart3 size={18} />
-              </span>
-              <div>
-                <h2 id="office-sec-1">Chất lượng &amp; Phân hóa kết quả toàn khoa</h2>
-                <p>Đánh giá phổ điểm tổng thể và tỷ lệ đạt / không đạt / vắng thi của toàn khoa.</p>
-              </div>
-            </div>
+          <section className="statistics-section" aria-label="Chất lượng và phân hóa kết quả toàn khoa">
             <div className="statistics-bento">
               <article className="statistics-card col-span-8">
                 <header>
@@ -246,17 +235,8 @@ export function OfficeStatisticsPage() {
             </div>
           </section>
 
-          {/* Mục 2: Vận hành chấm thi & Xử lý phúc khảo */}
-          <section className="statistics-section" aria-labelledby="office-sec-2">
-            <div className="statistics-section-head">
-              <span className="statistics-section-badge" aria-hidden="true">
-                <CheckCircle2 size={18} />
-              </span>
-              <div>
-                <h2 id="office-sec-2">Vận hành chấm thi &amp; Xử lý phúc khảo</h2>
-                <p>Kiểm soát tiến độ chấm bài theo kỳ thi và theo dõi trạng thái phân công, chấm phúc khảo.</p>
-              </div>
-            </div>
+          {/* Mục 2: chấm thi và phúc khảo */}
+          <section className="statistics-section" aria-label="Vận hành chấm thi và xử lý phúc khảo">
             <div className="statistics-bento">
               <article className="statistics-card col-span-7">
                 <header>
@@ -322,17 +302,8 @@ export function OfficeStatisticsPage() {
             </div>
           </section>
 
-          {/* Mục 3: So sánh môn học & Lưu lượng hệ thống */}
-          <section className="statistics-section" aria-labelledby="office-sec-3">
-            <div className="statistics-section-head">
-              <span className="statistics-section-badge" aria-hidden="true">
-                <TrendingUp size={18} />
-              </span>
-              <div>
-                <h2 id="office-sec-3">Mặt bằng môn học &amp; Lưu lượng hệ thống</h2>
-                <p>Đối chiếu kết quả giữa các môn học và theo dõi mật độ nộp bài toàn khoa theo ngày.</p>
-              </div>
-            </div>
+          {/* Mục 3: so sánh môn học và lưu lượng */}
+          <section className="statistics-section" aria-label="Mặt bằng môn học và lưu lượng hệ thống">
             <div className="statistics-bento">
               <article className="statistics-card col-span-5">
                 <header>
@@ -429,7 +400,6 @@ function OfficeKpis({ data }: { data: TeacherStatistics }) {
       note: `${office?.totalExaminations ?? 0} kỳ thi chính thức`,
       accent: CHART_PALETTE.indigo,
       tint: "#eef2ff",
-      Icon: ClipboardList,
     },
     {
       label: "Sinh viên tham gia",
@@ -437,7 +407,6 @@ function OfficeKpis({ data }: { data: TeacherStatistics }) {
       note: `Tỷ lệ tham dự ${pct(data.kpis.participants, data.kpis.students)}%`,
       accent: CHART_PALETTE.sky,
       tint: "#eff6ff",
-      Icon: Users,
     },
     {
       label: "Điểm TB toàn khoa",
@@ -445,7 +414,6 @@ function OfficeKpis({ data }: { data: TeacherStatistics }) {
       note: `Thang 10 · Tỷ lệ đạt ${data.kpis.passRate ?? 0}%`,
       accent: CHART_PALETTE.emerald,
       tint: "#ecfdf5",
-      Icon: Award,
     },
     {
       label: "Phúc khảo & Vi phạm thi",
@@ -453,13 +421,12 @@ function OfficeKpis({ data }: { data: TeacherStatistics }) {
       note: `${office?.regradeSummary.awaitingRegrade ?? 0} chờ chấm · ${office?.violationEvents ?? 0} lỗi rời phòng`,
       accent: CHART_PALETTE.amber,
       tint: "#fffbeb",
-      Icon: ShieldAlert,
     },
   ];
 
   return (
     <dl className="statistics-kpis">
-      {items.map(({ label, value, note, accent, tint, Icon }) => (
+      {items.map(({ label, value, note, accent, tint }) => (
         <div
           className="statistics-kpi"
           key={label}
@@ -467,9 +434,6 @@ function OfficeKpis({ data }: { data: TeacherStatistics }) {
         >
           <div className="statistics-kpi-top">
             <dt>{label}</dt>
-            <span className="statistics-kpi-icon" aria-hidden="true">
-              <Icon size={18} />
-            </span>
           </div>
           <dd>
             <span className="statistics-kpi-value">{value}</span>

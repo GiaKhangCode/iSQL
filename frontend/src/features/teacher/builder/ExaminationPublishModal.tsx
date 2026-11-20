@@ -107,8 +107,7 @@ export function ExaminationPublishModal({
       }
     }
     for (const c of assignedClasses) {
-      if (c.practice_lecturer) names.add(c.practice_lecturer);
-      else if (c.lecturer) names.add(c.lecturer);
+      if (c.lecturer) names.add(c.lecturer);
     }
     return Array.from(names);
   }, [planSessions, assignedClasses]);

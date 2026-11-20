@@ -13,8 +13,9 @@ class ClassSeeder extends Seeder
 {
     public function run(): void
     {
-        $instructors = User::whereIn('role', User::INSTRUCTOR_ROLES)->where('status', 'Active')->get();
-        $inst1 = $instructors->get(0) ?? User::where('role', 'admin')->first();
+        $access = app(\App\Services\Access\AccessControlService::class);
+        $instructors = User::whereIn('id', $access->holdersOf('class.teach'))->where('status', 'Active')->get();
+        $inst1 = $instructors->get(0) ?? User::whereIn('id', $access->superAdminIds())->first();
         $inst2 = $instructors->get(1) ?? $inst1;
         $inst3 = $instructors->get(2) ?? $inst1;
 
@@ -27,8 +28,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.R11',
                 'practice_class'         => 'IT004.R11.1',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst1->id,
-                'practice_instructor_id' => $inst2->id,
+                'instructor_id'          => $inst2->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -40,8 +40,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.R11',
                 'practice_class'         => 'IT004.R11.2',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst1->id,
-                'practice_instructor_id' => $inst3->id,
+                'instructor_id'          => $inst3->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -54,8 +53,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.R12',
                 'practice_class'         => 'IT004.R12.1',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst2->id,
-                'practice_instructor_id' => $inst1->id,
+                'instructor_id'          => $inst1->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -67,8 +65,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.R12',
                 'practice_class'         => 'IT004.R12.2',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst2->id,
-                'practice_instructor_id' => $inst3->id,
+                'instructor_id'          => $inst3->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -81,8 +78,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.R13',
                 'practice_class'         => 'IT004.R13.1',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst3->id,
-                'practice_instructor_id' => $inst1->id,
+                'instructor_id'          => $inst1->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -94,8 +90,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.R13',
                 'practice_class'         => 'IT004.R13.2',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst3->id,
-                'practice_instructor_id' => $inst2->id,
+                'instructor_id'          => $inst2->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -108,8 +103,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.N11',
                 'practice_class'         => 'IT004.N11.1',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst1->id,
-                'practice_instructor_id' => $inst2->id,
+                'instructor_id'          => $inst2->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -121,8 +115,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.N11',
                 'practice_class'         => 'IT004.N11.2',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst1->id,
-                'practice_instructor_id' => $inst3->id,
+                'instructor_id'          => $inst3->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -135,8 +128,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.N12',
                 'practice_class'         => 'IT004.N12.1',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst2->id,
-                'practice_instructor_id' => $inst1->id,
+                'instructor_id'          => $inst1->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -148,8 +140,7 @@ class ClassSeeder extends Seeder
                 'theory_class'           => 'IT004.N12',
                 'practice_class'         => 'IT004.N12.2',
                 'term'                   => 'HK1 2026-2027',
-                'instructor_id'          => $inst2->id,
-                'practice_instructor_id' => $inst3->id,
+                'instructor_id'          => $inst3->id,
                 'status'                 => 'Active',
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
@@ -168,14 +159,11 @@ class ClassSeeder extends Seeder
         if (Schema::hasTable('exam_class_proctors')) {
             DB::table('exam_class_proctors')->whereNotIn('class_id', $validIds)->delete();
         }
-        if (Schema::hasTable('class_instructors')) {
-            DB::table('class_instructors')->whereNotIn('class_id', $validIds)->delete();
-        }
         ClassEnrollment::whereNotIn('class_id', $validIds)->delete();
         ClassModel::whereNotIn('id', $validIds)->delete();
 
         // 3. Phân bổ sinh viên vào các lớp thực hành
-        $students = User::where('role', User::ROLE_STUDENT)->orderBy('email')->get();
+        $students = User::where('account_type', User::ACCOUNT_STUDENT)->orderBy('email')->get();
         $classCount = count($validIds);
 
         foreach ($students as $index => $student) {

@@ -4,7 +4,6 @@ import {ExamLoginPage} from "@/features/office/ExamSessionApp";
 import {apiFetch, ApiError} from "@/shared/api/apiClient";
 import {ProctorPage, ProctorRoomsView} from "@/features/office/ProctorPage";
 import {AdminAccessPage} from "@/features/admin/AccessPages";
-import {homeForRole} from "@/features/auth/authService";
 import {ExaminationsPage} from "@/features/office/ExaminationsPage";
 import {ExamAdmissionsPage} from "@/features/office/ExamAdmissionsPage";
 import {RegradeAssignmentsPage} from "@/features/office/RegradeAssignmentsPage";
@@ -25,6 +24,7 @@ import {
   PublicOnlyRoute,
   TeacherRoute,
   OfficeRoute,
+  HomeRedirect,
 } from "@/app/routes/ProtectedRoute";
 import {
   ForgotPasswordPage,
@@ -43,21 +43,19 @@ const WorkspacePage = lazy(() =>
     default: module.WorkspacePage,
   })),
 );
-const ContestWorkspacePage = lazy(() =>
-  import("@/features/workspace/ContestWorkspacePage").then((module) => ({
-    default: module.ContestWorkspacePage,
+const ExamSessionWorkspacePage = lazy(() =>
+  import("@/features/workspace/ExamSessionWorkspacePage").then((module) => ({
+    default: module.ExamSessionWorkspacePage,
   })),
 );
 import { AssignmentsPage } from "@/features/student/AssignmentsPage";
 import { AssignmentDetailPage } from "@/features/student/AssignmentDetailPage";
-import { ContestDetailPage } from "@/features/student/ContestDetailPage";
-import { ContestsPage } from "@/features/student/ContestsPage";
 import { SubmissionsPage } from "@/features/student/SubmissionsPage";
 import { ProblemEditorPage } from "@/features/teacher/ProblemEditorPage";
 import { DatabaseLibraryPage } from "@/features/teacher/DatabaseLibraryPage";
-import { AssignmentBuilderPage, ContestBuilderPage } from "@/features/teacher/builder/BuilderPages";
+import { AssignmentBuilderPage, ExamSessionBuilderPage } from "@/features/teacher/builder/BuilderPages";
 import { AssignmentsListPage, ProblemLibraryPage } from "@/features/teacher/TeacherLandingPages";
-import { ContestsListPage } from "@/features/teacher/ContestsListPage";
+import { ExamSessionsListPage } from "@/features/teacher/ExamSessionsListPage";
 import { ClassesPage } from "@/features/teacher/ClassesPage";
 import { ManualReviewPage, ResultsDashboardPage } from "@/features/teacher/ResultsPages";
 import { ActivityResultsPage } from "@/features/teacher/ActivityResultsPage";
@@ -110,7 +108,6 @@ export function App() {
       window.clearInterval(timer);
     };
   }, [session?.examSessionId, location.pathname, navigate]);
-  const home = session?.examSessionId ? "/examinations" : homeForRole(session?.role);
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -119,7 +116,7 @@ export function App() {
       <Routes>
         <Route
           path="/"
-          element={<Navigate replace to={session ? home : "/login"} />}
+          element={<HomeRedirect />}
         />
         <Route path="/exam-login" element={<ExamLoginPage/>}/>
         <Route path="/proctor" element={<ProctorPage/>}/>
@@ -146,11 +143,6 @@ export function App() {
               path="/assignments/classes/:scopeId"
               element={<AssignmentDetailPage />}
             />
-            <Route path="/contests" element={<ContestsPage />} />
-            <Route
-              path="/contests/:contestId"
-              element={<ContestDetailPage />}
-            />
             <Route path="/examinations" element={<StudentExaminationsPage />} />
             <Route
               path="/examinations/:examinationId"
@@ -167,18 +159,10 @@ export function App() {
             }
           />
           <Route
-            path="/contests/:contestId/exam"
+            path="/examinations/:examSessionId/exam"
             element={
               <Suspense fallback={<Loading variant="workspace" />}>
-                <ContestWorkspacePage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/examinations/:contestId/exam"
-            element={
-              <Suspense fallback={<Loading variant="workspace" />}>
-                <ContestWorkspacePage />
+                <ExamSessionWorkspacePage />
               </Suspense>
             }
           />
@@ -194,9 +178,6 @@ export function App() {
             <Route path="assignments" element={<CapabilityGuard permission="assignment.create"><AssignmentsListPage /></CapabilityGuard>} />
             <Route path="assignments/new" element={<CapabilityGuard permission="assignment.create"><AssignmentBuilderPage /></CapabilityGuard>} />
             <Route path="assignments/:id/edit" element={<CapabilityGuard permission="assignment.create"><AssignmentBuilderPage /></CapabilityGuard>} />
-            <Route path="contests" element={<CapabilityGuard permission="contest.create"><ContestsListPage/></CapabilityGuard>} />
-            <Route path="contests/new" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage /></CapabilityGuard>} />
-            <Route path="contests/:id/edit" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage /></CapabilityGuard>} />
             <Route path="shared" element={<SharedContentPage/>}/>
             <Route path="problems/:id/preview" element={<SharedPreviewPage kind="problem"/>}/>
             <Route path="database-library/:id/preview" element={<SharedPreviewPage kind="library"/>}/>
@@ -222,17 +203,14 @@ export function App() {
             <Route path="examinations/:examId/admissions" element={<CapabilityGuard permission="exam.credentials"><ExamAdmissionsPage/></CapabilityGuard>}/>
             <Route path="examinations/new" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
             <Route path="examinations/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
-            <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ContestsListPage sessionsOnly/></CapabilityGuard>}/>
-            <Route path="sessions/:id/edit" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage/></CapabilityGuard>}/>
-            <Route path="contests" element={<CapabilityGuard permission="contest.create"><ContestsListPage/></CapabilityGuard>}/>
-            <Route path="contests/new" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage/></CapabilityGuard>}/>
-            <Route path="contests/:id/edit" element={<CapabilityGuard permission="contest.create"><ContestBuilderPage/></CapabilityGuard>}/>
+            <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ExamSessionsListPage/></CapabilityGuard>}/>
+            <Route path="sessions/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExamSessionBuilderPage/></CapabilityGuard>}/>
             <Route path="regrade" element={<CapabilityGuard permission="examination.manage"><RegradeAssignmentsPage/></CapabilityGuard>}/>
-            <Route path="results" element={<CapabilityGuard permission="results.grade"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
-            <Route path="statistics" element={<CapabilityGuard permission="results.grade"><OfficeStatisticsPage/></CapabilityGuard>}/>
-            <Route path="results/activity/:activityId" element={<CapabilityGuard permission="results.grade"><ActivityResultsPage/></CapabilityGuard>}/>
-            <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="results.grade"><ManualReviewPage/></CapabilityGuard>}/>
-            <Route path="results/review/:submissionId" element={<CapabilityGuard permission="results.grade"><ManualReviewPage/></CapabilityGuard>}/>
+            <Route path="results" element={<CapabilityGuard permission="examination.manage"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
+            <Route path="statistics" element={<CapabilityGuard permission="examination.manage"><OfficeStatisticsPage/></CapabilityGuard>}/>
+            <Route path="results/activity/:activityId" element={<CapabilityGuard permission="examination.manage"><ActivityResultsPage/></CapabilityGuard>}/>
+            <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="examination.manage"><ManualReviewPage/></CapabilityGuard>}/>
+            <Route path="results/review/:submissionId" element={<CapabilityGuard permission="examination.manage"><ManualReviewPage/></CapabilityGuard>}/>
           </Route>
         </Route>
         <Route element={<AdminRoute />}>
@@ -242,8 +220,8 @@ export function App() {
             <Route path="examinations/new" element={<ExaminationBuilderPage/>}/>
             <Route path="examinations/:id/edit" element={<ExaminationBuilderPage/>}/>
             <Route path="examinations/:examId/admissions" element={<ExamAdmissionsPage/>}/>
-            <Route path="sessions" element={<ContestsListPage sessionsOnly/>}/>
-            <Route path="sessions/:id/edit" element={<ContestBuilderPage/>}/>
+            <Route path="sessions" element={<ExamSessionsListPage/>}/>
+            <Route path="sessions/:id/edit" element={<ExamSessionBuilderPage/>}/>
             <Route path="regrade" element={<RegradeAssignmentsPage/>}/>
             <Route path="results" element={<ResultsDashboardPage defaultKind="exams" onlyExams/>}/>
             <Route path="results/activity/:activityId" element={<ActivityResultsPage/>}/>
@@ -265,7 +243,7 @@ export function App() {
         </Route>
         <Route
           path="*"
-          element={<Navigate replace to={session ? home : "/login"} />}
+          element={<HomeRedirect />}
         />
       </Routes>
     </>

@@ -4,7 +4,7 @@ import {writeFile,unlink} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-const result=await build({stdin:{contents:'export {parseAudienceCsv} from "./src/shared/lib/contest/audienceCsv";',resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'cjs'});
+const result=await build({stdin:{contents:'export {parseAudienceCsv} from "./src/shared/lib/exam-session/audienceCsv";',resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,platform:'node',format:'cjs'});
 const file=join(tmpdir(),`audience-csv-${process.pid}.cjs`);await writeFile(file,result.outputFiles[0].contents);
 try{
   const {parseAudienceCsv:parse}=createRequire(import.meta.url)(file);

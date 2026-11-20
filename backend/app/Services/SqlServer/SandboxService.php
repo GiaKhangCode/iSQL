@@ -11,7 +11,7 @@ class SandboxService
 
     /**
      * Generate a deterministic, SQL-Server-safe schema name for a student's work
-     * on a given problem within a context (Assignment, Contest, or Practice).
+     * on a given problem within a context (Assignment, ExamSession, or Practice).
      */
     public function studentSchemaName(string $userId, string $context, string $problemId): string
     {

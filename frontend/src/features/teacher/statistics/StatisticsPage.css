@@ -439,3 +439,104 @@
   color: #64748b;
   font-variant-numeric: tabular-nums;
 }
+
+/* Bộ lọc của dashboard Giáo vụ khoa: hàng công cụ (phạm vi + đặt lại) và lưới ô lọc đều nhau. */
+.office-filters {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px 18px;
+}
+
+.office-filters-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eef1f7;
+}
+
+.office-filters-reset {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid #d5dce8;
+  border-radius: 9px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.office-filters-reset:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #b8c2d4;
+  color: #0f172a;
+}
+
+.office-filters-reset:focus-visible {
+  outline: 2px solid #5b5bd6;
+  outline-offset: 2px;
+}
+
+.office-filters-reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.office-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+@media (max-width: 1180px) {
+  .office-filters-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .office-filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .office-filters-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.office-filters-grid .statistics-field {
+  min-width: 0;
+}
+
+.office-filters-grid .statistics-field .app-select,
+.office-filters-grid .statistics-field input[type="date"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.office-filters-grid .statistics-field input[type="date"]:focus-visible {
+  outline: 2px solid #5b5bd6;
+  outline-offset: 0;
+  border-color: #5b5bd6;
+}
+
+@media (max-width: 540px) {
+  .office-filters-top > .statistics-kind {
+    width: 100%;
+  }
+
+  .office-filters-top > .statistics-kind button {
+    flex: 1 1 0;
+    padding-inline: 8px;
+  }
+
+  .office-filters-reset {
+    width: 100%;
+  }
+}

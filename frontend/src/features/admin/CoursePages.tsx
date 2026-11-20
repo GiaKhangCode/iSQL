@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Dialog, ErrorState, Loading, Status } from "@/shared/ui/ui";
 import { type AdminClass } from "@/data/adminPolicy";
-import { adminService } from "@/features/admin/adminService";
+import { adminService, lecturerOptionsFor, type InstructorOption } from "@/features/admin/adminService";
 import { teacherService } from "@/shared/api/teacherService";
 import type { TeacherClassMember } from "@/data/teacherTypes";
 import { academicTerms, formatAcademicTerm } from "@/shared/lib/datetime/academicTerms";
@@ -97,11 +97,10 @@ export function AdminCoursesPage() {
     }).catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load classes.")).finally(() => setLoading(false));
   }, []);
 
-  const practicalLecturer = (item: AdminClass & { practice_lecturer?: string }) =>
-    item.practice_lecturer || item.lecturer;
+  const lecturerName = (item: AdminClass) => item.lecturer;
 
   const visibleRows = classes.filter((item) =>
-    dates.matches(item) && matchesListSearch(query, item.course, item.id, practicalLecturer(item)) &&
+    dates.matches(item) && matchesListSearch(query, item.course, item.id, lecturerName(item)) &&
     (semester === "All semesters" || item.semester === semester));
   const visible = order.apply(visibleRows, item => item.id);
   const semesters = [...new Set(classes.map((item) => item.semester).filter(Boolean))].sort().reverse();
@@ -142,7 +141,7 @@ export function AdminCoursesPage() {
 
   if (loading) {
     return (
-      <section className="teacher-page teacher-list-page compact-teacher-contests admin-courses-page">
+      <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-courses-page">
         <h1 className="sr-only"><TranslatedText>{tr("Courses & classes")}</TranslatedText></h1>
         <TeacherListLoading
           label={tr("Loading courses and classes…")}
@@ -156,7 +155,7 @@ export function AdminCoursesPage() {
 
   if (loadError) {
     return (
-      <section className="teacher-page teacher-list-page compact-teacher-contests admin-courses-page">
+      <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-courses-page">
         <h1 className="sr-only"><TranslatedText>{tr("Courses & classes")}</TranslatedText></h1>
         <ErrorState
           title={tr("Could not load courses")}
@@ -168,7 +167,7 @@ export function AdminCoursesPage() {
   }
 
   return (
-    <section className="teacher-page teacher-list-page compact-teacher-contests admin-courses-page">
+    <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-courses-page">
       <h1 className="sr-only"><TranslatedText>{tr("Courses & classes")}</TranslatedText></h1>
       {notice && <p className="teacher-form-message" role="status"><TranslatedText>{tr(notice)}</TranslatedText></p>}
       <div className="teacher-list-detail-layout teacher-filter-layout">
@@ -180,7 +179,7 @@ export function AdminCoursesPage() {
               id: item.id,
               title: item.course,
               value: item.id,
-              description: `${item.id} · ${practicalLecturer(item)}`
+              description: `${item.id} · ${lecturerName(item)}`
             }))}
             search={query}
             onSearchChange={setQuery}
@@ -241,8 +240,8 @@ export function AdminCoursesPage() {
                       </button>
                       <small className="teacher-row-subtext">{item.id}</small>
                     </td>
-                    <td data-label={tr("LECTURER")} className={practicalLecturer(item) === "Unassigned" ? "admin-warning" : ""}>
-                      {practicalLecturer(item) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : practicalLecturer(item)}
+                    <td data-label={tr("LECTURER")} className={lecturerName(item) === "Unassigned" ? "admin-warning" : ""}>
+                      {lecturerName(item) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : lecturerName(item)}
                     </td>
                     <td data-label={tr("STUDENTS")}>{item.students}</td>
                     <td data-label={tr("STATUS")}><Status value={item.status} /></td>
@@ -324,8 +323,8 @@ export function AdminCoursesPage() {
                   </div>
                   <div>
                     <dt><TranslatedText>{tr("LECTURER")}</TranslatedText></dt>
-                    <dd className={practicalLecturer(selected) === "Unassigned" ? "admin-warning" : ""}>
-                      {practicalLecturer(selected) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : practicalLecturer(selected)}
+                    <dd className={lecturerName(selected) === "Unassigned" ? "admin-warning" : ""}>
+                      {lecturerName(selected) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : lecturerName(selected)}
                     </dd>
                   </div>
                   <div>
@@ -397,7 +396,7 @@ export function AdminEditClassPage() {
   const [lecturer, setLecturer] = useState("Unassigned");
   const [status, setStatus] = useState<AdminClass["status"]>("Draft");
   const [notice, setNotice] = useState("");
-  const [lecturers, setLecturers] = useState<{name: string, id: string}[]>([]);
+  const [lecturers, setLecturers] = useState<InstructorOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [members, setMembers] = useState<TeacherClassMember[]>([]);
   const [students, setStudents] = useState<TeacherClassMember[]>([]);
@@ -412,8 +411,8 @@ export function AdminEditClassPage() {
   useEffect(() => {
     Promise.all([
       adminService.getClasses(),
-      adminService.getUsers()
-    ]).then(([classes, users]) => {
+      adminService.getInstructors()
+    ]).then(([classes, instructors]) => {
       const cls = classes.find(c => c.id === classId);
       if (cls) {
         setRecord(cls);
@@ -424,7 +423,7 @@ export function AdminEditClassPage() {
         setLecturer(cls.lecturerId || "Unassigned");
         setStatus(cls.status as AdminClass["status"]);
       }
-      setLecturers(users.filter((user: any) => user.role.toLowerCase() === "lecturer" || user.role === "instructor").map((user: any) => ({ name: user.name, id: user.id })));
+      setLecturers(lecturerOptionsFor(instructors, cls));
       setLoading(false);
     }).catch((error) => { setLoadError(error instanceof Error ? error.message : "Could not load class details."); setLoading(false); });
   }, [classId]);

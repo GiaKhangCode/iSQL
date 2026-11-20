@@ -7,12 +7,12 @@ import { studentApi } from "@/features/student/studentApi";
 import { useLoad } from "@/shared/hooks/useLoad";
 import { Empty, ErrorState, Loading } from "@/shared/ui/ui";
 import { parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
-import { ContestDetailView } from "@/shared/components/ContestDetailView";
+import { ExamSessionDetailView } from "@/shared/components/ExamSessionDetailView";
 import { toast } from "@/shared/ui/StackingToasts";
 
 export function StudentExaminationDetailPage() {
   const { session } = useAuth();
-  if (session && !session.examSessionId && session.role === "student") {
+  if (session && !session.examSessionId && session.account_type === "student") {
     return <Navigate to="/dashboard" replace />;
   }
   const { t: tr } = useLanguage("student");
@@ -76,7 +76,7 @@ export function StudentExaminationDetailPage() {
 
   if (loading) {
     return (
-      <section className="page contest-detail-page compact-contest-detail">
+      <section className="page exam-session-detail-page compact-exam-session-detail">
         <Loading variant="detail" label={tr("Loading examination…")} />
       </section>
     );
@@ -84,7 +84,7 @@ export function StudentExaminationDetailPage() {
 
   if (!data || error) {
     return (
-      <section className="page contest-detail-page compact-contest-detail">
+      <section className="page exam-session-detail-page compact-exam-session-detail">
         <ErrorState
           title={tr("Examination unavailable")}
           message={tr(error) || tr("Could not load examination.")}
@@ -110,9 +110,9 @@ export function StudentExaminationDetailPage() {
   const phase = now < starts ? "Upcoming" : now >= ends ? "Closed" : "Live";
 
   return (
-    <section className="page contest-detail-page compact-contest-detail">
-      <ContestDetailView
-        contest={exam}
+    <section className="page exam-session-detail-page compact-exam-session-detail">
+      <ExamSessionDetailView
+        examSession={exam}
         isExamination={true}
         phase={phase}
         now={now}

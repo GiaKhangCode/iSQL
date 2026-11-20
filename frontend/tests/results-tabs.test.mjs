@@ -10,9 +10,9 @@ for(const key of ['window','document','HTMLElement','Node','localStorage'])globa
 HTMLElement.prototype.scrollTo=()=>{};
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.ResizeObserver=class{observe(){}disconnect(){}};
-globalThis.__resultActivities=Array.from({length:18},(_,index)=>({id:`a${index+1}`,title:`Assignment ${index+1}`,createdAt:`2026-10-${String(index+1).padStart(2,'0')}T00:00:00Z`,isContest:false,classes:'Class 1',submitted:'1/2',average:'50%',awaiting:1}));
-globalThis.__resultActivities.push({id:'old',title:'Exam old',createdAt:'2026-01-01',isContest:true,examinationId:'exam-parent',classes:'Class 2',submitted:'1/2',average:'50%',awaiting:0},{id:'new',title:'Exam new',createdAt:'2026-11-01',isContest:true,examinationId:'exam-parent',classes:'Class 2',submitted:'1/2',average:'50%',awaiting:0});
-globalThis.__resultActivities.push({id:'competition',title:'Contest distinct',isContest:true,classes:'Class 2',submitted:'1/2',average:'50%',awaiting:0});
+globalThis.__resultActivities=Array.from({length:18},(_,index)=>({id:`a${index+1}`,title:`Assignment ${index+1}`,createdAt:`2026-10-${String(index+1).padStart(2,'0')}T00:00:00Z`,isExamSession:false,classes:'Class 1',submitted:'1/2',average:'50%',awaiting:1}));
+globalThis.__resultActivities.push({id:'old',title:'Exam old',createdAt:'2026-01-01',isExamSession:true,examinationId:'exam-parent',classes:'Class 2',submitted:'1/2',average:'50%',awaiting:0},{id:'new',title:'Exam new',createdAt:'2026-11-01',isExamSession:true,examinationId:'exam-parent',classes:'Class 2',submitted:'1/2',average:'50%',awaiting:0});
+globalThis.__resultActivities.push({id:'competition',title:'Exam session distinct',isExamSession:true,classes:'Class 2',submitted:'1/2',average:'50%',awaiting:0});
 const buildResult=await build({stdin:{contents:`import React from 'react';export {act} from 'react';export {Simulate} from 'react-dom/test-utils';export {createRoot} from 'react-dom/client';import {MemoryRouter} from 'react-router-dom';import {ResultsDashboardPage} from './src/features/teacher/ResultsPages';export {newestFirst} from './src/shared/lib/sql/listOrder';export const page=()=> <MemoryRouter><ResultsDashboardPage/></MemoryRouter>;`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',plugins:[{name:'results',setup(b){b.onLoad({filter:/shared[\\/]api[\\/]teacherService\.ts$/},()=>({contents:'export const teacherService={getAssignments:async()=>globalThis.__resultActivities};',loader:'js'}));}}]});
 const file=join(tmpdir(),`results-tabs-${process.pid}.cjs`);await writeFile(file,buildResult.outputFiles[0].contents);
 let root,api;
@@ -38,7 +38,7 @@ try {
  assert.equal(rows()[0].querySelector('.teacher-result-id-link').getAttribute('href'),'/teacher/results/activity/a3','The link uses the actual assignment ID');
  await click(panel().querySelector('[data-results-kind=exams]'));
  assert.equal(rows().length,2);
- assert.doesNotMatch(panel().textContent,/Contest distinct/,'Independent competitions are excluded from examinations');
+ assert.doesNotMatch(panel().textContent,/ExamSession distinct/,'Independent competitions are excluded from examinations');
  await click(panel().querySelector('.u027-toggle'));
  assert.ok(rows()[0].textContent.includes('Exam old'),'Results keep the requested descending ID order');
  await api.act(async()=>api.Simulate.change(panel().querySelector('input'),{target:{value:'old'}}));

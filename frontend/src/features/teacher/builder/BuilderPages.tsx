@@ -3,7 +3,7 @@ import { formatErrorMessage, ApiError } from "@/shared/api/apiClient";
 import {Select} from "@/shared/ui/Select";
 import { BuilderProblemLibrary } from "@/features/teacher/builder/BuilderProblemLibrary";
 import {authService} from "@/features/auth/authService";
-import type { AudienceFileData } from "@/shared/lib/contest/audienceFiles";
+import type { AudienceFileData } from "@/shared/lib/exam-session/audienceFiles";
 import { AudienceImportDialog } from "@/features/teacher/components/AudienceImportDialog";
 import { ExaminationSessionPlanner } from "@/shared/components/ExaminationSessionPlanner";
 import { StudentSearchPicker } from "@/shared/components/StudentSearchPicker";
@@ -24,8 +24,8 @@ import { teacherService } from "@/shared/api/teacherService";
 import { ClassPicker, TeacherField, TeacherSectionTitle } from "@/features/teacher/components/TeacherPageParts";
 import { toDateTimeLocal } from "@/shared/lib/datetime/serverDateTime";
 import type { WorkspacePart } from "@/data/models";
-import { ContestBannerCrop, defaultBannerCrop, type BannerCrop } from "@/shared/components/ContestBannerCrop";
-import { resolveContestBannerUrl } from "@/shared/lib/contest/contestBanner";
+import { ExamSessionBannerCrop, defaultBannerCrop, type BannerCrop } from "@/shared/components/ExamSessionBannerCrop";
+import { resolveExamSessionBannerUrl } from "@/shared/lib/exam-session/examSessionBanner";
 import { WORKSPACE_PARTS } from "@/shared/lib/workspace/workspaceParts";
 import "@/styles/problem-workspace.css";
 import "@/styles/session-management.css";
@@ -35,19 +35,21 @@ import { ExaminationPublishModal } from "@/features/teacher/builder/ExaminationP
 import { examSessions, type ProctorOption } from "@/shared/api/examSessions";
 import { BuilderSelectedQuestions, selectedQuestions } from "@/features/teacher/builder/BuilderSelectedQuestions";
 import { DEFAULT_SUBMISSION_LIMIT, SubmissionLimitControl } from "@/features/teacher/submissions/SubmissionLimitControl";
-import { assignmentSeed, contestSeed, assignmentWorkspaceParts, DateTimeInput, ActivityPreview, type BuilderDraft, type BuilderProblem } from "@/features/teacher/builder/BuilderShared";
+import { assignmentSeed, examSessionSeed, assignmentWorkspaceParts, DateTimeInput, ActivityPreview, type BuilderDraft, type BuilderProblem } from "@/features/teacher/builder/BuilderShared";
+import { SCORING_CUSTOM, customScoringSummary, examPapers, normalizeScoringMode, problemForSave, questionPointsOf, type ScoredProblem } from "@/features/teacher/builder/questionScoring";
+import { CustomScoreTotal, ScoringModeControl } from "@/features/teacher/builder/BuilderScoring";
 
 export function AssignmentBuilderPage() {
-  return <BuilderPage contest={false} />;
+  return <BuilderPage examSession={false} />;
 }
 
-export function ContestBuilderPage() {
-  return <BuilderPage contest />;
+export function ExamSessionBuilderPage() {
+  return <BuilderPage examSession />;
 }
 
-export function ExaminationBuilderPage() { return <BuilderPage contest examination/>; }
+export function ExaminationBuilderPage() { return <BuilderPage examSession examination/>; }
 
-function BuilderPage({ contest, examination=false }: { contest: boolean; examination?:boolean }) {
+function BuilderPage({ examSession, examination=false }: { examSession: boolean; examination?:boolean }) {
   const { t: tr } = useLanguage("teacher");
 
 
@@ -56,7 +58,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
   const requestedSession=Number(new URLSearchParams(location.search).get("session")) || undefined;
   const navigate = useNavigate();
   const builderRoot=location.pathname.startsWith("/admin/")?"/admin":location.pathname.startsWith("/office/")?"/office":"/teacher";
-  const activityKind=examination?"examinations":contest?(location.pathname.includes("/sessions/")?"sessions":"contests"):"assignments";
+  const activityKind=examination?"examinations":examSession?(location.pathname.includes("/sessions/")?"sessions":"exam-sessions"):"assignments";
   const builderListPath=`${builderRoot}/${activityKind}`;
   const [refreshingSessions,setRefreshingSessions]=useState(false);
   const [examinationPlan,setExaminationPlan]=useState<ExaminationPlan>(initialExaminationPlan);
@@ -113,7 +115,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
   const [problemsError, setProblemsError] = useState("");
   const [draftError, setDraftError] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
-  const retrySave = useRef<(published: boolean, destination?: string) => Promise<void>>(async () => {});
+  const retrySave = useRef<(published: boolean, destination?: string) => Promise<unknown>>(async () => {});
   const [saveState, setSaveState] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const hasUnsavedChangesRef = useRef(false);
@@ -178,13 +180,13 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     if (/tiêu đề|title/i.test(msg)) {
       targetId = "builder-title-input";
     } else if (/mô tả|description/i.test(msg)) {
-      targetId = "contest-description";
+      targetId = "exam-session-description";
     } else if (/lớp|sinh viên|class|student|audience/i.test(msg)) {
-      targetId = contest ? "contest-audience" : "assignment-audience";
+      targetId = examSession ? "exam-session-audience" : "assignment-audience";
     } else if (/ngày|giờ|starts|ends|opens|closes|due date/i.test(msg)) {
-      targetId = contest ? "contest-schedule" : "assignment-schedule";
+      targetId = examSession ? "exam-session-schedule" : "assignment-schedule";
     } else if (/bài toán|câu hỏi|problem|question/i.test(msg)) {
-      targetId = contest ? "contest-problems" : "assignment-problems";
+      targetId = examSession ? "exam-session-problems" : "assignment-problems";
     }
 
     if (targetId) {
@@ -195,9 +197,9 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       }, 50);
     }
   }
-  const {activeSection:activeContestSection,navigateToSection:navigateToContestSection}=useSectionNavigation(
-    contest ? [...(parentExaminationId?["contest-setup","contest-schedule","contest-problems"]: ["contest-setup",...(!examination?["contest-audience"]:[]),...(examination?["examination-settings"]:[]),"contest-schedule",...(!examination?["contest-problems"]:[])])] : ["assignment-setup","assignment-audience","assignment-schedule","assignment-problems"], Boolean(draft));
-  const {navigationRef:contestNavigationRef,activeItemRef:activeContestNavigationButtonRef,indicator:contestNavigationIndicator}=useNavigationIndicator(activeContestSection,`${Boolean(draft)}|${hasUnsavedChanges}`);
+  const {activeSection:activeExamSessionSection,navigateToSection:navigateToExamSessionSection}=useSectionNavigation(
+    examSession ? [...(parentExaminationId?["exam-session-setup","exam-session-schedule","exam-session-problems"]: ["exam-session-setup",...(!examination?["exam-session-audience"]:[]),...(examination?["examination-settings"]:[]),"exam-session-schedule",...(!examination?["exam-session-problems"]:[])])] : ["assignment-setup","assignment-audience","assignment-schedule","assignment-problems"], Boolean(draft));
+  const {navigationRef:examSessionNavigationRef,activeItemRef:activeExamSessionNavigationButtonRef,indicator:examSessionNavigationIndicator}=useNavigationIndicator(activeExamSessionSection,`${Boolean(draft)}|${hasUnsavedChanges}`);
   const [addProblemOpen, setAddProblemOpen] = useState(false);
   const [examSessionTargetIndex, setExamSessionTargetIndex] = useState<number | null>(null);
   const [libraryClosing, setLibraryClosing] = useState(false);
@@ -256,7 +258,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
   const [individualStudents, setIndividualStudents] = useState<number | null>(null);
   const [overlappingStudents, setOverlappingStudents] = useState(0);
   const [audienceError, setAudienceError] = useState("");
-  const contestSplitLayoutRef = useRef<HTMLDivElement>(null);
+  const examSessionSplitLayoutRef = useRef<HTMLDivElement>(null);
   const bannerFileInput = useRef<HTMLInputElement>(null);
   const [cropSource, setCropSource] = useState<string | null>(null);
   const [cropInitial, setCropInitial] = useState<BannerCrop>(defaultBannerCrop);
@@ -298,7 +300,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       try {
         const data = await teacherService.getClasses();
         setAllTeacherClasses(data);
-        const activeClasses = data.filter((c: any) => c.status === "Active" && (contest || normalizeAcademicTerm(c.term || "")===currentAcademicTerm()));
+        const activeClasses = data.filter((c: any) => c.status === "Active" && (examSession || normalizeAcademicTerm(c.term || "")===currentAcademicTerm()));
         setAvailableClasses(activeClasses);
         const validIds = new Set(activeClasses.map((c: any) => c.id));
         setExaminationPlan(current => {
@@ -347,7 +349,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       }
       const emptyPlan=initialExaminationPlan();
       if(examination)setExaminationPlan(emptyPlan);
-      setDraft(examination ? {...contestSeed,...examinationSchedule(emptyPlan),studentOptions:{...contestSeed.studentOptions,examMode:true,maxSubmissions:DEFAULT_SUBMISSION_LIMIT}} : contest ? contestSeed : assignmentSeed);
+      setDraft(examination ? {...examSessionSeed,...examinationSchedule(emptyPlan),studentOptions:{...examSessionSeed.studentOptions,examMode:true,maxSubmissions:DEFAULT_SUBMISSION_LIMIT}} : examSession ? examSessionSeed : assignmentSeed);
       return;
     }
     
@@ -367,10 +369,10 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
           audienceType: data.audienceType || "classes",
           shortDescription: data.shortDescription || "",
           description: data.description || "",
-          rules: data.rules || (contest ? data.instructions || "" : ""),
-          bannerUrl: contest ? data.bannerUrl || null : null,
-          bannerSourceUrl: contest ? data.bannerSourceUrl || null : null,
-          bannerCrop: contest ? data.bannerCrop || null : null,
+          rules: data.rules || (examSession ? data.instructions || "" : ""),
+          bannerUrl: examSession ? data.bannerUrl || null : null,
+          bannerSourceUrl: examSession ? data.bannerSourceUrl || null : null,
+          bannerCrop: examSession ? data.bannerCrop || null : null,
           instructions: data.instructions || "",
           opens: examination ? examinationSchedule(loaded).opens : toDateTimeLocal(data.opens),
           closes: examination ? examinationSchedule(loaded).closes : toDateTimeLocal(data.closes),
@@ -378,10 +380,11 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
             ...item,
             workspaceParts: assignmentWorkspaceParts(item.workspaceParts),
           })),
-          studentOptions: { ...(contest ? contestSeed.studentOptions : assignmentSeed.studentOptions), ...data.studentOptions, ...(examination?{examMode:true}:{}) },
-          published: data.published
+          studentOptions: { ...(examSession ? examSessionSeed.studentOptions : assignmentSeed.studentOptions), ...data.studentOptions, ...(examination?{examMode:true}:{}) },
+          published: data.published,
+          scoringMode: normalizeScoringMode(data.scoringMode),
         });
-        if (!examination && !contest && data.published) {
+        if (!examination && !examSession && data.published) {
           const snapshot: Record<string, { workspaceParts: WorkspacePart[]; questionSelection?: QuestionSelection }> = {};
           (data.problemList || []).forEach((item: BuilderProblem) => {
             snapshot[item.id] = {
@@ -395,7 +398,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
         }
         const saved=readLocalDraft();
         if(saved){
-          const serverIds = new Set((data.problemList || []).map((item: BuilderProblem) => item.id));
+          const serverIds = new Set<string>((data.problemList || []).map((item: BuilderProblem) => item.id));
           const savedIds = new Set((saved.draft.problems || []).map((item: BuilderProblem) => item.id));
           const compatibleWithPublished = !data.published || [...serverIds].every((pid) => savedIds.has(pid));
           if (!compatibleWithPublished) {
@@ -415,7 +418,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       }
     }
     fetchAssignment();
-  }, [id, isNew, contest, examination]);
+  }, [id, isNew, examSession, examination]);
 
   const audienceType = draft?.audienceType;
   const selectedIds = draft?.classIds.join("|") || "";
@@ -443,9 +446,9 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     }
     let active = true;
     setEligibleStudents(null);
-    const emails=audienceType==="all_students"?[]:selectedEmails?selectedEmails.split("|"):[];
+    const emails=selectedEmails?selectedEmails.split("|"):[];
     if(emails.some(email=>!validStudentIdentifier(email))) return;
-    const timer=window.setTimeout(()=>teacherService.getAudienceCount(audienceType, audienceType==="all_students"?[]:selectedIds ? selectedIds.split("|") : [], emails)
+    const timer=window.setTimeout(()=>teacherService.getAudienceCount(audienceType, selectedIds ? selectedIds.split("|") : [], emails)
       .then((result) => { if (active) { setEligibleStudents(result.eligibleStudents); setIndividualStudents(result.individualStudents ?? emails.length); setOverlappingStudents(result.overlappingStudents ?? 0);
         if(!examination && result.coveredIndividuals?.length){
           const covered=result.coveredIndividuals;
@@ -577,16 +580,6 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     setShowPublishIssues(false);
   }
 
-  function selectAudience(value: BuilderDraft["audienceType"]) {
-    if(value === "classes"){setAudiencePanel("classes");setAudiencePanelClosing(false);}
-    if (value === "all_students") {nextAudiencePanel.current=null;setAudiencePanel(null);setAudiencePanelClosing(false);}
-    setDraft((current) => current ? { ...current, audienceType: value,
-      classIds: current.classIds,studentEmails:current.studentEmails } : null);
-    markUnsaved();
-    setSaveState("Unsaved changes");
-    setAlertText("");
-  }
-
   function toggleAudiencePanel(panel:"classes"|"students") {
     nextAudiencePanel.current=audiencePanel===panel && !audiencePanelClosing?null:panel;
     if(!audiencePanel){setAudiencePanel(panel);setAudiencePanelClosing(false);}
@@ -626,11 +619,11 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     } catch {
       setCropInitial(defaultBannerCrop);
     }
-    setCropSource(resolveContestBannerUrl(draft.bannerSourceUrl) || draft.bannerSourceUrl);
+    setCropSource(resolveExamSessionBannerUrl(draft.bannerSourceUrl) || draft.bannerSourceUrl);
   }
 
   async function applyBanner(banner: Blob, source: Blob, crop: BannerCrop) {
-    const urls = await teacherService.uploadContestBanner(banner, source);
+    const urls = await teacherService.uploadExamSessionBanner(banner, source);
     setDraft((current) => current ? { ...current, ...urls, bannerCrop: JSON.stringify(crop) } : null);
     markUnsaved();
     setSaveState("Unsaved changes");
@@ -640,7 +633,19 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
 
   const selectedCounts = draft.problems.map(item => Object.values(selectedQuestions(problemDetails[item.id] || null, item.workspaceParts || [], item.questionSelection)).reduce((sum, questions) => sum + questions.length, 0));
   const totalQuestions = selectedCounts.reduce((sum, count) => sum + count, 0);
-  const weightedProblems = draft.problems.map((item, index) => ({...item, points: totalQuestions ? 10 * selectedCounts[index] / totalQuestions : 0}));
+  // "Tùy chỉnh điểm": điểm của bài = tổng điểm từng câu (đề đầu tiên); chia đều thì theo số câu như cũ.
+  const customScoring = normalizeScoringMode(draft.scoringMode) === SCORING_CUSTOM;
+  const scoredProblem = (item: BuilderProblem): ScoredProblem => {
+    const selected = selectedQuestions(problemDetails[item.id] || null, item.workspaceParts || [], item.questionSelection);
+    const ids = Object.fromEntries(Object.entries(selected).map(([part, list]) => [part, list.map(question => question.id)]));
+    return { title: item.id, papers: examPapers(item.questionSelection, ids), points: questionPointsOf(item.questionSelection) };
+  };
+  const customSummary = customScoringSummary(draft.problems.map(scoredProblem));
+  const sessionScoring = examination ? examinationPlan.sessions.map(slot => customScoringSummary((slot.problems || []).map(scoredProblem))) : [];
+  const weightedProblems = draft.problems.map((item, index) => ({
+    ...item,
+    points: customScoring ? customSummary.problemPoints[index] : totalQuestions ? 10 * selectedCounts[index] / totalQuestions : 0,
+  }));
   const scheduleValid =
     !!draft.opens && !!draft.closes && new Date(draft.opens) < new Date(draft.closes);
   const durationMinutes = scheduleValid ? Math.round((new Date(draft.closes).getTime() - new Date(draft.opens).getTime()) / 60000) : 0;
@@ -652,14 +657,14 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       : draft.classIds;
 
     if (!draft.title.trim()) issues.push("Enter a title.");
-    if(draft.audienceType!=="all_students" && selectedEmails.split("|").filter(Boolean).some(email=>!validStudentIdentifier(email)))issues.push("Check the student IDs or email addresses.");
+    if(selectedEmails.split("|").filter(Boolean).some(email=>!validStudentIdentifier(email)))issues.push("Check the student IDs or email addresses.");
     if(examination && examinationClassIds.some(id=>!examinationPlan.sessions.some(slot=>(slot.classIds || []).includes(id))))issues.push("Assign all selected classes to sessions.");
     if(examination && examinationPlan.sessions.some((slot,index)=>!slot.starts || !slot.ends || slot.ends<=slot.starts || index>0 && `${examinationPlan.sessions[index-1].examDate || examinationPlan.examDate}T${examinationPlan.sessions[index-1].ends}`>`${slot.examDate || examinationPlan.examDate}T${slot.starts}`))issues.push("Session times must be chronological and must not overlap.");
-    if (!contest && draft.classIds.length === 0 && !draft.studentEmails.length) issues.push("Select at least one class.");
-    if (contest && !examination && draft.audienceType === "classes" && draft.classIds.length === 0 && !selectedEmails) issues.push("Select at least one class or choose All students.");
+    if (!examSession && draft.classIds.length === 0 && !draft.studentEmails.length) issues.push("Select at least one class.");
+    if (examSession && !examination && draft.audienceType === "classes" && draft.classIds.length === 0 && !selectedEmails) issues.push("Select at least one class.");
     if (examination && examinationClassIds.length === 0 && !selectedEmails) issues.push("Select at least one class.");
-    if (contest && !examination && !draft.shortDescription.trim()) issues.push("Add a short description.");
-    if (contest && !examination && !draft.description.trim()) issues.push("Add a contest description.");
+    if (examSession && !examination && !draft.shortDescription.trim()) issues.push("Add a short description.");
+    if (examSession && !examination && !draft.description.trim()) issues.push("Add an exam session description.");
     if (!examination && draft.problems.length === 0) issues.push("Add at least one problem.");
     if (examination) {
       if (examinationPlan.sessions.length === 0) {
@@ -687,8 +692,13 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       if (draft.problems.some((item, index) => !problemDetails[item.id] || !selectedCounts[index])) issues.push("Select at least one question for each problem.");
       if (draft.problems.some((item) => !(item.workspaceParts?.length))) issues.push("Select at least one section for each problem.");
     }
-    if (!draft.opens || !Number.isFinite(new Date(draft.opens).getTime())) issues.push(contest ? "Enter a valid start date and time." : "Enter a valid opening date and time.");
-    if (!draft.closes || !Number.isFinite(new Date(draft.closes).getTime())) issues.push(contest ? "Enter a valid end date and time." : "Enter a valid due date and time.");
+    if (customScoring) {
+      for (const summary of examination ? sessionScoring : [customSummary]) {
+        summary.issues.forEach(issue => { if (!issues.includes(issue)) issues.push(issue); });
+      }
+    }
+    if (!draft.opens || !Number.isFinite(new Date(draft.opens).getTime())) issues.push(examSession ? "Enter a valid start date and time." : "Enter a valid opening date and time.");
+    if (!draft.closes || !Number.isFinite(new Date(draft.closes).getTime())) issues.push(examSession ? "Enter a valid end date and time." : "Enter a valid due date and time.");
     if (draft.opens && draft.closes && Number.isFinite(new Date(draft.opens).getTime()) && Number.isFinite(new Date(draft.closes).getTime()) && new Date(draft.opens) >= new Date(draft.closes)) {
       issues.push("The end date and time must be after the start date and time.");
     }
@@ -713,23 +723,24 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     setSaveState("Saving to server...");
     const notification = toast.show({ variant: "loading", title: "Saving…", description: draft.title });
     try {
+      const scoringMode = normalizeScoringMode(draft!.scoringMode);
+      const problemsToSave = weightedProblems.map(item => problemForSave(item, scoringMode));
       const payload = {
         title: draft!.title,
-        isContest: contest,
-        classIds: contest && draft!.audienceType==="all_students"?[]:(draft!.classIds || []),
+        classIds: draft!.classIds || [],
         ...(parentExaminationId?{classTransfers:Object.fromEntries(Object.entries(classTransfers).filter(([classId])=>draft!.classIds.includes(classId)))}:{}),
-        studentEmails: examination || (contest && draft!.audienceType==="all_students") ? [] : draft!.studentEmails,
-        audienceType: contest ? draft!.audienceType : "classes",
-        shortDescription: contest ? draft!.shortDescription.trim() : "",
-        description: contest ? draft!.description : "",
-        rules: contest ? draft!.rules : "",
-        ...(contest ? { bannerUrl: draft!.bannerUrl, bannerSourceUrl: draft!.bannerSourceUrl, bannerCrop: draft!.bannerCrop } : {}),
-        instructions: contest ? "" : draft!.instructions,
+        studentEmails: examination ? [] : draft!.studentEmails,
+        audienceType: "classes",
+        shortDescription: examSession ? draft!.shortDescription.trim() : "",
+        description: examSession ? draft!.description : "",
+        rules: examSession ? draft!.rules : "",
+        ...(examSession ? { bannerUrl: draft!.bannerUrl, bannerSourceUrl: draft!.bannerSourceUrl, bannerCrop: draft!.bannerCrop } : {}),
+        instructions: examSession ? "" : draft!.instructions,
         opens: draft!.opens ? new Date(draft!.opens).toISOString() : null,
         closes: draft!.closes ? new Date(draft!.closes).toISOString() : null,
-        problems: examination ? [] : weightedProblems,
-        scoringMode: "equal_questions",
-        studentOptions: contest
+        problems: examination ? [] : problemsToSave,
+        scoringMode,
+        studentOptions: examSession
           ? { leaderboard: draft!.studentOptions.leaderboard, hints: draft!.studentOptions.hints ?? true, aiAllowed: draft!.studentOptions.aiAllowed ?? true, examMode: draft!.studentOptions.examMode, examViolationLimit: draft!.studentOptions.examViolationLimit ?? 2, showScoresAfterSubmit: draft!.studentOptions.showScoresAfterSubmit, maxSubmissions: draft!.studentOptions.maxSubmissions }
           : { comments: draft!.studentOptions.comments, hints: draft!.studentOptions.hints ?? true, aiAllowed: draft!.studentOptions.aiAllowed ?? true, examMode: draft!.studentOptions.examMode, examViolationLimit: draft!.studentOptions.examViolationLimit ?? 2, showScoresAfterSubmit: draft!.studentOptions.showScoresAfterSubmit, maxSubmissions: draft!.studentOptions.maxSubmissions },
         published: isPublished
@@ -742,16 +753,19 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
           title: payload.title,
           template: {
             ...payload,
-            problems: weightedProblems
+            problems: problemsToSave
           },
-          problems: weightedProblems,
-          sessions: examinationPlan.sessions.map(s => {
-            const sessionProblems = (s.problems && s.problems.length > 0)
+          problems: problemsToSave,
+          sessions: examinationPlan.sessions.map((s, sessionIndex) => {
+            const sessionProblems = ((s.problems && s.problems.length > 0)
               ? s.problems.map((sp: any) => {
-                  const match = weightedProblems.find((wp: any) => wp.id === sp.id);
+                  const match = problemsToSave.find((wp: any) => wp.id === sp.id);
                   return match ? { ...sp, ...match, questionSelection: match.questionSelection } : sp;
                 })
-              : weightedProblems;
+              : problemsToSave
+            ).map((sp: any, problemIndex: number) => customScoring && s.problems?.length
+              ? { ...sp, points: sessionScoring[sessionIndex]?.problemPoints[problemIndex] ?? sp.points }
+              : problemForSave(sp, scoringMode));
             return {
               ...s,
               problems: sessionProblems,
@@ -770,7 +784,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
       }
       
       setDraft({ ...draft!, published: isPublished });
-      if (!examination && !contest && isPublished) {
+      if (!examination && !examSession && isPublished) {
         const snapshot: Record<string, { workspaceParts: WorkspacePart[]; questionSelection?: QuestionSelection }> = {};
         (draft?.problems || []).forEach((item) => {
           snapshot[item.id] = {
@@ -844,7 +858,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
   }
 
   function getMaxPreviewWidth() {
-    const availableWidth = contestSplitLayoutRef.current?.clientWidth ?? 1200;
+    const availableWidth = examSessionSplitLayoutRef.current?.clientWidth ?? 1200;
     return window.innerWidth <= 900
       ? Math.max(320, Math.min(680, availableWidth - 332, window.innerWidth * 0.42))
       : Math.max(320, Math.min(680, availableWidth - 584));
@@ -854,7 +868,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     setPreviewWidth(Math.max(320, Math.min(getMaxPreviewWidth(), width)));
   }
 
-  function closeContestPreview() {
+  function closeExamSessionPreview() {
     if (!previewOpen || previewClosing) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setPreviewOpen(false);
@@ -863,13 +877,13 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
     setPreviewClosing(true);
   }
 
-  function toggleContestPreview() {
+  function toggleExamSessionPreview() {
     setAddProblemOpen(false);
     setLibraryClosing(false);
     setSettingsProblemId(null);
     setSettingsClosing(false);
     if (previewOpen && !previewClosing) {
-      closeContestPreview();
+      closeExamSessionPreview();
       return;
     }
     setPreviewClosing(false);
@@ -996,9 +1010,9 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
   const csvAction=(mode:"classes"|"students")=><GlidingTooltipGroup className="teacher-search-csv" label={tr("CSV")} role="group" multiline>
     <button type="button" className="teacher-search-csv-button" disabled={csvBusy} data-tooltip={tr(mode==="classes"?"CSV: one class ID per line. No header required.":"CSV: one student ID or email per line. No header required. Students are looked up automatically.")} onClick={()=>setCsvMode(mode)}><TranslatedText>{csvBusy?"…":tr("Use CSV")}</TranslatedText></button>
   </GlidingTooltipGroup>;
-  const bannerActions = contest ? (
-        <div className="teacher-contest-banner-editor" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
-          <div className="teacher-contest-banner-editor-actions">
+  const bannerActions = examSession ? (
+        <div className="teacher-exam-session-banner-editor" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+          <div className="teacher-exam-session-banner-editor-actions">
             <button className="button" type="button" onClick={() => bannerFileInput.current?.click()}><ImagePlus size={14} aria-hidden="true" /><TranslatedText>{tr("Click to change image")}</TranslatedText></button>
             {draft.bannerSourceUrl && <button className="button" type="button" onClick={adjustBanner}><TranslatedText>{tr("Adjust crop")}</TranslatedText></button>}
             {draft.bannerUrl && <button className="button" type="button" onClick={() => {
@@ -1017,60 +1031,60 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
 
   const audienceSummary=(
                 <div className="teacher-assignment-summary">
-                  <span><TranslatedText>{tr(contest ? "OPEN TO" : "ASSIGNED TO")}</TranslatedText></span>
+                  <span><TranslatedText>{tr(examSession ? "OPEN TO" : "ASSIGNED TO")}</TranslatedText></span>
                   <strong>
-                    <span><TranslatedText>{contest && draft.audienceType === "all_students" ? tr("All students") : tr("Classes: {value0}",{value0:draft.classIds.length})}</TranslatedText></span>
+                    <span><TranslatedText>{tr("Classes: {value0}",{value0:draft.classIds.length})}</TranslatedText></span>
                     <span className="teacher-assignment-summary-separator" aria-hidden="true">·</span>
                     <span><TranslatedText>{eligibleStudents !== null ? tr("{value0} eligible student{value1}", { value0: eligibleStudents, value1: eligibleStudents === 1 ? "" : "s" }) : tr("Student count unavailable")}</TranslatedText></span>
                   </strong>
                 </div>
   );
   return (
-    <section className={`teacher-page teacher-builder-page teacher-authoring-editor-page${parentExaminationId ? " session-management-builder" : ""}${contest ? " teacher-contest-editor-page" : " teacher-assignment-editor-page"}`}>
-      {contest && <input ref={bannerFileInput} className="teacher-banner-file-input" type="file" accept="image/jpeg,image/png,image/webp"
+    <section className={`teacher-page teacher-builder-page teacher-authoring-editor-page${parentExaminationId ? " session-management-builder" : ""}${examSession ? " teacher-exam-session-editor-page" : " teacher-assignment-editor-page"}`}>
+      {examSession && <input ref={bannerFileInput} className="teacher-banner-file-input" type="file" accept="image/jpeg,image/png,image/webp"
         onChange={(event) => { chooseBanner(event.target.files?.[0]); event.target.value = ""; }} />}
       <div
-        ref={contestSplitLayoutRef}
+        ref={examSessionSplitLayoutRef}
         className={`teacher-problem-workspace-layout${previewOpen || addProblemOpen ? " has-live-preview" : ""}${previewClosing || libraryClosing ? " is-closing-preview" : ""}`}
         style={{ "--teacher-preview-width": `${addProblemOpen ? 420 : previewWidth}px` } as CSSProperties}
       >
-      <div className={`teacher-builder-layout${contest ? " teacher-contest-builder-layout" : " teacher-assignment-builder-layout"}`}>
-        <aside className={`teacher-contest-navigation${contest ? "" : " teacher-assignment-navigation"}`}>
-          <div className="teacher-contest-navigation-heading">
-            <h2><TranslatedText>{tr(parentExaminationId?"Edit examination session":examination ? isNew?"New examination":"Edit examination" : isNew ? (contest ? "New contest" : "New assignment") : (contest ? "Edit contest" : "Edit assignment"))}</TranslatedText></h2>
+      <div className={`teacher-builder-layout${examSession ? " teacher-exam-session-builder-layout" : " teacher-assignment-builder-layout"}`}>
+        <aside className={`teacher-exam-session-navigation${examSession ? "" : " teacher-assignment-navigation"}`}>
+          <div className="teacher-exam-session-navigation-heading">
+            <h2><TranslatedText>{tr(parentExaminationId?"Edit examination session":examination ? isNew?"New examination":"Edit examination" : isNew ? (examSession ? "New exam session" : "New assignment") : (examSession ? "Edit exam session" : "Edit assignment"))}</TranslatedText></h2>
             <UnsavedChangesBadge visible={hasUnsavedChanges} />
-            <div className="teacher-contest-save-exit-actions">
+            <div className="teacher-exam-session-save-exit-actions">
               <button className="button" type="button" onClick={() => requestNavigation(builderListPath)}><TranslatedText>{tr("Exit")}</TranslatedText></button>
               <button className="button primary" type="button" onClick={()=>saveDraft()} disabled={saveBusy || !draft.title.trim() || Boolean(parentExaminationId&&!hasUnsavedChanges)}>
                 <TranslatedText>{saveBusy ? tr("Saving…") : tr("Save")}</TranslatedText>
               </button>
             </div>
           </div>
-          <nav ref={contestNavigationRef} className="teacher-contest-page-nav" aria-label={tr(contest ? "Contest sections" : "Assignment sections")}>
+          <nav ref={examSessionNavigationRef} className="teacher-exam-session-page-nav" aria-label={tr(examSession ? "Exam session sections" : "Assignment sections")}>
             <span
-              className="teacher-contest-page-nav-indicator"
+              className="teacher-exam-session-page-nav-indicator"
               aria-hidden="true"
               style={{
-                width: `${contestNavigationIndicator.width}px`,
-                height: `${contestNavigationIndicator.height}px`,
-                transform: `translate(${contestNavigationIndicator.x}px, ${contestNavigationIndicator.y}px)`,
+                width: `${examSessionNavigationIndicator.width}px`,
+                height: `${examSessionNavigationIndicator.height}px`,
+                transform: `translate(${examSessionNavigationIndicator.x}px, ${examSessionNavigationIndicator.y}px)`,
               }}
             />
             <h3><TranslatedText>{tr("On this page")}</TranslatedText></h3>
             {(parentExaminationId
-              ? [["contest-setup","Builder general information"],["contest-schedule","Exam schedule & submissions"],["contest-problems","Exam content"]]
-              : contest
-                ? [["contest-setup","Builder general information"],...(!examination?[["contest-audience","Builder participants"]]:[]),...(examination?[["examination-settings","Common settings"]]:[]),["contest-schedule","Exam schedule & submissions"],...(!examination?[["contest-problems","Exam content"]]:[])]
+              ? [["exam-session-setup","Builder general information"],["exam-session-schedule","Exam schedule & submissions"],["exam-session-problems","Exam content"]]
+              : examSession
+                ? [["exam-session-setup","Builder general information"],...(!examination?[["exam-session-audience","Builder participants"]]:[]),...(examination?[["examination-settings","Common settings"]]:[]),["exam-session-schedule","Exam schedule & submissions"],...(!examination?[["exam-session-problems","Exam content"]]:[])]
                 : [["assignment-setup","Builder general information"],["assignment-audience","Builder participants"],["assignment-schedule","Schedule & submissions"],["assignment-problems","Assignment content"]]
-            ).map(([sectionId,label])=><button key={sectionId} ref={activeContestSection===sectionId?activeContestNavigationButtonRef:undefined} type="button" className={activeContestSection===sectionId?"is-active":""} aria-current={activeContestSection===sectionId?"location":undefined} onClick={()=>navigateToContestSection(sectionId)}><TranslatedText>{tr(label)}</TranslatedText></button>)}
+            ).map(([sectionId,label])=><button key={sectionId} ref={activeExamSessionSection===sectionId?activeExamSessionNavigationButtonRef:undefined} type="button" className={activeExamSessionSection===sectionId?"is-active":""} aria-current={activeExamSessionSection===sectionId?"location":undefined} onClick={()=>navigateToExamSessionSection(sectionId)}><TranslatedText>{tr(label)}</TranslatedText></button>)}
           </nav>
           {alertText && <p className="teacher-form-message" role="status"><TranslatedText>{tr(alertText)}</TranslatedText></p>}
           {showPublishIssues && publishIssues.length > 0 && <div className="teacher-publish-issues" role="alert" aria-live="polite">
             <strong><TranslatedText>{tr("Cannot publish yet. Please fix:")}</TranslatedText></strong>
             <ul>{publishIssues.map((issue) => <li key={issue}><TranslatedText>{tr(issue)}</TranslatedText></li>)}</ul>
           </div>}
-          <div className="teacher-contest-navigation-actions">
-            <button className="button" type="button" onClick={toggleContestPreview}><TranslatedText>{tr("Preview")}</TranslatedText> <TranslatedText>{tr(contest ? "contest" : "assignment")}</TranslatedText></button>
+          <div className="teacher-exam-session-navigation-actions">
+            <button className="button" type="button" onClick={toggleExamSessionPreview}><TranslatedText>{tr("Preview")}</TranslatedText> <TranslatedText>{tr(examSession ? "examSession" : "assignment")}</TranslatedText></button>
             {parentExaminationId
               ? <button className="button primary" type="button" onClick={()=>requestNavigation(`${builderRoot}/examinations/${parentExaminationId}/edit`)} disabled={saveBusy}><TranslatedText>{tr("Back to examination")}</TranslatedText></button>
               : examination && draft?.published
@@ -1085,7 +1099,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
           </div>
         </aside>
         <section className="teacher-builder-main">
-          <div className="teacher-builder-setup" id={contest ? "contest-setup" : "assignment-setup"}>
+          <div className="teacher-builder-setup" id={examSession ? "exam-session-setup" : "assignment-setup"}>
             <TeacherSectionTitle title={tr("Builder general information")}>
               {parentExaminationId && <Select className="teacher-session-switch" aria-label={tr("Switch exam session")} value={id} disabled={saveBusy || !siblingSessions.length} onChange={event=>{if(event.target.value!==id)requestNavigation(`${builderRoot}/sessions/${encodeURIComponent(event.target.value)}/edit`);}}>
                 {!siblingSessions.some(row=>row.id===id) && <option value={id}>{draft.title}</option>}
@@ -1105,11 +1119,11 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
                 }}
               />
             </TeacherField>
-            {contest && !parentExaminationId && <>
+            {examSession && !parentExaminationId && <>
               <TeacherField label={tr("SHORT DESCRIPTION")}>
-                <input value={draft.shortDescription} maxLength={180} onChange={(event) => update("shortDescription", event.target.value)} placeholder={tr("One-line contest summary")} />
+                <input value={draft.shortDescription} maxLength={180} onChange={(event) => update("shortDescription", event.target.value)} placeholder={tr("One-line exam session summary")} />
               </TeacherField>
-              <div id="contest-description" className="teacher-field teacher-long-text-field teacher-contest-long-text-field">
+              <div id="exam-session-description" className="teacher-field teacher-long-text-field teacher-exam-session-long-text-field">
                 <div className="teacher-long-text-heading">
                   <span><TranslatedText>{tr("DESCRIPTION")}</TranslatedText></span>
                 </div>
@@ -1119,10 +1133,10 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
                   onChange={(value) => update("description", value)}
                   onOpenExpanded={() => setExpandedTextField("description")}
                 />
-                <small className="muted"><TranslatedText>{tr("Markdown text is saved as the contest description.")}</TranslatedText></small>
+                <small className="muted"><TranslatedText>{tr("Markdown text is saved as the exam session description.")}</TranslatedText></small>
               </div>
             </>}
-            {!contest && <div id="assignment-instructions" className="teacher-field teacher-long-text-field teacher-contest-long-text-field">
+            {!examSession && <div id="assignment-instructions" className="teacher-field teacher-long-text-field teacher-exam-session-long-text-field">
               <div className="teacher-long-text-heading">
                 <span><TranslatedText>{tr("INSTRUCTIONS")}</TranslatedText></span>
               </div>
@@ -1138,28 +1152,18 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
           <div>
           {!examination && !parentExaminationId && <div
             className={`teacher-builder-audience${
-              highlightError?.targetId === (contest ? "contest-audience" : "assignment-audience") ? " has-error" : ""
+              highlightError?.targetId === (examSession ? "exam-session-audience" : "assignment-audience") ? " has-error" : ""
             }`}
-            id={contest ? "contest-audience" : "assignment-audience"}
+            id={examSession ? "exam-session-audience" : "assignment-audience"}
           >
             {!parentExaminationId&&<TeacherSectionTitle title={tr("Builder participants")}/>}
-            {contest && !examination && !parentExaminationId && <div className="teacher-audience-control-row"><fieldset className="teacher-field teacher-audience-field">
-              <legend><TranslatedText>{tr("AUDIENCE")}</TranslatedText></legend>
-              <div className="teacher-audience-options">
-                <label><input type="radio" name="contest-audience" checked={draft.audienceType === "classes"} onChange={() => selectAudience("classes")} /> <TranslatedText>{tr("Selected classes")}</TranslatedText></label>
-                <label><input type="radio" name="contest-audience" checked={draft.audienceType === "all_students"} onChange={() => selectAudience("all_students")} /> <TranslatedText>{tr("All students")}</TranslatedText></label>
-                <div className="teacher-audience-disclosure-slot" data-visible={draft.audienceType==="classes"} aria-hidden={draft.audienceType!=="classes"} ref={node=>{if(node)node.inert=draft.audienceType!=="classes";}}>
-                <button type="button" className="teacher-audience-collapse teacher-audience-disclosure-button" disabled={draft.audienceType!=="classes"} tabIndex={draft.audienceType==="classes"?0:-1} aria-controls="builder-class-picker" aria-expanded={audiencePanel==="classes" && !audiencePanelClosing} onClick={()=>toggleAudiencePanel("classes")}><ChevronDown size={14} aria-hidden="true"/><TranslatedText>{tr(audiencePanel==="classes" && !audiencePanelClosing?"Hide participant list":"Show participant list")}</TranslatedText></button>
-                </div>
-              </div>
-            </fieldset>{audienceSummary}</div>}
             <div className="teacher-builder-class-assignment">
-              {(!contest || examination) && <div className="teacher-class-assignment-heading">
-                {!contest && <span className="teacher-current-term">{formatAcademicTerm(currentAcademicTerm())}</span>}
+              {(!examSession || examination) && <div className="teacher-class-assignment-heading">
+                {!examSession && <span className="teacher-current-term">{formatAcademicTerm(currentAcademicTerm())}</span>}
                 {audienceSummary}
                 <button type="button" className="teacher-audience-collapse teacher-audience-disclosure-button" aria-controls="builder-class-picker" aria-expanded={audiencePanel==="classes" && !audiencePanelClosing} onClick={()=>toggleAudiencePanel("classes")}><ChevronDown size={14} aria-hidden="true"/><TranslatedText>{tr(audiencePanel==="classes" && !audiencePanelClosing?"Collapse participant list":"Show participant list")}</TranslatedText></button>
               </div>}
-              {(!contest || parentExaminationId || draft.audienceType === "classes") && <ClassPicker
+              {(!examSession || parentExaminationId || draft.audienceType === "classes") && <ClassPicker
                 panelId="builder-class-picker"
                 selected={draft.classIds}
                 onChange={updateSessionClasses}
@@ -1212,11 +1216,11 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
 
           <div
             className={`teacher-schedule-section teacher-builder-schedule${
-              highlightError?.targetId === (contest ? "contest-schedule" : "assignment-schedule") ? " has-error" : ""
+              highlightError?.targetId === (examSession ? "exam-session-schedule" : "assignment-schedule") ? " has-error" : ""
             }`}
-            id={contest ? "contest-schedule" : "assignment-schedule"}
+            id={examSession ? "exam-session-schedule" : "assignment-schedule"}
           >
-            <TeacherSectionTitle title={tr(contest ? "Exam schedule & submissions" : "Schedule & submissions")} />
+            <TeacherSectionTitle title={tr(examSession ? "Exam schedule & submissions" : "Schedule & submissions")} />
             {examination ? <ExaminationSessionPlanner
               onRefresh={isNew ? undefined : refreshSessionTimes}
               refreshing={refreshingSessions}
@@ -1240,6 +1244,8 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
               problemDetails={problemDetails}
               catalogErrors={catalogErrors}
               onRetryCatalog={() => setCatalogRetry(v => v + 1)}
+              scoringMode={normalizeScoringMode(draft.scoringMode)}
+              onScoringModeChange={mode => update("scoringMode", mode)}
               onChange={plan => {
                 setHighlightError(null);
                 const sessionClassIds = [...new Set(plan.sessions.flatMap(slot => slot.classIds || []))];
@@ -1254,16 +1260,16 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
                 setAlertText("");
               }}
             /> : <>
-            <fieldset className="teacher-contest-schedule-fields">
-              <TeacherField label={tr(contest ? "STARTS" : "OPENS")}>
-                <DateTimeInput label={tr(contest ? "Starts" : "Opens")} value={draft.opens} onChange={(value) => update("opens", value)} />
+            <fieldset className="teacher-exam-session-schedule-fields">
+              <TeacherField label={tr(examSession ? "STARTS" : "OPENS")}>
+                <DateTimeInput label={tr(examSession ? "Starts" : "Opens")} value={draft.opens} onChange={(value) => update("opens", value)} />
               </TeacherField>
-              <TeacherField label={tr(contest ? "ENDS" : "DUE DATE")}>
-                <DateTimeInput label={tr(contest ? "Ends" : "Due date")} value={draft.closes} onChange={(value) => update("closes", value)} />
+              <TeacherField label={tr(examSession ? "ENDS" : "DUE DATE")}>
+                <DateTimeInput label={tr(examSession ? "Ends" : "Due date")} value={draft.closes} onChange={(value) => update("closes", value)} />
               </TeacherField>
             </fieldset>            </>}
 
-            {contest && !examination && durationMinutes > 0 && <p className="teacher-timezone"><TranslatedText>{tr("Duration ·")}</TranslatedText> {durationMinutes} <TranslatedText>{tr("min")}</TranslatedText></p>}
+            {examSession && !examination && durationMinutes > 0 && <p className="teacher-timezone"><TranslatedText>{tr("Duration ·")}</TranslatedText> {durationMinutes} <TranslatedText>{tr("min")}</TranslatedText></p>}
 
           {!examination && !parentExaminationId && <div>
           <GlidingTooltipGroup className="teacher-exam-mode-setting" label={tr("Submission settings")} role="group" multiline>
@@ -1289,15 +1295,18 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
 
           {!examination && <div
             className={`teacher-builder-problems${
-              highlightError?.targetId === (contest ? "contest-problems" : "assignment-problems") ? " has-error" : ""
+              highlightError?.targetId === (examSession ? "exam-session-problems" : "assignment-problems") ? " has-error" : ""
             }`}
-            id={contest ? "contest-problems" : "assignment-problems"}
+            id={examSession ? "exam-session-problems" : "assignment-problems"}
           >
-            <TeacherSectionTitle title={tr(contest ? "Exam content" : "Assignment content")} />
-            <GlidingTooltipGroup className="builder-scoring-summary" label={tr("Equal scoring")} role="group" multiline>
-              <strong><TranslatedText>{tr("Total: 10 points")}</TranslatedText></strong>
+            <TeacherSectionTitle title={tr(examSession ? "Exam content" : "Assignment content")} />
+            <GlidingTooltipGroup className="builder-scoring-summary" label={tr(customScoring ? "Custom points" : "Equal scoring")} role="group" multiline>
+              <ScoringModeControl value={normalizeScoringMode(draft.scoringMode)} onChange={mode => update("scoringMode", mode)} />
+              {customScoring
+                ? <CustomScoreTotal total={customSummary.total} />
+                : <strong><TranslatedText>{tr("Total: 10 points")}</TranslatedText></strong>}
               <span><TranslatedText>{tr("{value0} selected questions", { value0: totalQuestions })}</TranslatedText></span>
-              <button type="button" className="builder-scoring-help" aria-label={tr("Equal scoring")} data-tooltip={tr("Each selected question has the same weight, across all problems and SQL types.")}><CircleHelp size={14} aria-hidden="true" /></button>
+              <button type="button" className="builder-scoring-help" aria-label={tr(customScoring ? "Custom points" : "Equal scoring")} data-tooltip={tr(customScoring ? "Enter the points of every selected question. Every exam variant must add up to 10 points." : "Each selected question has the same weight, across all problems and SQL types.")}><CircleHelp size={14} aria-hidden="true" /></button>
             <button
               className="button primary teacher-small-button builder-library-trigger"
               type="button"
@@ -1312,7 +1321,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
             </button>
             </GlidingTooltipGroup>
             {problemsError && <p className="teacher-state-failed" role="alert"><TranslatedText>{tr(problemsError)}</TranslatedText></p>}
-            <ol className="builder-problem-list" aria-label={tr(contest ? "Exam content" : "Assignment content")}>
+            <ol className="builder-problem-list" aria-label={tr(examSession ? "Exam content" : "Assignment content")}>
               {draft.problems.map((item, index) => {
                 const problem = allProblems.find(row => row.id === item.id);
                 const lockedSnapshot = lockedProblemsSnapshot[item.id];
@@ -1354,13 +1363,14 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
                   </header>
                   <div className="builder-problem-tools">
                     <BuilderInlineSettings
-                      selectionMode={contest || examination ? "auto" : "manual"}
+                      selectionMode={examSession || examination ? "auto" : "manual"}
                       hideTrigger
                       problemId={item.id}
                       title={problem.title}
                       detail={problemDetails[item.id] || null}
                       parts={item.workspaceParts || []}
                       questionSelection={item.questionSelection}
+                      scoringMode={normalizeScoringMode(draft.scoringMode)}
                       locked={isLockedProblem}
                       lockedQuestionSelection={lockedSnapshot?.questionSelection}
                       lockedParts={lockedSnapshot?.workspaceParts}
@@ -1404,7 +1414,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
             closeProblemLibrary();
           } else {
             // Assignments pick questions by hand: a newly added problem starts with nothing ticked.
-            if (contest || examination) addProblem(id);
+            if (examSession || examination) addProblem(id);
             else addProblem(id, [], undefined, undefined, { DDL: [], DML: [], SQL: [], TRIGGER: [] });
           }
         }}
@@ -1416,7 +1426,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
         }}
       />}
       {previewOpen && <aside
-        className={`teacher-student-preview-panel${contest ? " teacher-contest-preview-panel" : " teacher-assignment-preview-panel"}${previewClosing ? " is-closing" : ""}`}
+        className={`teacher-student-preview-panel${examSession ? " teacher-exam-session-preview-panel" : " teacher-assignment-preview-panel"}${previewClosing ? " is-closing" : ""}`}
         aria-label={tr("Student preview")}
         onAnimationEnd={(event) => {
           if (event.target !== event.currentTarget || event.animationName !== "teacher-preview-panel-out") return;
@@ -1441,7 +1451,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
           }}
           onPointerMove={(event) => {
             if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-            const bounds = contestSplitLayoutRef.current?.getBoundingClientRect();
+            const bounds = examSessionSplitLayoutRef.current?.getBoundingClientRect();
             if (bounds) resizePreviewTo(bounds.right - event.clientX);
           }}
           onPointerUp={(event) => {
@@ -1456,13 +1466,13 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
         ><span aria-hidden="true" /></button>
         <header className="teacher-student-preview-heading">
           <h2><TranslatedText>{tr("Student preview")}</TranslatedText></h2>
-          <button type="button" className="icon-button" aria-label={tr("Close preview")} title={tr("Close preview")} onClick={closeContestPreview}>
+          <button type="button" className="icon-button" aria-label={tr("Close preview")} title={tr("Close preview")} onClick={closeExamSessionPreview}>
             <X size={18} aria-hidden="true" />
           </button>
         </header>
         <div className="teacher-student-preview">
-          <div className={`teacher-student-preview-scroll${contest ? " teacher-contest-preview-scroll" : ""}`}>
-            <ActivityPreview draft={{...draft, problems: weightedProblems}} contest={contest} classes={availableClasses} problems={allProblems} bannerActions={bannerActions} />
+          <div className={`teacher-student-preview-scroll${examSession ? " teacher-exam-session-preview-scroll" : ""}`}>
+            <ActivityPreview draft={{...draft, problems: weightedProblems}} examSession={examSession} classes={availableClasses} problems={allProblems} bannerActions={bannerActions} />
           </div>
         </div>
       </aside>}
@@ -1509,7 +1519,7 @@ function BuilderPage({ contest, examination=false }: { contest: boolean; examina
         </div>
       </Dialog>}
       {csvMode && <AudienceImportDialog mode={csvMode} classIds={availableClasses.map(item=>item.id)} onImport={importAudienceCsv} onClose={()=>setCsvMode(null)} />}
-      {contest && cropSource && <ContestBannerCrop sourceUrl={cropSource} initialCrop={cropInitial} onClose={closeCrop} onApply={applyBanner} />}
+      {examSession && cropSource && <ExamSessionBannerCrop sourceUrl={cropSource} initialCrop={cropInitial} onClose={closeCrop} onApply={applyBanner} />}
       {showPublishModal && (
         <ExaminationPublishModal
           examinationId={parentExaminationId || (!isNew && examination ? id : undefined)}

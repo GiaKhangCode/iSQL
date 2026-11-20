@@ -11,11 +11,14 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AccountFixture;
+use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 class ProblemCrudTest extends TestCase
 {
     use DatabaseTransactions;
+    use UsesDefaultRolePermissions;
 
     protected User $adminUser;
     protected User $instructor1;
@@ -25,13 +28,14 @@ class ProblemCrudTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->useDefaultRolePermissions();
 
         // 1. Admin
         $this->adminUser = User::create([
             'name'            => 'Admin Problem Test',
             'email'           => 'admin_prob_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'admin',
+            ...AccountFixture::for('admin'),
             'status'          => 'Active',
             'initials'        => 'AP',
         ]);
@@ -41,7 +45,7 @@ class ProblemCrudTest extends TestCase
             'name'            => 'Teacher One',
             'email'           => 'teacher1_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor',
+            ...AccountFixture::for('instructor'),
             'status'          => 'Active',
             'initials'        => 'T1',
         ]);
@@ -51,7 +55,7 @@ class ProblemCrudTest extends TestCase
             'name'            => 'Teacher Two',
             'email'           => 'teacher2_' . uniqid() . '@uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'instructor',
+            ...AccountFixture::for('instructor'),
             'status'          => 'Active',
             'initials'        => 'T2',
         ]);
@@ -61,7 +65,7 @@ class ProblemCrudTest extends TestCase
             'name'            => 'Student One',
             'email'           => 'student_' . uniqid() . '@gm.uit.edu.vn',
             'hashed_password' => Hash::make('password123'),
-            'role'            => 'student',
+            ...AccountFixture::for('student'),
             'status'          => 'Active',
             'initials'        => 'S1',
         ]);
@@ -363,9 +367,12 @@ class ProblemCrudTest extends TestCase
 
     public function test_validate_reference_solution(): void
     {
-        // Valid reference solution
+        // Valid reference solution. Tự dựng bảng bằng schema + seedData: sandbox không có sẵn
+        // bảng nào, và validateSolution rollback toàn bộ sau khi chạy.
         Sanctum::actingAs($this->instructor1);
         $resp = $this->postJson('/api/problems/validate', [
+            'schema'            => 'CREATE TABLE Customers (Id int, Name varchar(40), Country varchar(40));',
+            'seedData'          => "INSERT INTO Customers VALUES (1, 'A', 'Vietnam'), (2, 'B', 'Laos');",
             'referenceSolution' => 'SELECT * FROM Customers WHERE Country = \'Vietnam\';',
         ]);
         $resp->assertStatus(200);
