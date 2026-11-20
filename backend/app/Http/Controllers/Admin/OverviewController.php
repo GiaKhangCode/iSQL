@@ -12,8 +12,18 @@ class OverviewController extends Controller
     {
     }
 
-    public function index(): JsonResponse
+    public function stats(): JsonResponse
     {
-        return response()->json($this->overviewService->getCounts());
+        return response()->json($this->overviewService->stats());
+    }
+
+    public function activities(): JsonResponse
+    {
+        return response()->json($this->overviewService->recentActivities());
+    }
+
+    public function errors(): JsonResponse
+    {
+        return response()->json($this->overviewService->recentGradingErrors());
     }
 }

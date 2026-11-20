@@ -61,9 +61,7 @@ class AssignmentService
                     $query->where(function ($q) use ($user, $proctorSessionIds) {
                         $q->where('instructor_id', $user->id)
                           ->orWhereHas('classes', function ($cq) use ($user) {
-                              $cq->where('instructor_id', $user->id)
-                                 ->orWhere('practice_instructor_id', $user->id)
-                                 ->orWhereHas('instructors', fn ($iq) => $iq->where('users.id', $user->id));
+                              $cq->where('instructor_id', $user->id);
                           });
                         if (!empty($proctorSessionIds)) {
                             $q->orWhereIn('id', $proctorSessionIds);
@@ -109,8 +107,6 @@ class AssignmentService
                 if (!$isExamActivity && $assignment->instructor_id !== $user->id) {
                     // Check if instructor teaches one of the classes or is a proctor
                     $taughtClassIds = ClassModel::where('instructor_id', $user->id)
-                        ->orWhere('practice_instructor_id', $user->id)
-                        ->orWhereHas('instructors', fn ($q) => $q->where('users.id', $user->id))
                         ->pluck('id')->all();
                     $assignmentClassIds = $assignment->classes->pluck('id')->all();
                     $isProctor = \App\Models\ExamClassProctor::where('session_id', $assignment->id)
@@ -145,11 +141,7 @@ class AssignmentService
 
     protected function taughtClassIdsForUser(User $user): array
     {
-        return ClassModel::where(function ($query) use ($user): void {
-            $query->where('instructor_id', $user->id)
-                ->orWhere('practice_instructor_id', $user->id)
-                ->orWhereHas('instructors', fn ($q) => $q->where('users.id', $user->id));
-        })->pluck('id')->all();
+        return ClassModel::where('instructor_id', $user->id)->pluck('id')->all();
     }
 
     protected function canAccessAllClasses(User $user): bool
@@ -363,11 +355,7 @@ class AssignmentService
             if (!empty($classIds)) {
                 $user = User::find($instructorId);
                 if ($user && !$this->canAccessAllClasses($user)) {
-                    $taughtClassIds = ClassModel::where(function ($query) use ($user): void {
-                        $query->where('instructor_id', $user->id)
-                            ->orWhere('practice_instructor_id', $user->id)
-                            ->orWhereHas('instructors', fn ($q) => $q->where('users.id', $user->id));
-                    })->pluck('id')->all();
+                    $taughtClassIds = ClassModel::where('instructor_id', $user->id)->pluck('id')->all();
 
                     $invalidClasses = array_diff($classIds, $taughtClassIds);
                     if (!empty($invalidClasses)) {
@@ -412,11 +400,7 @@ class AssignmentService
                 }
 
                 if (isset($data['class_ids'])) {
-                    $taughtClassIds = ClassModel::where(function ($query) use ($user): void {
-                        $query->where('instructor_id', $user->id)
-                            ->orWhere('practice_instructor_id', $user->id)
-                            ->orWhereHas('instructors', fn ($q) => $q->where('users.id', $user->id));
-                    })->pluck('id')->all();
+                    $taughtClassIds = ClassModel::where('instructor_id', $user->id)->pluck('id')->all();
 
                     $invalidClasses = array_diff((array) $data['class_ids'], $taughtClassIds);
                     if (!empty($invalidClasses)) {
@@ -526,13 +510,7 @@ class AssignmentService
 
         if (!$isPrivileged) {
             if ($isExamActivity) {
-                $practicalClassIds = ClassModel::where(function ($q) use ($user) {
-                    $q->where('practice_instructor_id', $user->id)
-                        ->orWhereIn('id', DB::table('class_instructors')
-                            ->where('instructor_id', $user->id)
-                            ->where('assignment_type', 'practical')
-                            ->select('class_id'));
-                })->pluck('id')->all();
+                $practicalClassIds = ClassModel::where('instructor_id', $user->id)->pluck('id')->all();
 
                 $assignmentClassIds = $assignment->classes->pluck('id')->all();
                 $scopedPracticalClassIds = !empty($assignmentClassIds)
@@ -553,10 +531,7 @@ class AssignmentService
                     return [];
                 }
             } elseif ($assignment->instructor_id !== $user->id) {
-                $taughtClassIds = ClassModel::where('instructor_id', $user->id)
-                    ->orWhere('practice_instructor_id', $user->id)
-                    ->orWhereHas('instructors', fn ($q) => $q->where('users.id', $user->id))
-                    ->pluck('id')->all();
+                $taughtClassIds = ClassModel::where('instructor_id', $user->id)->pluck('id')->all();
                 $assignmentClassIds = $assignment->classes->pluck('id')->all();
                 $isProctor = \App\Models\ExamClassProctor::where('session_id', $assignment->id)
                     ->where('proctor_id', $user->id)

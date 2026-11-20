@@ -67,17 +67,10 @@ class ClassInstructorEligibilityTest extends TestCase
         return $user;
     }
 
-    private function assign(User $instructor, string $type = 'practical')
+    private function assign(User $instructor, string $prefix = '/api/admin')
     {
-        return $this->putJson("/api/admin/classes/{$this->class->id}/instructor", [
-            'instructor_id' => $instructor->id, 'assignment_type' => $type,
-        ]);
-    }
-
-    private function sync(User $theory, User $practical, string $prefix = '/api/admin')
-    {
-        return $this->putJson("{$prefix}/classes/{$this->class->id}/instructors", [
-            'theory_instructor_id' => $theory->id, 'practical_instructor_id' => $practical->id,
+        return $this->putJson("{$prefix}/classes/{$this->class->id}/instructor", [
+            'instructor_id' => $instructor->id,
         ]);
     }
 
@@ -91,11 +84,9 @@ class ClassInstructorEligibilityTest extends TestCase
     public function test_a_student_account_with_class_teach_via_a_custom_role_can_be_assigned_everywhere(): void
     {
         $teacher = $this->giveOnly($this->makeUser('student'), ['class.teach']);
-        $other = $this->giveOnly($this->makeUser('student'), ['class.teach']);
 
         $this->assign($teacher)->assertOk()->assertJsonPath('lecturer_id', $teacher->id);
-        $this->sync($other, $teacher)->assertOk();
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $this->class->id, 'instructor_id' => $other->id, 'assignment_type' => 'theory']);
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id, 'instructor_id' => $teacher->id]);
 
         $this->postJson('/api/admin/classes', ['course' => 'C', 'term' => 'T', 'lecturer_id' => $teacher->id])
             ->assertStatus(201)->assertJsonPath('lecturer_id', $teacher->id);
@@ -113,13 +104,14 @@ class ClassInstructorEligibilityTest extends TestCase
         $this->assertContains($teacher->id, $this->listedIds());
     }
 
-    public function test_the_teacher_prefix_sync_route_uses_the_same_rule(): void
+    public function test_the_teacher_prefix_assign_route_uses_the_same_rule(): void
     {
         $teacher = $this->giveOnly($this->makeUser('student'), ['class.teach']);
         $stale = $this->giveOnly($this->makeUser('instructor_practical'), ['results.grade']);
 
-        $this->sync($teacher, $teacher, '/api/teacher')->assertOk();
-        $this->sync($stale, $teacher, '/api/teacher')->assertStatus(422)->assertJsonValidationErrors('theory_instructor_id', 'errors');
+        $this->assign($teacher, '/api/teacher')->assertOk();
+        $this->assign($stale, '/api/teacher')->assertStatus(422)->assertJsonValidationErrors('instructor_id', 'errors');
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id, 'instructor_id' => $teacher->id]);
     }
 
     // ───────────────── loại tài khoản = instructor nhưng không còn class.teach ─────────────────
@@ -127,17 +119,14 @@ class ClassInstructorEligibilityTest extends TestCase
     public function test_an_instructor_account_without_class_teach_is_rejected_everywhere(): void
     {
         $stale = $this->giveOnly($this->makeUser('instructor_practical'), ['problem.create', 'results.grade', 'assignment.create']);
-        $ok = $this->giveOnly($this->makeUser('student'), ['class.teach']);
         $classes = ClassModel::count();
 
         $this->assign($stale)->assertStatus(422)->assertJsonValidationErrors('instructor_id', 'errors');
-        $this->sync($stale, $ok)->assertStatus(422)->assertJsonValidationErrors('theory_instructor_id', 'errors');
-        $this->sync($ok, $stale)->assertStatus(422)->assertJsonValidationErrors('practical_instructor_id', 'errors');
         $this->postJson('/api/admin/classes', ['course' => 'C', 'term' => 'T', 'lecturer_id' => $stale->id])
             ->assertStatus(422)->assertJsonValidationErrors('instructor_id', 'errors');
 
         $this->assertSame($classes, ClassModel::count(), 'không tạo lớp dở dang');
-        $this->assertDatabaseMissing('class_instructors', ['class_id' => $this->class->id]);
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id, 'instructor_id' => null]);
         $this->assertNotContains($stale->id, $this->listedIds());
     }
 
@@ -160,7 +149,7 @@ class ClassInstructorEligibilityTest extends TestCase
         $office = $this->makeUser('faculty_office');
         $student = $this->makeUser('student');
 
-        $this->assign($lecturer, 'theory')->assertOk();
+        $this->assign($lecturer)->assertOk();
         foreach ([$head, $office, $student] as $u) {
             $this->assign($u)->assertStatus(422);
         }
@@ -195,34 +184,36 @@ class ClassInstructorEligibilityTest extends TestCase
 
         $this->giveOnly($teacher, ['results.grade']);
 
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $this->class->id, 'instructor_id' => $teacher->id]);
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id, 'instructor_id' => $teacher->id]);
         $this->getJson("/api/admin/classes/{$this->class->id}")->assertOk()->assertJsonPath('lecturer_id', $teacher->id);
-        $this->assign($teacher, 'theory')->assertStatus(422);
+
+        // Một người khác cũng không có class.teach thì không được thay vào.
+        $other = $this->giveOnly($this->makeUser('instructor_practical'), ['results.grade']);
+        $this->assign($other)->assertStatus(422);
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id, 'instructor_id' => $teacher->id]);
     }
 
-    public function test_resubmitting_the_current_assignment_does_not_require_class_teach(): void
+    public function test_resubmitting_the_current_instructor_does_not_require_class_teach(): void
     {
-        $theory = $this->giveOnly($this->makeUser('instructor_theory'), ['class.teach']);
-        $practical = $this->giveOnly($this->makeUser('instructor_practical'), ['class.teach']);
-        $this->sync($theory, $practical)->assertOk();
+        $current = $this->giveOnly($this->makeUser('instructor_practical'), ['class.teach']);
+        $other = $this->giveOnly($this->makeUser('instructor_theory'), ['class.teach']);
+        $this->assign($current)->assertOk();
 
-        // Cả hai mất quyền dạy nhưng vẫn đứng lớp.
-        $this->giveOnly($theory, ['results.grade']);
-        $this->giveOnly($practical, ['results.grade']);
+        // Mất quyền dạy nhưng vẫn đứng lớp.
+        $this->giveOnly($current, ['results.grade']);
+        $this->giveOnly($other, ['results.grade']);
 
         // Form sửa lớp của frontend luôn gửi lại giảng viên đang chọn: sửa ngày không được 422.
         $this->putJson("/api/admin/classes/{$this->class->id}", [
-            'lecturerId' => $practical->id, 'endDate' => '2027-01-31',
-        ])->assertOk()->assertJsonPath('lecturer_id', $practical->id);
-        $this->assign($practical, 'practical')->assertOk();
-        $this->sync($theory, $practical)->assertOk();
-        $this->sync($theory, $practical, '/api/teacher')->assertOk();
+            'lecturerId' => $current->id, 'endDate' => '2027-01-31',
+        ])->assertOk()->assertJsonPath('lecturer_id', $current->id);
+        $this->assign($current)->assertOk();
+        $this->assign($current, '/api/teacher')->assertOk();
 
-        // Nhưng đổi sang loại khác là phân công mới.
-        $this->sync($practical, $theory)->assertStatus(422)->assertJsonValidationErrors(['theory_instructor_id', 'practical_instructor_id'], 'errors');
-        $this->assign($theory, 'practical')->assertStatus(422);
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $this->class->id, 'instructor_id' => $theory->id, 'assignment_type' => 'theory']);
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $this->class->id, 'instructor_id' => $practical->id, 'assignment_type' => 'practical']);
+        // Nhưng đổi sang người khác là phân công mới, cần class.teach.
+        $this->assign($other)->assertStatus(422);
+        $this->putJson("/api/admin/classes/{$this->class->id}", ['lecturerId' => $other->id])->assertStatus(422);
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id, 'instructor_id' => $current->id]);
     }
 
     public function test_changing_the_account_type_of_a_teaching_instructor_is_no_longer_blocked(): void
@@ -233,7 +224,7 @@ class ClassInstructorEligibilityTest extends TestCase
         $this->putJson("/api/admin/users/{$teacher->id}", ['account_type' => 'student'])->assertOk();
 
         $this->assertSame('student', $teacher->fresh()->account_type);
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $this->class->id, 'instructor_id' => $teacher->id]);
+        $this->assertDatabaseHas('classes', ['id' => $this->class->id, 'instructor_id' => $teacher->id]);
     }
 
     // ───────────────── GET /api/admin/instructors ─────────────────

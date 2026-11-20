@@ -119,17 +119,12 @@ class RegradeAssignmentTest extends TestCase
         ], $attrs));
     }
 
-    private function makeClass(User $student, ?User $practical = null, ?Assignment $exam = null, bool $viaPivot = false): ClassModel
+    private function makeClass(User $student, ?User $instructor = null, ?Assignment $exam = null): ClassModel
     {
         $class = ClassModel::create([
             'id' => 'RG_' . strtoupper(uniqid()), 'course' => 'RG Course ' . uniqid(), 'term' => 'RG Term', 'status' => 'Active',
-            'instructor_id' => $viaPivot ? null : $practical?->id, 'practice_instructor_id' => $viaPivot ? null : $practical?->id,
+            'instructor_id' => $instructor?->id,
         ]);
-        if ($practical && $viaPivot) {
-            DB::table('class_instructors')->insert([
-                'class_id' => $class->id, 'instructor_id' => $practical->id, 'assignment_type' => 'practical', 'assigned_at' => now(),
-            ]);
-        }
         $class->students()->attach($student->id, ['role' => 'Member', 'joined_at' => now()]);
         if ($exam) {
             DB::table('assignment_classes')->insert(['id' => (string) Str::uuid(), 'assignment_id' => $exam->id, 'class_id' => $class->id]);
@@ -199,11 +194,7 @@ class RegradeAssignmentTest extends TestCase
     {
         $student = $this->makeUser('student', null, 'RG Học Viên ' . uniqid());
         $practical = $this->makeUser('instructor');
-        $viaPivot = $this->makeUser('instructor');
         $class = $this->makeClass($student, $practical, $this->exam);
-        DB::table('class_instructors')->insert([
-            'class_id' => $class->id, 'instructor_id' => $viaPivot->id, 'assignment_type' => 'practical', 'assigned_at' => now(),
-        ]);
         $sub = $this->makeSubmission($student, null, ['score' => 80, 'evaluated_score' => 7.5, 'result' => 'Accepted']);
         $appeal = $this->makeAppeal($sub, ['status' => 'resolved', 'resolved_at' => now()->subMinutes(5)]);
         $reviewer = $this->makeReviewer('RG Người Chấm ' . uniqid());
@@ -247,7 +238,7 @@ class RegradeAssignmentTest extends TestCase
         $this->assertNotNull($row['completedAt']);
         $this->assertSame('Xem lại câu 2', $row['assignmentNote']);
         $this->assertSame('Xem lại câu 2', $row['note']);
-        $this->assertEqualsCanonicalizing([$practical->id, $viaPivot->id], $row['excludedReviewerIds'], 'giảng viên thực hành đứng lớp (cột cũ và bảng nối)');
+        $this->assertSame([$practical->id], $row['excludedReviewerIds'], 'giảng viên đứng lớp (classes.instructor_id)');
         $this->assertSame(1, $appeal->count());
     }
 
@@ -292,7 +283,7 @@ class RegradeAssignmentTest extends TestCase
         $a = $this->makeUser('instructor');
         $b = $this->makeUser('instructor');
         $this->makeClass($student, $a);
-        $this->makeClass($student, $b, null, true);
+        $this->makeClass($student, $b);
         $this->makeSubmission($student);
 
         $row = $this->candidates(['session_id' => $this->exam->id])['rows'][0];
@@ -605,17 +596,22 @@ class RegradeAssignmentTest extends TestCase
         $admin = $this->makeUser('admin');
 
         foreach ([null, '', 'khong-co-user', $notGrader->id, $inactive->id, $admin->id] as $bad) {
-            $this->putJson(self::BASE . "/{$sub->id}", ['reviewerId' => $bad])->assertStatus(404)->assertJsonPath('detail', 'Không tìm thấy giảng viên chấm phúc khảo.');
+            // Người chấm sai nằm trong dữ liệu gửi lên: 422 gắn vào reviewerId, không phải 404.
+            $this->putJson(self::BASE . "/{$sub->id}", ['reviewerId' => $bad])->assertStatus(422)
+                ->assertJsonPath('detail', 'Không tìm thấy giảng viên chấm phúc khảo.')
+                ->assertJsonValidationErrors('reviewerId', 'errors');
         }
-        $this->putJson(self::BASE . "/{$sub->id}", [])->assertStatus(404);
+        $this->putJson(self::BASE . "/{$sub->id}", [])->assertStatus(422)->assertJsonValidationErrors('reviewerId', 'errors');
         $this->putJson(self::BASE . "/{$sub->id}", ['reviewerId' => $practical->id])->assertStatus(422)
-            ->assertJsonPath('detail', 'Không được chọn giảng viên thực hành đứng lớp của sinh viên này để chấm phúc khảo.');
+            ->assertJsonPath('detail', 'Không được chọn giảng viên đứng lớp của sinh viên này để chấm phúc khảo.')
+            ->assertJsonValidationErrors('reviewerId', 'errors');
         $this->assertNull(SubmissionRegradeAssignment::find($sub->id), 'không tạo phân công khi bị từ chối');
         $this->assertSame(0, DB::table('notifications')->where('user_id', $practical->id)->count());
 
         $this->assignRow($sub, $okReviewer, ['completed_at' => now()]);
-        $this->putJson(self::BASE . "/{$sub->id}", ['reviewerId' => $this->makeReviewer()->id])->assertStatus(422)
-            ->assertJsonPath('detail', 'Bài nộp này đã được chấm phúc khảo xong, không thể phân công lại.');
+        // Yêu cầu hợp lệ nhưng bài nộp đã chấm xong: xung đột trạng thái (409), không phải lỗi dữ liệu (422).
+        $this->putJson(self::BASE . "/{$sub->id}", ['reviewerId' => $this->makeReviewer()->id])->assertStatus(409)
+            ->assertJsonPath('detail', 'Bài nộp này đã được chấm phúc khảo xong, không thể phân công lại hoặc hủy.');
         $this->assertSame($okReviewer->id, SubmissionRegradeAssignment::find($sub->id)->assigned_instructor_id);
     }
 
@@ -661,8 +657,8 @@ class RegradeAssignmentTest extends TestCase
         $done = $this->makeSubmission($student, null, [], $this->makeProblem());
         $reviewer = $this->makeReviewer();
         $this->assignRow($done, $reviewer, ['completed_at' => now()]);
-        $this->deleteJson(self::BASE . "/{$done->id}")->assertStatus(422)
-            ->assertJsonPath('detail', 'Bài nộp này đã được chấm phúc khảo xong, không thể phân công lại.');
+        $this->deleteJson(self::BASE . "/{$done->id}")->assertStatus(409)
+            ->assertJsonPath('detail', 'Bài nộp này đã được chấm phúc khảo xong, không thể phân công lại hoặc hủy.');
         $this->assertNotNull(SubmissionRegradeAssignment::find($done->id));
         $this->assertSame(0, $this->notificationsFor($reviewer, 'Hủy phân công'));
     }

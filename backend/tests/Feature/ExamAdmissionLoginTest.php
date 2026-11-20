@@ -141,22 +141,51 @@ class ExamAdmissionLoginTest extends TestCase
             ->assertJsonPath('user.id', $this->student->id);
     }
 
-    public function test_exam_username_with_wrong_password_returns_401(): void
+    public function test_exam_username_with_wrong_password_returns_the_generic_401(): void
     {
         $this->login($this->admission->username, 'sai-mat-khau')
             ->assertStatus(401)
-            ->assertJsonPath('detail', 'Sai tài khoản hoặc mật khẩu ca thi.');
+            ->assertJsonPath('detail', 'Email hoặc mật khẩu không chính xác.');
 
         $this->assertSame('issued', $this->admission->fresh()->status);
     }
 
-    public function test_revoked_exam_username_returns_401_even_with_the_right_password(): void
+    public function test_revoked_exam_username_returns_the_generic_401_even_with_the_right_password(): void
     {
         $this->admission->update(['status' => 'revoked']);
 
         $this->login($this->admission->username, self::TEMP_PASSWORD)
             ->assertStatus(401)
-            ->assertJsonPath('detail', 'Sai tài khoản hoặc mật khẩu ca thi.');
+            ->assertJsonPath('detail', 'Email hoặc mật khẩu không chính xác.');
+    }
+
+    public function test_the_error_does_not_reveal_whether_an_exam_username_exists(): void
+    {
+        $this->admission->update(['status' => 'revoked']);
+        $revoked = $this->admission->username;
+
+        $answers = [
+            $this->login($revoked, 'sai')->assertStatus(401)->json(),
+            $this->login('K7_KHONG_TON_TAI', 'sai')->assertStatus(401)->json(),
+            $this->login('khong.ton.tai@gm.uit.edu.vn', 'sai')->assertStatus(401)->json(),
+        ];
+
+        $this->assertSame($answers[0], $answers[1]);
+        $this->assertSame($answers[1], $answers[2]);
+    }
+
+    public function test_login_is_throttled_per_account_and_ip_and_the_message_is_in_detail(): void
+    {
+        for ($i = 0; $i < 10; $i++) {
+            $this->login($this->admission->username, 'sai')->assertStatus(401);
+        }
+
+        $this->login($this->admission->username, self::TEMP_PASSWORD)
+            ->assertStatus(429)
+            ->assertJsonPath('detail', 'Bạn đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.');
+
+        // Tên khác cùng IP không bị ảnh hưởng.
+        $this->login($this->student->email, 'sai')->assertStatus(401);
     }
 
     public function test_initial_password_is_accepted_even_when_the_hash_differs(): void

@@ -19,6 +19,8 @@ import type { ProctorOption } from "@/shared/api/examSessions";
 import type { WorkspacePart } from "@/data/models";
 import type { BuilderProblem } from "@/features/teacher/builder/BuilderShared";
 import { WORKSPACE_PARTS } from "@/shared/lib/workspace/workspaceParts";
+import { SCORING_CUSTOM, SCORING_EQUAL, customScoringSummary, examPapers, questionPointsOf, type ScoringMode } from "@/features/teacher/builder/questionScoring";
+import { CustomScoreTotal, ScoringModeControl } from "@/features/teacher/builder/BuilderScoring";
 import "@/styles/examinations.css";
 
 export type ExaminationSessionPlannerProps = {
@@ -51,6 +53,9 @@ export type ExaminationSessionPlannerProps = {
     conflictStudents?: Array<{ id: string; name: string; email: string; student_id?: string }>;
   } | null;
   onClearError?: () => void;
+  /** Cách tính điểm của cả kỳ thi; "custom_questions" hiện ô nhập điểm ở từng câu. */
+  scoringMode?: ScoringMode;
+  onScoringModeChange?: (mode: ScoringMode) => void;
 };
 
 type ModalSlotState = {
@@ -209,6 +214,8 @@ export function ExaminationSessionPlanner({
   onRetryCatalog,
   errorTarget = null,
   onClearError,
+  scoringMode = SCORING_EQUAL,
+  onScoringModeChange,
 }: ExaminationSessionPlannerProps) {
   const { t } = useLanguage("teacher");
 
@@ -537,6 +544,14 @@ export function ExaminationSessionPlanner({
     }, 0);
   }, [sessionProblems, allProblems, problemDetails]);
 
+  // "Tùy chỉnh điểm": tổng điểm từng câu của ca đang xem (mỗi mã đề phải đủ 10 điểm).
+  const customScoring = scoringMode === SCORING_CUSTOM;
+  const sessionCustomTotal = useMemo(() => customScoringSummary(sessionProblems.map(item => {
+    const selected = selectedQuestions(problemDetails?.[item.id] || null, item.workspaceParts || [], item.questionSelection);
+    const ids = Object.fromEntries(Object.entries(selected).map(([part, list]) => [part, list.map(question => question.id)]));
+    return { title: item.id, papers: examPapers(item.questionSelection, ids), points: questionPointsOf(item.questionSelection) };
+  })).total, [sessionProblems, problemDetails]);
+
   return (
     <section className="examination-planner-v2">
       {/* Header bar: [+ Thêm ngày thi] on the left, followed by Date tabs */}
@@ -857,14 +872,19 @@ export function ExaminationSessionPlanner({
                       <small className="muted">Mỗi ca thi sử dụng danh sách câu hỏi độc lập</small>
                     </h4>
                   </div>
-                  <GlidingTooltipGroup className="builder-scoring-summary" label={t("Equal scoring")} role="group" multiline>
-                    <strong><TranslatedText>{t("Total: 10 points")}</TranslatedText></strong>
+                  <GlidingTooltipGroup className="builder-scoring-summary" label={t(customScoring ? "Custom points" : "Equal scoring")} role="group" multiline>
+                    {onScoringModeChange && <ScoringModeControl value={scoringMode} onChange={onScoringModeChange} />}
+                    {customScoring
+                      ? <CustomScoreTotal total={sessionCustomTotal} />
+                      : <strong><TranslatedText>{t("Total: 10 points")}</TranslatedText></strong>}
                     <span><TranslatedText>{t("{value0} selected questions", { value0: totalQuestions })}</TranslatedText></span>
                     <button
                       type="button"
                       className="builder-scoring-help"
-                      aria-label={t("Equal scoring")}
-                      data-tooltip={t("Each selected question has the same weight, across all problems and SQL types.")}
+                      aria-label={t(customScoring ? "Custom points" : "Equal scoring")}
+                      data-tooltip={t(customScoring
+                        ? "Enter the points of every selected question. Every exam variant must add up to 10 points."
+                        : "Each selected question has the same weight, across all problems and SQL types.")}
                     >
                       <CircleHelp size={14} aria-hidden="true" />
                     </button>
@@ -949,6 +969,7 @@ export function ExaminationSessionPlanner({
                               detail={problemDetails?.[item.id] || null}
                               parts={item.workspaceParts || []}
                               questionSelection={item.questionSelection}
+                              scoringMode={scoringMode}
                               onQuestionSelectionChange={(selection) => updateSessionProblem(item.id, { questionSelection: selection })}
                               onPartsChange={(parts) => updateSessionProblem(item.id, { workspaceParts: parts })}
                               onBatchChange={(patch) => updateSessionProblem(item.id, patch)}

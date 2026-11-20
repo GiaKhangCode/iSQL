@@ -115,10 +115,10 @@ class UserPermissionTest extends TestCase
     {
         foreach (['user.manage', 'class.manage', 'access.manage'] as $permission) {
             Sanctum::actingAs($this->makeUser('student', [$permission]));
-            $this->getJson('/api/admin/overview')->assertOk();
+            $this->getJson('/api/admin/overview/stats')->assertOk();
         }
         Sanctum::actingAs($this->makeUser('admin', ['problem.create']));
-        $this->getJson('/api/admin/overview')->assertStatus(403);
+        $this->getJson('/api/admin/overview/stats')->assertStatus(403);
     }
 
     // ───────────── bảo vệ siêu quản trị cuối cùng ─────────────

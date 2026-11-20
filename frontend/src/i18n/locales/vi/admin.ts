@@ -295,7 +295,6 @@ export const admin: Dictionary = {
   "Search tags...": "Tìm kiếm thẻ...",
   "No tags found.": "Không tìm thấy thẻ nào phù hợp.",
   "Create a new tag or adjust your search filter.": "Hãy tạo thẻ mới hoặc điều chỉnh bộ lọc tìm kiếm.",
-  "Order index": "Thứ tự",
   "Tag name": "Tên thẻ",
   "Tag kind": "Loại thẻ",
   "Applies to": "Áp dụng phần",

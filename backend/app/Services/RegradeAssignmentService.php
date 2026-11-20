@@ -15,6 +15,7 @@ use App\Models\WorkspaceSubmissionResult;
 use App\Services\Access\AccessControlService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Phân công giảng viên chấm phúc khảo cho bài thi (giáo vụ phân công, giảng viên được giao chấm).
@@ -184,12 +185,17 @@ class RegradeAssignmentService
         $this->assertNotQuestionOnly($sub);
         $existing = $this->assertNotCompleted($sub);
 
+        // Người chấm nằm trong dữ liệu gửi lên nên chọn sai là lỗi dữ liệu (422, gắn vào reviewerId), không phải 404.
         $reviewer = $this->eligibleReviewerQuery()->where('id', $reviewerId)->first();
-        abort_unless($reviewer !== null, 404, 'Không tìm thấy giảng viên chấm phúc khảo.');
+        if ($reviewer === null) {
+            throw ValidationException::withMessages(['reviewerId' => ['Không tìm thấy giảng viên chấm phúc khảo.']]);
+        }
 
         $excludedIds = $this->classInstructorIdsForSubmission($sub, $activity);
         if (in_array((string) $reviewer->id, $excludedIds, true)) {
-            abort(422, 'Không được chọn giảng viên thực hành đứng lớp của sinh viên này để chấm phúc khảo.');
+            throw ValidationException::withMessages([
+                'reviewerId' => ['Không được chọn giảng viên đứng lớp của sinh viên này để chấm phúc khảo.'],
+            ]);
         }
 
         $previousReviewerId = $existing && $existing->assigned_instructor_id !== $reviewer->id
@@ -305,12 +311,15 @@ class RegradeAssignmentService
         abort_if($isQuestionOnly, 422, 'Không thể phân công phúc khảo cho bài nộp từng câu.');
     }
 
-    /** @return SubmissionRegradeAssignment|null phân công hiện có; 422 nếu đã chấm xong */
+    /**
+     * @return SubmissionRegradeAssignment|null phân công hiện có; 409 nếu đã chấm xong. Yêu cầu hợp lệ nhưng
+     *         bài nộp đang ở trạng thái không cho phép thao tác (xung đột trạng thái), nên không phải 422.
+     */
     private function assertNotCompleted(Submission $sub): ?SubmissionRegradeAssignment
     {
         $existing = SubmissionRegradeAssignment::find($sub->id);
         if ($existing && $existing->completed_at !== null) {
-            abort(422, 'Bài nộp này đã được chấm phúc khảo xong, không thể phân công lại.');
+            abort(409, 'Bài nộp này đã được chấm phúc khảo xong, không thể phân công lại hoặc hủy.');
         }
 
         return $existing;
@@ -345,19 +354,11 @@ class RegradeAssignmentService
         }
 
         if (!empty($studentClassIds)) {
-            $classes = ClassModel::whereIn('id', $studentClassIds)->get(['id', 'practice_instructor_id']);
+            $classes = ClassModel::whereIn('id', $studentClassIds)->get(['id', 'instructor_id']);
             foreach ($classes as $cls) {
-                if ($cls->practice_instructor_id) {
-                    $excluded[] = (string) $cls->practice_instructor_id;
+                if ($cls->instructor_id) {
+                    $excluded[] = (string) $cls->instructor_id;
                 }
-            }
-            $pivotIds = DB::table('class_instructors')
-                ->whereIn('class_id', $studentClassIds)
-                ->where('assignment_type', 'practical')
-                ->pluck('instructor_id')
-                ->all();
-            foreach ($pivotIds as $pid) {
-                $excluded[] = (string) $pid;
             }
         }
 
@@ -422,14 +423,8 @@ class RegradeAssignmentService
         }
         $allClassIds = array_values(array_unique($allClassIds));
         $classesMap = !empty($allClassIds)
-            ? ClassModel::whereIn('id', $allClassIds)->get(['id', 'course', 'practice_instructor_id'])->keyBy('id')
+            ? ClassModel::whereIn('id', $allClassIds)->get(['id', 'course', 'instructor_id'])->keyBy('id')
             : collect();
-        $classInstructorsMap = [];
-        if (!empty($allClassIds)) {
-            foreach (DB::table('class_instructors')->whereIn('class_id', $allClassIds)->where('assignment_type', 'practical')->get(['class_id', 'instructor_id']) as $ci) {
-                $classInstructorsMap[(string) $ci->class_id][] = (string) $ci->instructor_id;
-            }
-        }
 
         $rows = [];
         foreach ($subs as $sub) {
@@ -462,12 +457,9 @@ class RegradeAssignmentService
                     if ($className === null) {
                         $className = (string) $cls->course;
                     }
-                    if ($cls->practice_instructor_id) {
-                        $excluded[] = (string) $cls->practice_instructor_id;
+                    if ($cls->instructor_id) {
+                        $excluded[] = (string) $cls->instructor_id;
                     }
-                }
-                foreach (($classInstructorsMap[$cid] ?? []) as $pid) {
-                    $excluded[] = $pid;
                 }
             }
 

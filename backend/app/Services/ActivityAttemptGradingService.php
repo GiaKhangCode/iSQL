@@ -8,6 +8,7 @@ use App\Models\Problem;
 use App\Models\Submission;
 use App\Models\User;
 use App\Models\WorkspaceSubmissionResult;
+use App\Services\Grading\QuestionScoring;
 use App\Services\SqlServer\SandboxService;
 use Illuminate\Support\Str;
 
@@ -15,7 +16,8 @@ use Illuminate\Support\Str;
  * Chấm bản nháp của một bài trong lượt làm (ActivityAttempt) và lưu thành Submission + kết quả từng phần.
  *
  * Tách từ Student/ActivityAttemptController::gradeAndStoreMemberSubmission. Mỗi phần của bài
- * (SQL, DDL, DML, TRIGGER) cho ra một "section" gồm các câu hỏi; điểm = số câu đúng / tổng số câu * điểm tối đa.
+ * (SQL, DDL, DML, TRIGGER) cho ra một "section" gồm các câu hỏi; điểm tính theo trọng số từng câu
+ * (xem QuestionScoring: không có `questionPoints` thì = số câu đúng / tổng số câu * điểm tối đa).
  */
 class ActivityAttemptGradingService
 {
@@ -52,6 +54,7 @@ class ActivityAttemptGradingService
         $sections = [];
         $totalQuestions = 0;
         $passedQuestions = 0;
+        $outcomes = [];
 
         foreach ($parts as $part) {
             $part = strtoupper((string) $part);
@@ -68,15 +71,16 @@ class ActivityAttemptGradingService
             $sections[] = $graded['section'];
             $totalQuestions += $graded['total'];
             $passedQuestions += $graded['passed'];
+            foreach ($graded['section']['questions'] as $question) {
+                $outcomes[] = ['part' => $part, 'id' => (string) $question['id'], 'passed' => ($question['status'] ?? '') === 'Accepted'];
+            }
         }
 
         $maxPoints = (float) ($member->points ?: 10.0);
         $overallStatus = ($totalQuestions > 0 && $passedQuestions === $totalQuestions)
             ? 'Accepted'
             : ($passedQuestions > 0 ? 'Partial' : 'Wrong Answer');
-        $score = $totalQuestions > 0
-            ? round(($passedQuestions / $totalQuestions) * $maxPoints, 2)
-            : 0;
+        $score = QuestionScoring::score($outcomes, $selection, $maxPoints);
 
         $queryPayload = json_encode([
             'ddl'       => (string) ($draft['ddl'] ?? ''),

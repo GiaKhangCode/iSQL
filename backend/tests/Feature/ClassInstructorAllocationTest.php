@@ -98,19 +98,12 @@ class ClassInstructorAllocationTest extends TestCase
         $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
             ->putJson("/api/admin/classes/{$this->testClass->id}/instructor", [
                 'instructor_id'   => $this->instructor1->id,
-                'assignment_type' => 'practical',
             ]);
 
         $response->assertStatus(200)
             ->assertJsonPath('id', $this->testClass->id)
             ->assertJsonPath('lecturer', $this->instructor1->name)
             ->assertJsonPath('lecturer_id', $this->instructor1->id);
-
-        $this->assertDatabaseHas('class_instructors', [
-            'class_id'        => $this->testClass->id,
-            'instructor_id'   => $this->instructor1->id,
-            'assignment_type' => 'practical',
-        ]);
 
         $this->assertDatabaseHas('classes', [
             'id'            => $this->testClass->id,
@@ -123,7 +116,6 @@ class ClassInstructorAllocationTest extends TestCase
         $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
             ->postJson("/api/admin/classes/{$this->testClass->id}/allocate-teacher", [
                 'lecturer_id'     => $this->instructor1->id,
-                'assignment_type' => 'practical',
             ]);
 
         $response->assertStatus(200)
@@ -173,60 +165,56 @@ class ClassInstructorAllocationTest extends TestCase
             'id'            => $this->testClass->id,
             'instructor_id' => null,
         ]);
+    }
 
-        $this->assertDatabaseMissing('class_instructors', [
-            'class_id' => $this->testClass->id,
+    public function test_a_class_has_exactly_one_instructor_so_assigning_again_replaces_the_previous_one(): void
+    {
+        $headers = ['Authorization' => "Bearer {$this->adminToken}"];
+
+        $this->withHeaders($headers)
+            ->putJson("/api/admin/classes/{$this->testClass->id}/instructor", ['instructor_id' => $this->instructor1->id])
+            ->assertStatus(200);
+        $this->withHeaders($headers)
+            ->putJson("/api/admin/classes/{$this->testClass->id}/instructor", ['instructor_id' => $this->instructor2->id])
+            ->assertStatus(200)
+            ->assertJsonPath('lecturer_id', $this->instructor2->id);
+
+        $this->assertDatabaseHas('classes', [
+            'id'            => $this->testClass->id,
+            'instructor_id' => $this->instructor2->id,
         ]);
     }
 
-    public function test_admin_can_sync_both_theory_and_practical_instructors(): void
+    public function test_admin_can_unassign_instructor_via_instructor_endpoint(): void
     {
-        $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
-            ->putJson("/api/admin/classes/{$this->testClass->id}/instructors", [
-                'theory_instructor_id'    => $this->instructor2->id,
-                'practical_instructor_id' => $this->instructor1->id,
-            ]);
+        $this->testClass->update(['instructor_id' => $this->instructor1->id]);
 
-        $response->assertStatus(200);
-
-        $this->assertDatabaseHas('class_instructors', [
-            'class_id'        => $this->testClass->id,
-            'instructor_id'   => $this->instructor2->id,
-            'assignment_type' => 'theory',
-        ]);
-
-        $this->assertDatabaseHas('class_instructors', [
-            'class_id'        => $this->testClass->id,
-            'instructor_id'   => $this->instructor1->id,
-            'assignment_type' => 'practical',
-        ]);
-    }
-
-    public function test_admin_can_remove_instructor_assignment_by_type(): void
-    {
-        // First sync
         $this->withHeader('Authorization', "Bearer {$this->adminToken}")
+            ->putJson("/api/admin/classes/{$this->testClass->id}/instructor", ['instructor_id' => 'Unassigned'])
+            ->assertStatus(200)
+            ->assertJsonPath('lecturer_id', null)
+            ->assertJsonPath('lecturer', 'Unassigned');
+
+        $this->assertDatabaseHas('classes', ['id' => $this->testClass->id, 'instructor_id' => null]);
+    }
+
+    public function test_theory_instructor_routes_and_fields_no_longer_exist(): void
+    {
+        $headers = ['Authorization' => "Bearer {$this->adminToken}"];
+
+        // PUT .../instructors (đồng bộ lý thuyết + thực hành) và DELETE .../instructors/{loại} đã bị bỏ.
+        $this->withHeaders($headers)
             ->putJson("/api/admin/classes/{$this->testClass->id}/instructors", [
                 'theory_instructor_id'    => $this->instructor2->id,
                 'practical_instructor_id' => $this->instructor1->id,
-            ]);
+            ])
+            ->assertStatus(404);
+        $this->withHeaders($headers)
+            ->deleteJson("/api/admin/classes/{$this->testClass->id}/instructors/theory")
+            ->assertStatus(404);
 
-        // Remove theory instructor
-        $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
-            ->deleteJson("/api/admin/classes/{$this->testClass->id}/instructors/theory");
-
-        $response->assertStatus(200);
-
-        $this->assertDatabaseMissing('class_instructors', [
-            'class_id'        => $this->testClass->id,
-            'assignment_type' => 'theory',
-        ]);
-
-        // Practical instructor remains
-        $this->assertDatabaseHas('class_instructors', [
-            'class_id'        => $this->testClass->id,
-            'assignment_type' => 'practical',
-        ]);
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable('class_instructors'));
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('classes', 'practice_instructor_id'));
     }
 
     public function test_assigning_non_instructor_fails_validation(): void
@@ -234,7 +222,6 @@ class ClassInstructorAllocationTest extends TestCase
         $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
             ->putJson("/api/admin/classes/{$this->testClass->id}/instructor", [
                 'instructor_id'   => $this->studentUser->id, // Student, not instructor
-                'assignment_type' => 'practical',
             ]);
 
         $response->assertStatus(422);
@@ -245,7 +232,6 @@ class ClassInstructorAllocationTest extends TestCase
         $response = $this->withHeader('Authorization', "Bearer {$this->studentToken}")
             ->putJson("/api/admin/classes/{$this->testClass->id}/instructor", [
                 'instructor_id'   => $this->instructor1->id,
-                'assignment_type' => 'practical',
             ]);
 
         $response->assertStatus(403);

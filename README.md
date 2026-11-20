@@ -202,7 +202,7 @@ Sau khi chạy `db:seed`, bạn có thể sử dụng ngay các tài khoản sau
 
 ## 🛡️ Hệ Thống Phân Quyền (RBAC theo capability)
 
-Một **vai trò** là tập các mã quyền (`practice.solve`, `problem.create`, `assignment.create`, `results.grade`, `class.manage`, `user.manage`, `access.manage`...). Một người có thể giữ nhiều vai trò; quyền hiệu lực = hợp các vai trò + quyền gán trực tiếp. Vai trò **Admin** là siêu quản trị (có mọi quyền trừ `results.grade`). Khu vực giao diện (`student|teacher|office|admin`) được suy ra từ quyền, xem `GET /api/auth/permissions`. Quản trị vai trò qua `/api/admin/access*` (trang **Roles** của admin).
+Một **vai trò** là tập các mã quyền (`practice.solve`, `problem.create`, `assignment.create`, `results.grade`, `class.manage`, `user.manage`, `access.manage`...). Một người có thể giữ nhiều vai trò; quyền hiệu lực = hợp các vai trò + quyền gán trực tiếp. Vai trò **Admin** là siêu quản trị (có mọi quyền trừ `results.grade` và `class.teach`: admin không chấm bài và không phải giảng viên đứng lớp). Khu vực giao diện (`student|teacher|office|admin`) được suy ra từ quyền, xem `GET /api/auth/permissions`. Quản trị vai trò qua `/api/admin/access*` (trang **Roles** của admin).
 
 ### Quy tắc đăng ký tài khoản
 - **Sinh viên (`POST /api/auth/register`):** Tự động kích hoạt (`status = 'Active'`) và nhận vai trò mặc định **Sinh viên**.
@@ -220,7 +220,8 @@ Một **vai trò** là tập các mã quyền (`practice.solve`, `problem.create
 - `/api/student/*`: Dashboard tiến độ học tập cá nhân, danh sách lớp theo học, database cá nhân.
 - `/api/problems/*`: Ngân hàng bài tập SQL (CRUD, chạy thử câu lệnh, nộp bài chấm điểm).
 - `/api/assignments/*` & `/api/examinations/*`: Quản lý kỳ thi, ca thi, giám thị, liên kết lớp học, cấu hình bài thi DDL/DML/Query.
-- `/api/contests/*`: **Sandbox phòng thi SQL Server** (khởi tạo schema, chạy DDL/DML/Query, nộp bài).
+- `/api/exam-sessions/*`: **Sandbox phòng thi SQL Server** của ca thi (khởi tạo schema, chạy DDL/DML/Query, nộp bài).
+- `/api/notifications/*` & `/api/sharing/*`: Thông báo (chuông) và chia sẻ bài toán/thư viện CSDL giữa giảng viên.
 - `/api/submissions/*` & `/api/regrade-assignments/*`: Lịch sử nộp bài, chấm bài, công bố/ẩn điểm và phân công phúc khảo.
 
 ---

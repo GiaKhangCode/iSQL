@@ -7,6 +7,7 @@ import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
 import { ExamSessionDetailView } from "@/shared/components/ExamSessionDetailView";
 import type { ExamSession, WorkspacePart } from "@/data/models";
 import type { QuestionSelection } from "@/features/teacher/builder/BuilderProblemSettings";
+import type { ScoringMode } from "@/features/teacher/builder/questionScoring";
 import { WORKSPACE_PARTS } from "@/shared/lib/workspace/workspaceParts";
 
 export type BuilderProblem = { id: string; points: number; workspaceParts?: WorkspacePart[]; questionSelection?: QuestionSelection; datasetVisibility?: Record<string, boolean>; databaseStructureVisible?: boolean; databaseDescriptionVisible?: boolean };
@@ -28,6 +29,8 @@ export type BuilderDraft = {
   problems: BuilderProblem[];
   studentOptions: { comments: boolean; leaderboard: boolean; examMode: boolean; examViolationLimit?: number; showScoresAfterSubmit: boolean; maxSubmissions: number | null; hints?: boolean; aiAllowed?: boolean };
   published: boolean;
+  /** Cách tính điểm; thiếu = chia đều (nháp cũ trong sessionStorage không có trường này). */
+  scoringMode?: ScoringMode;
 };
 
 export const assignmentSeed: BuilderDraft = {

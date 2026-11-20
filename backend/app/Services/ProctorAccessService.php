@@ -12,8 +12,7 @@ use App\Services\Access\StaffAccess;
  * Ai được coi thi ca nào, và danh sách ca/phòng của một giám thị.
  *
  * Quyền vào một ca: quản lý kỳ thi, chủ ca, giám thị ghi tên trong ca (theo tên hoặc email), giám thị được phân
- * công cho lớp/phòng, hoặc giảng viên dạy một lớp của ca (cột instructor_id, practice_instructor_id hay bảng
- * class_instructors). Khi chọn một phòng (roomId) thì chỉ tính phân công/giảng dạy của đúng lớp đó.
+ * công cho lớp/phòng, hoặc giảng viên dạy một lớp của ca (cột classes.instructor_id: một lớp một giảng viên). Khi chọn một phòng (roomId) thì chỉ tính phân công/giảng dạy của đúng lớp đó.
  */
 class ProctorAccessService
 {
@@ -56,11 +55,7 @@ class ProctorAccessService
         }
         if (!empty($sessionClassIds)) {
             $teaches = ClassModel::whereIn('id', $sessionClassIds)
-                ->where(function ($q) use ($user) {
-                    $q->where('instructor_id', $user->id)
-                      ->orWhere('practice_instructor_id', $user->id)
-                      ->orWhereHas('instructors', fn ($iq) => $iq->where('users.id', $user->id));
-                })
+                ->where('instructor_id', $user->id)
                 ->exists();
             if ($teaches) {
                 return $session;
@@ -88,8 +83,6 @@ class ProctorAccessService
             ->get();
 
         $taughtClassIds = ClassModel::where('instructor_id', $user->id)
-            ->orWhere('practice_instructor_id', $user->id)
-            ->orWhereHas('instructors', fn ($q) => $q->where('users.id', $user->id))
             ->pluck('id')
             ->flip()
             ->all();

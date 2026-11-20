@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Validate tạo lớp (POST /api/admin/classes).
@@ -36,7 +35,6 @@ class StoreClassRequest extends FormRequest
             'lecturer_id'     => 'sometimes|nullable|string',
             'lecturerId'      => 'sometimes|nullable|string',
             'instructor_id'   => 'sometimes|nullable|string',
-            'assignment_type' => ['sometimes', 'string', Rule::in(['theory', 'practical'])],
         ];
     }
 }

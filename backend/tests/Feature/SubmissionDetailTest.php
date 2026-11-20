@@ -409,19 +409,16 @@ class SubmissionDetailTest extends TestCase
         $this->show($this->makeAccount('faculty_office', ['examination.manage']))->assertOk();
     }
 
-    public function test_teaching_a_class_through_each_instructor_column_grants_access(): void
+    public function test_teaching_a_class_of_the_activity_grants_access(): void
     {
-        $viaPractice = $this->makeAccount('instructor');
-        $viaPivot = $this->makeAccount('instructor');
-        $class = $this->makeClass(['practice_instructor_id' => $viaPractice->id]);
+        $teacher = $this->makeAccount('instructor');
+        $class = $this->makeClass(['instructor_id' => $teacher->id]);
         $this->linkClass($this->activity, $class);
-        DB::table('class_instructors')->insert(['class_id' => $class->id, 'instructor_id' => $viaPivot->id, 'assignment_type' => 'theory']);
 
-        $this->show($viaPractice)->assertOk();
-        $this->show($viaPivot)->assertOk();
+        $this->show($teacher)->assertOk();
     }
 
-    public function test_exam_submissions_are_visible_only_to_practical_instructors_of_the_students_class(): void
+    public function test_exam_submissions_are_visible_only_to_the_instructor_of_the_students_class(): void
     {
         $session = $this->makeExamSession(['instructor_id' => $this->teacher->id]);
         $problem = $this->makeProblem();
@@ -431,20 +428,14 @@ class SubmissionDetailTest extends TestCase
         $this->enroll($class, $this->student);
         $this->linkClass($session, $class);
         $practical = $this->makeAccount('instructor');
-        $viaPivot = $this->makeAccount('instructor');
-        $theory = $this->makeAccount('instructor');
-        $class->update(['practice_instructor_id' => $practical->id]);
-        DB::table('class_instructors')->insert(['class_id' => $class->id, 'instructor_id' => $viaPivot->id, 'assignment_type' => 'practical']);
-        DB::table('class_instructors')->insert(['class_id' => $class->id, 'instructor_id' => $theory->id, 'assignment_type' => 'theory']);
+        $class->update(['instructor_id' => $practical->id]);
         $outsider = $this->makeAccount('instructor');
-        $otherClass = $this->makeClass(['practice_instructor_id' => $outsider->id]);
+        $otherClass = $this->makeClass(['instructor_id' => $outsider->id]);
         $this->enroll($otherClass, $this->makeStudent());
 
         $this->show($practical, $sub)->assertOk();
-        $this->show($viaPivot, $sub)->assertOk();
-        // Chủ ca thi, giảng viên lý thuyết và giảng viên lớp khác đều không xem được bài thi.
+        // Chủ ca thi và giảng viên lớp khác đều không xem được bài thi.
         $this->show($this->teacher, $sub)->assertStatus(403);
-        $this->show($theory, $sub)->assertStatus(403);
         $this->show($outsider, $sub)->assertStatus(403);
         // Người xem mọi kết quả thì xem được.
         $this->show($this->makeAccount('instructor', ['results.view_all']), $sub)->assertOk();
@@ -453,7 +444,7 @@ class SubmissionDetailTest extends TestCase
     public function test_an_activity_is_an_exam_through_either_flag_on_its_own(): void
     {
         $practical = $this->makeAccount('instructor');
-        $class = $this->makeClass(['practice_instructor_id' => $practical->id]);
+        $class = $this->makeClass(['instructor_id' => $practical->id]);
         $this->enroll($class, $this->student);
 
         foreach ([['examination_id' => $this->makeExamination()->id, 'exam_mode' => false], ['exam_mode' => true]] as $flags) {
@@ -474,7 +465,7 @@ class SubmissionDetailTest extends TestCase
         $problem = $this->makeProblem();
         $sub = $this->makeSubmission($this->student, $problem, $session, ['source' => 'ExamSession']);
         $teacher = $this->makeAccount('instructor');
-        $class = $this->makeClass(['practice_instructor_id' => $teacher->id]);
+        $class = $this->makeClass(['instructor_id' => $teacher->id]);
         $this->linkClass($session, $class);
         $this->enroll($class, $this->makeStudent());
 
@@ -494,7 +485,7 @@ class SubmissionDetailTest extends TestCase
         $this->linkClass($session, $inSession);
         $this->enroll($notInSession, $this->student);
         $teacher = $this->makeAccount('instructor');
-        $notInSession->update(['practice_instructor_id' => $teacher->id]);
+        $notInSession->update(['instructor_id' => $teacher->id]);
 
         // Dạy lớp của sinh viên nhưng lớp đó không thuộc ca thi.
         $this->show($teacher, $sub)->assertStatus(403);
@@ -675,7 +666,7 @@ class SubmissionDetailTest extends TestCase
         $this->enroll($class, $this->student);
         $this->linkClass($session, $class);
         $practical = $this->makeAccount('instructor');
-        $class->update(['practice_instructor_id' => $practical->id]);
+        $class->update(['instructor_id' => $practical->id]);
 
         $this->work($practical, $session)->assertOk();
         $this->work($this->teacher, $session)->assertStatus(403)
@@ -730,7 +721,7 @@ class SubmissionDetailTest extends TestCase
         $class = $this->makeClass();
         $this->enroll($class, $this->student);
         $practical = $this->makeAccount('instructor');
-        $class->update(['practice_instructor_id' => $practical->id]);
+        $class->update(['instructor_id' => $practical->id]);
 
         $this->show($this->teacher, $sub)->assertStatus(403);
         $this->show($practical, $sub)->assertOk();

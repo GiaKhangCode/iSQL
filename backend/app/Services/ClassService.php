@@ -76,33 +76,32 @@ class ClassService
             && $this->eligibleInstructorQuery()->whereKey($userId)->exists();
     }
 
-    /** Người này đang được phân công đúng loại này cho lớp này? */
-    public function isCurrentAssignment(string $classId, string $assignmentType, ?string $userId): bool
+    /** Người này đang là giảng viên của lớp này? (Một lớp một giảng viên: cột classes.instructor_id.) */
+    public function isCurrentInstructor(string $classId, ?string $userId): bool
     {
         return $userId !== null && $userId !== ''
-            && DB::table('class_instructors')
-                ->where('class_id', $classId)
-                ->where('assignment_type', $assignmentType)
-                ->where('instructor_id', $userId)
-                ->exists();
+            && ClassModel::whereKey($classId)->where('instructor_id', $userId)->exists();
     }
 
     /**
-     * Được đặt người này vào vị trí ($classId, $assignmentType)? Phân công mới cần class.teach; gửi lại đúng
-     * phân công đang có thì không (người mất quyền dạy vẫn giữ lớp đang dạy, và form sửa lớp luôn gửi lại giảng viên).
+     * Được đặt người này làm giảng viên của lớp? Phân công mới cần class.teach; gửi lại đúng người đang dạy thì
+     * không (người mất quyền dạy vẫn giữ lớp đang dạy, và form sửa lớp luôn gửi lại giảng viên).
      */
-    public function canHoldAssignment(string $classId, string $assignmentType, ?string $userId): bool
+    public function canHoldClass(string $classId, ?string $userId): bool
     {
-        return $this->isCurrentAssignment($classId, $assignmentType, $userId)
+        return $this->isCurrentInstructor($classId, $userId)
             || $this->isEligibleInstructor($userId);
     }
+
+    /** Quan hệ nạp kèm khi trả lớp ra API. */
+    private const CLASS_RELATIONS = ['instructor', 'students', 'courseRecord', 'academicTerm'];
 
     /**
      * Get all classes for Admin view
      */
     public function getAllClasses(): Collection
     {
-        return ClassModel::with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm'])
+        return ClassModel::with(self::CLASS_RELATIONS)
             ->orderBy('created_at', 'desc')->get();
     }
 
@@ -111,42 +110,22 @@ class ClassService
      */
     public function getClass(string $classId, ?string $instructorId = null): ClassModel
     {
-        $query = ClassModel::with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm'])->whereKey($classId);
+        $query = ClassModel::with(self::CLASS_RELATIONS)->whereKey($classId);
 
         if ($instructorId !== null) {
-            $this->scopeToPracticalInstructor($query, $instructorId);
+            $query->where('instructor_id', $instructorId);
         }
 
         return $query->firstOrFail();
     }
 
     /**
-     * Get one class that the user teaches in ANY capacity (theory or practical, or the legacy
-     * `instructor_id`). Used for read-only views such as the roster; writes use getClass()
-     * with an instructor id, which is limited to practical instructors.
-     */
-    public function getClassTaughtBy(string $classId, string $instructorId): ClassModel
-    {
-        return ClassModel::whereKey($classId)
-            ->where(function (Builder $q) use ($instructorId): void {
-                $q->where('instructor_id', $instructorId)
-                    ->orWhere('practice_instructor_id', $instructorId)
-                    ->orWhereHas('instructors', function (Builder $instructors) use ($instructorId): void {
-                        $instructors->where('users.id', $instructorId);
-                    });
-            })
-            ->firstOrFail();
-    }
-
-    /**
-     * Get classes taught by a specific practical instructor
+     * Get classes taught by a specific instructor
      */
     public function getInstructorClasses(string $instructorId): Collection
     {
-        $query = ClassModel::with(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
-        $this->scopeToPracticalInstructor($query, $instructorId);
-
-        return $query->distinct()
+        return ClassModel::with(self::CLASS_RELATIONS)
+            ->where('instructor_id', $instructorId)
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -154,7 +133,7 @@ class ClassService
     public function getStudentClasses(string $studentId): Collection
     {
         return User::findOrFail($studentId)->enrolledClasses()
-            ->with(['instructor', 'instructors', 'courseRecord', 'academicTerm'])
+            ->with(['instructor', 'courseRecord', 'academicTerm'])
             ->orderByDesc('created_at')
             ->get();
     }
@@ -186,6 +165,8 @@ class ClassService
         if ($hasInstructor) {
             // Kiểm tra TRƯỚC khi tạo lớp để id lạ/không hợp lệ trả 422 thay vì lỗi khóa ngoại.
             $this->assertActiveInstructor($instructorId);
+        } else {
+            $instructorId = null;
         }
 
         $attributes = [
@@ -203,97 +184,28 @@ class ClassService
             $attributes['id'] = $data['id'];
         }
 
-        // Tạo lớp và gán giảng viên là một đơn vị: lỗi giữa chừng không được để lại lớp dở dang.
-        $class = DB::transaction(function () use ($attributes, $hasInstructor, $data, $instructorId): ClassModel {
-            $class = ClassModel::create($attributes);
+        $class = ClassModel::create($attributes);
 
-            if ($hasInstructor) {
-                $this->assignInstructor($class->id, $data['assignment_type'] ?? 'practical', $instructorId);
-            }
-
-            return $class;
-        });
-
-        return $class->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+        return $class->load(self::CLASS_RELATIONS);
     }
 
     /**
-     * Assign an instructor to a class (or unassign if instructorId is Unassigned / null).
+     * Đặt giảng viên của lớp (một lớp một giảng viên), hoặc bỏ phân công khi instructorId là null / '' / 'Unassigned'.
      */
-    public function assignInstructor(string $classId, string $assignmentType = 'practical', ?string $instructorId = null): ClassModel
+    public function assignInstructor(string $classId, ?string $instructorId = null): ClassModel
     {
         $class = ClassModel::findOrFail($classId);
 
         if ($instructorId === null || $instructorId === 'Unassigned' || $instructorId === '') {
-            return $this->removeInstructorAssignment($classId, $assignmentType);
+            $class->update(['instructor_id' => null]);
+        } else {
+            if (! $this->isCurrentInstructor($class->id, $instructorId)) {
+                $this->assertActiveInstructor($instructorId);
+            }
+            $class->update(['instructor_id' => $instructorId]);
         }
 
-        if (! $this->isCurrentAssignment($class->id, $assignmentType, $instructorId)) {
-            $this->assertActiveInstructor($instructorId);
-        }
-
-        DB::transaction(function () use ($class, $assignmentType, $instructorId): void {
-            DB::table('class_instructors')
-                ->where('class_id', $class->id)
-                ->where('assignment_type', $assignmentType)
-                ->delete();
-            DB::table('class_instructors')->insert([
-                'class_id' => $class->id,
-                'instructor_id' => $instructorId,
-                'assignment_type' => $assignmentType,
-                'assigned_at' => now(),
-            ]);
-            $this->syncLegacyInstructorId($class->id);
-        });
-
-        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
-    }
-
-    public function syncInstructorAssignments(string $classId, string $theoryInstructorId, string $practicalInstructorId): ClassModel
-    {
-        $class = ClassModel::findOrFail($classId);
-        if (! $this->isCurrentAssignment($class->id, 'theory', $theoryInstructorId)) {
-            $this->assertActiveInstructor($theoryInstructorId);
-        }
-        if (! $this->isCurrentAssignment($class->id, 'practical', $practicalInstructorId)) {
-            $this->assertActiveInstructor($practicalInstructorId);
-        }
-
-        DB::transaction(function () use ($class, $theoryInstructorId, $practicalInstructorId): void {
-            DB::table('class_instructors')->where('class_id', $class->id)->delete();
-            DB::table('class_instructors')->insert([
-                [
-                    'class_id' => $class->id,
-                    'instructor_id' => $theoryInstructorId,
-                    'assignment_type' => 'theory',
-                    'assigned_at' => now(),
-                ],
-                [
-                    'class_id' => $class->id,
-                    'instructor_id' => $practicalInstructorId,
-                    'assignment_type' => 'practical',
-                    'assigned_at' => now(),
-                ],
-            ]);
-            $this->syncLegacyInstructorId($class->id);
-        });
-
-        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
-    }
-
-    public function removeInstructorAssignment(string $classId, string $assignmentType): ClassModel
-    {
-        $class = ClassModel::findOrFail($classId);
-
-        DB::transaction(function () use ($class, $assignmentType): void {
-            DB::table('class_instructors')
-                ->where('class_id', $class->id)
-                ->where('assignment_type', $assignmentType)
-                ->delete();
-            $this->syncLegacyInstructorId($class->id);
-        });
-
-        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+        return $class->refresh()->load(self::CLASS_RELATIONS);
     }
 
     /**
@@ -319,22 +231,6 @@ class ClassService
                 'instructor_id' => ['The instructor must be an active account allowed to teach classes (class.teach).'],
             ]);
         }
-    }
-
-    private function syncLegacyInstructorId(string $classId): void
-    {
-        $practicalId = DB::table('class_instructors')
-            ->where('class_id', $classId)
-            ->where('assignment_type', 'practical')
-            ->value('instructor_id');
-        $theoryId = DB::table('class_instructors')
-            ->where('class_id', $classId)
-            ->where('assignment_type', 'theory')
-            ->value('instructor_id');
-
-        DB::table('classes')->where('id', $classId)->update([
-            'instructor_id' => $practicalId ?? $theoryId,
-        ]);
     }
 
     /**
@@ -368,13 +264,13 @@ class ClassService
 
         if ($hasLecturerInput) {
             $lecturerId = $data['lecturer_id'] ?? $data['lecturerId'] ?? $data['instructor_id'] ?? null;
-            $assignmentType = $data['assignment_type'] ?? 'practical';
 
             if ($lecturerId === 'Unassigned' || $lecturerId === null || $lecturerId === '') {
-                DB::table('class_instructors')->where('class_id', $class->id)->delete();
                 $data['instructor_id'] = null;
             } else {
-                $this->assignInstructor($class->id, $assignmentType, $lecturerId);
+                if (! $this->isCurrentInstructor($class->id, $lecturerId)) {
+                    $this->assertActiveInstructor($lecturerId);
+                }
                 $data['instructor_id'] = $lecturerId;
             }
         }
@@ -382,7 +278,7 @@ class ClassService
         $class->fill($data);
         $class->save();
 
-        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+        return $class->refresh()->load(self::CLASS_RELATIONS);
     }
 
     /**
@@ -412,15 +308,6 @@ class ClassService
 
         $base = $class->toArray();
 
-        $practiceInstructorId = $class->practice_instructor_id ?? $lecturerId;
-        $practiceLecturer = $lecturerName;
-        if ($class->practice_instructor_id && $class->practice_instructor_id !== $lecturerId) {
-            $pInst = User::find($class->practice_instructor_id);
-            if ($pInst) {
-                $practiceLecturer = $pInst->name;
-            }
-        }
-
         return array_merge($base, [
             'id'                     => $class->id,
             'course'                 => $class->course,
@@ -430,8 +317,6 @@ class ClassService
             'lecturer'               => $lecturerName,
             'lecturer_id'            => $lecturerId,
             'lecturerId'             => $lecturerId,
-            'practice_instructor_id' => $practiceInstructorId,
-            'practice_lecturer'      => $practiceLecturer,
             'students'               => $studentsCount,
             'status'                 => $class->status,
             'semester'               => $class->term,
@@ -457,29 +342,10 @@ class ClassService
         $query = ClassModel::whereKey($classId);
 
         if ($instructorId !== null) {
-            $this->scopeToPracticalInstructor($query, $instructorId);
+            $query->where('instructor_id', $instructorId);
         }
 
         return $query->firstOrFail();
-    }
-
-    /**
-     * Limit a class query to classes where the user is the practical instructor.
-     */
-    private function scopeToPracticalInstructor(Builder $query, string $instructorId): void
-    {
-        $query->where(function (Builder $q) use ($instructorId): void {
-            $q->where('practice_instructor_id', $instructorId)
-                ->orWhereHas('instructors', function (Builder $instructors) use ($instructorId): void {
-                    $instructors->where('users.id', $instructorId)
-                        ->where('class_instructors.assignment_type', 'practical');
-                })
-                ->orWhere(function (Builder $fallback) use ($instructorId): void {
-                    $fallback->whereNull('practice_instructor_id')
-                        ->whereDoesntHave('instructors')
-                        ->where('instructor_id', $instructorId);
-                });
-        });
     }
 
     public function addStudents(string $classId, array $studentIds, ?string $instructorId = null): ClassModel
@@ -491,7 +357,7 @@ class ClassService
             $class->students()->syncWithoutDetaching($studentIds);
         });
 
-        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+        return $class->refresh()->load(self::CLASS_RELATIONS);
     }
 
     public function replaceStudents(string $classId, array $studentIds, ?string $instructorId = null): ClassModel
@@ -503,7 +369,7 @@ class ClassService
             $class->students()->sync($studentIds);
         });
 
-        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+        return $class->refresh()->load(self::CLASS_RELATIONS);
     }
 
     public function removeStudent(string $classId, string $studentId, ?string $instructorId = null): ClassModel
@@ -513,7 +379,7 @@ class ClassService
             abort(404, 'Student is not enrolled in this class.');
         }
 
-        return $class->refresh()->load(['instructor', 'instructors', 'students', 'courseRecord', 'academicTerm']);
+        return $class->refresh()->load(self::CLASS_RELATIONS);
     }
 
     private function assertStudentAccounts(array $studentIds): void

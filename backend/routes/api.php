@@ -32,7 +32,7 @@ Route::prefix('sharing')->group(base_path('routes/sharing.php'));
 Route::get('/exercise-tags', [\App\Http\Controllers\Admin\ExerciseTagController::class, 'index']);
 
 // Direct Exam Login (Public login endpoint + Authenticated status endpoint)
-Route::post('/exam-auth/login', [ExamLoginProctorController::class, 'login']);
+Route::post('/exam-auth/login', [ExamLoginProctorController::class, 'login'])->middleware('throttle:login');
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/exam-auth/status', [ExamLoginProctorController::class, 'status']);
 

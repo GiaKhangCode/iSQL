@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\AcademicTermController;
+use App\Http\Controllers\Admin\LecturerRequestController;
 use App\Http\Controllers\Admin\OverviewController;
 use App\Http\Controllers\ClassRosterController;
 use App\Http\Controllers\Admin\ExerciseTagController;
@@ -18,6 +19,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/users', [UserController::class, 'store']);
     Route::post('/users/import', [UserController::class, 'importCsv']);
     Route::get('/users/role-options', [UserController::class, 'roleOptions']);
+    // Duyệt giảng viên đăng ký (phải đứng trước /users/{id}).
+    Route::get('/users/lecturer-requests', [LecturerRequestController::class, 'index']);
+    Route::post('/users/lecturer-requests/{id}/approve', [LecturerRequestController::class, 'approve']);
+    Route::post('/users/lecturer-requests/{id}/reject', [LecturerRequestController::class, 'reject']);
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::patch('/users/{id}', [UserController::class, 'update']);
@@ -28,7 +33,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
     });
 
-    Route::get('/overview', [OverviewController::class, 'index'])->middleware('capability:user.manage,class.manage,access.manage');
+    // Trang Tổng quan: số liệu, nhật ký gần đây, lỗi chấm bài gần đây.
+    Route::prefix('overview')->middleware('capability:user.manage,class.manage,access.manage')->group(function () {
+        Route::get('/stats', [OverviewController::class, 'stats']);
+        Route::get('/activities', [OverviewController::class, 'activities']);
+        Route::get('/errors', [OverviewController::class, 'errors']);
+    });
 
     // Lớp, danh mục môn học, học kỳ và thẻ bài tập: quyền class.manage.
     Route::middleware('capability:class.manage')->group(function () {
@@ -44,9 +54,6 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/classes/{id}/instructor', [ClassController::class, 'assignInstructor']);
     Route::put('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
     Route::post('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
-    Route::put('/classes/{id}/instructors', [ClassController::class, 'syncInstructors']);
-    Route::delete('/classes/{id}/instructors/{assignmentType}', [ClassController::class, 'removeInstructorAssignment'])
-        ->whereIn('assignmentType', ['theory', 'practical']);
 
     Route::get('/classes/{id}/members', [ClassRosterController::class, 'getMembers']);
     Route::post('/classes/{id}/members', [ClassRosterController::class, 'addMember']);

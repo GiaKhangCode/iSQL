@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Validate sửa lớp (PUT/PATCH /api/admin/classes/{id}).
@@ -35,7 +34,6 @@ class UpdateClassRequest extends FormRequest
             'lecturer_id'     => 'sometimes|nullable|string',
             'lecturerId'      => 'sometimes|nullable|string',
             'instructor_id'   => 'sometimes|nullable|string',
-            'assignment_type' => ['sometimes', 'string', Rule::in(['theory', 'practical'])],
         ];
     }
 }

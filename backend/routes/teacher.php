@@ -34,9 +34,6 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/classes/{id}/instructor', [ClassController::class, 'assignInstructor']);
         Route::put('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
         Route::post('/classes/{id}/allocate-teacher', [ClassController::class, 'assignInstructor']);
-        Route::put('/classes/{id}/instructors', [ClassController::class, 'syncInstructors']);
-        Route::delete('/classes/{id}/instructors/{assignmentType}', [ClassController::class, 'removeInstructorAssignment'])
-            ->whereIn('assignmentType', ['theory', 'practical']);
 
         Route::post('/classes/{id}/members', [ClassRosterController::class, 'addMember']);
         Route::delete('/classes/{id}/members/{studentId}', [ClassRosterController::class, 'removeMember']);

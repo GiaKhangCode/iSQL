@@ -10,7 +10,7 @@ export type { QueryResult } from "@/shared/types/queryResult";
 export type { DailySubmission } from "@/shared/types/dailySubmission";
 
 export interface StudentAssignments {
-  classes: { id: string; code: string; name: string; lecturer: string }[];
+  classes: { id: string; code: string; name: string; lecturer: string; createdAt?: string | null }[];
   assignments: Assignment[];
   deadlines: Deadline[];
   problems: { id: string; title: string; topic: string; difficulty: string }[];

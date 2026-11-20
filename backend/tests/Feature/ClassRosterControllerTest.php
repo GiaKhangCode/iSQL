@@ -71,11 +71,6 @@ class ClassRosterControllerTest extends TestCase
             'instructor_id' => $practical?->id,
             'status'        => 'Active',
         ]);
-        if ($practical) {
-            DB::table('class_instructors')->insert([
-                'class_id' => $class->id, 'instructor_id' => $practical->id, 'assignment_type' => 'practical', 'assigned_at' => now(),
-            ]);
-        }
 
         return $class;
     }
@@ -224,15 +219,13 @@ class ClassRosterControllerTest extends TestCase
         $this->getJson(self::T . '/students')->assertOk();
     }
 
-    public function test_theory_only_instructor_can_read_but_not_edit_the_roster(): void
+    public function test_the_class_instructor_can_read_but_not_edit_the_roster(): void
     {
-        $theory = $this->makeInstructor('instructor_theory');
-        DB::table('class_instructors')->insert([
-            'class_id' => $this->class->id, 'instructor_id' => $theory->id, 'assignment_type' => 'theory', 'assigned_at' => now(),
-        ]);
+        $teacher = $this->makeInstructor('instructor_theory');
+        $this->class->update(['instructor_id' => $teacher->id]);
         $student = $this->makeUser('student');
         $this->enroll($student);
-        Sanctum::actingAs($theory);
+        Sanctum::actingAs($teacher);
 
         $this->getJson(self::T . "/{$this->class->id}/members")->assertOk()->assertJsonPath('0.id', $student->id);
         $this->getJson(self::T . "/{$this->class->id}/students")->assertOk();

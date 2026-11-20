@@ -81,10 +81,20 @@ class ExamLoginService
     {
         $row = $this->findAdmission(trim($username));
         if (!$row) {
+            $this->spendHashTime($password);
             abort(401, self::BAD_CREDENTIALS);
         }
 
         return $this->loginWithAdmission($request, $row, $password);
+    }
+
+    /**
+     * Tốn một lần băm mật khẩu khi không có tài khoản để so, để thời gian phản hồi của tên không tồn tại
+     * không nhanh hơn tên tồn tại mà sai mật khẩu (không đoán được tên hợp lệ qua độ trễ).
+     */
+    public function spendHashTime(string $password): void
+    {
+        Hash::make($password);
     }
 
     /**
@@ -94,14 +104,11 @@ class ExamLoginService
      */
     public function loginWithAdmission(Request $request, ExamAdmission $row, string $password): array
     {
-        if ($row->status === 'revoked') {
-            abort(401, self::BAD_CREDENTIALS);
-        }
-
+        // Luôn kiểm mật khẩu trước, kể cả tài khoản đã thu hồi: cùng lỗi, cùng thời gian với sai mật khẩu.
         $passwordOk = Hash::check($password, $row->hashed_password)
             || ($row->initial_password !== null && hash_equals((string) $row->initial_password, $password));
 
-        if (!$passwordOk) {
+        if ($row->status === 'revoked' || !$passwordOk) {
             abort(401, self::BAD_CREDENTIALS);
         }
 

@@ -98,8 +98,6 @@ class AdminClassControllerTest extends TestCase
             'patch'   => ['PATCH', '/api/admin/classes/x'],
             'destroy' => ['DELETE', '/api/admin/classes/x'],
             'assign'  => ['PUT', '/api/admin/classes/x/instructor'],
-            'sync'    => ['PUT', '/api/admin/classes/x/instructors'],
-            'remove'  => ['DELETE', '/api/admin/classes/x/instructors/theory'],
         ];
     }
 
@@ -137,11 +135,14 @@ class AdminClassControllerTest extends TestCase
         $row = collect($res->json())->firstWhere('id', $new->id);
         foreach ([
             'id', 'course', 'course_code', 'theory_class', 'practice_class', 'lecturer', 'lecturer_id', 'lecturerId',
-            'practice_instructor_id', 'practice_lecturer', 'students', 'status', 'semester', 'term', 'dates',
+            'students', 'status', 'semester', 'term', 'dates',
             'start_date', 'startDate', 'end_date', 'endDate',
         ] as $key) {
             $this->assertArrayHasKey($key, $row, $key);
         }
+        // Một lớp một giảng viên: không còn trường giảng viên thực hành riêng.
+        $this->assertArrayNotHasKey('practice_instructor_id', $row);
+        $this->assertArrayNotHasKey('practice_lecturer', $row);
     }
 
     public function test_row_values_for_unassigned_class_without_dates(): void
@@ -153,7 +154,6 @@ class AdminClassControllerTest extends TestCase
         $this->assertSame('Unassigned', $row['lecturer']);
         $this->assertNull($row['lecturer_id']);
         $this->assertSame($row['lecturer_id'], $row['lecturerId']);
-        $this->assertSame('Unassigned', $row['practice_lecturer']);
         $this->assertSame(0, $row['students']);
         $this->assertSame('HK Test', $row['semester']);
         $this->assertSame('HK Test', $row['term']);
@@ -185,7 +185,6 @@ class AdminClassControllerTest extends TestCase
 
         $this->assertSame($instructor->name, $row['lecturer']);
         $this->assertSame($instructor->id, $row['lecturer_id']);
-        $this->assertSame($instructor->name, $row['practice_lecturer']);
         $this->assertSame(2, $row['students']);
         $this->assertSame('2026-09-01 – 2026-12-01', $row['dates']);
         $this->assertSame('2026-09-01', $row['start_date']);
@@ -240,7 +239,6 @@ class AdminClassControllerTest extends TestCase
 
         $res->assertJsonPath('id', $id)->assertJsonPath('term', 'HK2 2026')->assertJsonPath('semester', 'HK2 2026');
         $this->assertDatabaseHas('classes', ['id' => $id, 'term' => 'HK2 2026', 'instructor_id' => null]);
-        $this->assertSame(0, DB::table('class_instructors')->where('class_id', $id)->count());
         $this->assertLogged("Created class {$id}");
     }
 
@@ -334,7 +332,6 @@ class AdminClassControllerTest extends TestCase
             'course_id không tồn tại'   => [['course_id' => 'nope', 'term' => 'T'], 'course_id'],
             'term_id không tồn tại'     => [['course' => 'C', 'term_id' => 'nope'], 'term_id'],
             'status không hợp lệ'       => [['course' => 'C', 'term' => 'T', 'status' => 'Closed'], 'status'],
-            'assignment_type sai'       => [['course' => 'C', 'term' => 'T', 'assignment_type' => 'lab'], 'assignment_type'],
             'start_date không phải ngày' => [['course' => 'C', 'term' => 'T', 'start_date' => 'abc'], 'start_date'],
             'course quá 255 ký tự'      => [['course' => str_repeat('x', 256), 'term' => 'T'], 'course'],
         ];
@@ -356,7 +353,7 @@ class AdminClassControllerTest extends TestCase
         $this->assertSame($logs, ActivityLog::count());
     }
 
-    public function test_store_with_lecturer_creates_practical_assignment_by_default(): void
+    public function test_store_with_lecturer_sets_the_class_instructor(): void
     {
         $instructor = $this->makeUser('instructor_practical');
 
@@ -365,10 +362,10 @@ class AdminClassControllerTest extends TestCase
 
         $id = $res->json('id');
         $res->assertJsonPath('lecturer_id', $instructor->id)->assertJsonPath('lecturer', $instructor->name);
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $id, 'instructor_id' => $instructor->id, 'assignment_type' => 'practical']);
+        $this->assertDatabaseHas('classes', ['id' => $id, 'instructor_id' => $instructor->id]);
     }
 
-    public function test_store_with_theory_lecturer_sets_legacy_instructor_id_from_theory(): void
+    public function test_store_ignores_a_legacy_assignment_type_field(): void
     {
         $instructor = $this->makeUser('instructor_theory');
 
@@ -376,7 +373,7 @@ class AdminClassControllerTest extends TestCase
             'course' => 'C', 'term' => 'T', 'instructor_id' => $instructor->id, 'assignment_type' => 'theory',
         ])->assertStatus(201);
 
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $res->json('id'), 'instructor_id' => $instructor->id, 'assignment_type' => 'theory']);
+        $this->assertDatabaseHas('classes', ['id' => $res->json('id'), 'instructor_id' => $instructor->id]);
         $res->assertJsonPath('lecturer_id', $instructor->id);
     }
 
@@ -404,7 +401,7 @@ class AdminClassControllerTest extends TestCase
 
         $this->assertSame($classes, ClassModel::count(), 'không được để lại lớp dở dang');
         $this->assertSame($logs, ActivityLog::count());
-        $this->assertSame(0, DB::table('class_instructors')->whereIn('instructor_id', [$student->id, $inactive->id])->count());
+        $this->assertSame(0, ClassModel::whereIn('instructor_id', [$student->id, $inactive->id])->count());
     }
 
     public function test_store_with_invalid_custom_id_and_lecturer_does_not_reserve_the_id(): void
@@ -454,7 +451,7 @@ class AdminClassControllerTest extends TestCase
         $res->assertJsonPath('course', 'Môn mới')->assertJsonPath('term', 'HK3')->assertJsonPath('status', 'Draft')
             ->assertJsonPath('lecturer_id', $instructor->id)->assertJsonPath('start_date', '2026-02-01')
             ->assertJsonPath('end_date', '2026-06-01');
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $class->id, 'instructor_id' => $instructor->id, 'assignment_type' => 'practical']);
+        $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => $instructor->id]);
     }
 
     public function test_update_renaming_course_reresolves_catalog_id(): void
@@ -480,34 +477,25 @@ class AdminClassControllerTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('course_id', 'errors');
     }
 
-    public function test_update_unassigned_lecturer_clears_every_assignment(): void
+    public function test_update_unassigned_lecturer_clears_the_instructor(): void
     {
-        $theory = $this->makeUser('instructor_theory');
         $practical = $this->makeUser('instructor_practical');
         $class = $this->makeClass(['instructor_id' => $practical->id]);
-        DB::table('class_instructors')->insert([
-            ['class_id' => $class->id, 'instructor_id' => $theory->id, 'assignment_type' => 'theory', 'assigned_at' => now()],
-            ['class_id' => $class->id, 'instructor_id' => $practical->id, 'assignment_type' => 'practical', 'assigned_at' => now()],
-        ]);
 
         $res = $this->putJson("/api/admin/classes/{$class->id}", ['lecturerId' => 'Unassigned'])->assertOk();
 
         $res->assertJsonPath('lecturer', 'Unassigned')->assertJsonPath('lecturer_id', null);
-        $this->assertSame(0, DB::table('class_instructors')->where('class_id', $class->id)->count());
         $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => null]);
     }
 
-    public function test_update_without_lecturer_keys_keeps_assignments(): void
+    public function test_update_without_lecturer_keys_keeps_the_instructor(): void
     {
         $practical = $this->makeUser('instructor_practical');
         $class = $this->makeClass(['instructor_id' => $practical->id]);
-        DB::table('class_instructors')->insert([
-            'class_id' => $class->id, 'instructor_id' => $practical->id, 'assignment_type' => 'practical', 'assigned_at' => now(),
-        ]);
 
         $this->putJson("/api/admin/classes/{$class->id}", ['status' => 'Archived'])->assertOk()->assertJsonPath('lecturer_id', $practical->id);
 
-        $this->assertSame(1, DB::table('class_instructors')->where('class_id', $class->id)->count());
+        $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => $practical->id]);
     }
 
     public function test_update_with_non_instructor_lecturer_is_422_and_changes_nothing(): void
@@ -569,7 +557,7 @@ class AdminClassControllerTest extends TestCase
             'lecturerId' => $instructor->id, 'start_date' => '2026-12-01', 'end_date' => '2026-01-01',
         ])->assertStatus(422);
 
-        $this->assertSame(0, DB::table('class_instructors')->where('class_id', $class->id)->count());
+        $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => null]);
     }
 
     /** @return array<string, array{0:array<string,mixed>,1:string}> */
@@ -582,7 +570,6 @@ class AdminClassControllerTest extends TestCase
             'course_id không có'  => [['course_id' => 'nope'], 'course_id'],
             'term_id không có'    => [['term_id' => 'nope'], 'term_id'],
             'end_date sai định dạng' => [['end_date' => 'abc'], 'end_date'],
-            'assignment_type sai' => [['assignment_type' => 'lab'], 'assignment_type'],
         ];
     }
 
@@ -612,29 +599,27 @@ class AdminClassControllerTest extends TestCase
 
     // ───────────────────────── assignInstructor ─────────────────────────
 
-    public function test_assign_instructor_logs_with_type_and_defaults_to_practical(): void
+    public function test_assign_instructor_sets_the_class_instructor_and_logs(): void
     {
         $instructor = $this->makeUser('instructor_practical');
         $class = $this->makeClass();
 
         $this->postJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $instructor->id])->assertOk();
 
-        $this->assertDatabaseHas('class_instructors', ['class_id' => $class->id, 'assignment_type' => 'practical', 'instructor_id' => $instructor->id]);
-        $this->assertLogged("Assigned instructor {$instructor->id} (practical) to class {$class->id}");
+        $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => $instructor->id]);
+        $this->assertLogged("Assigned instructor {$instructor->id} to class {$class->id}");
     }
 
-    public function test_assign_instructor_replaces_same_type_and_keeps_other_type(): void
+    public function test_assign_instructor_replaces_the_previous_instructor(): void
     {
-        [$a, $b, $theory] = [$this->makeUser('instructor_practical'), $this->makeUser('instructor_practical'), $this->makeUser('instructor_theory')];
+        [$a, $b] = [$this->makeUser('instructor_practical'), $this->makeUser('instructor_theory')];
         $class = $this->makeClass();
 
-        $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $theory->id, 'assignment_type' => 'theory'])->assertOk();
         $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $a->id])->assertOk();
         $res = $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $b->id])->assertOk();
 
-        $rows = DB::table('class_instructors')->where('class_id', $class->id)->pluck('instructor_id', 'assignment_type')->all();
-        $this->assertEquals(['theory' => $theory->id, 'practical' => $b->id], $rows);
         $res->assertJsonPath('lecturer_id', $b->id);
+        $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => $b->id]);
     }
 
     public function test_assign_instructor_accepts_the_three_id_aliases(): void
@@ -648,17 +633,28 @@ class AdminClassControllerTest extends TestCase
         }
     }
 
+    public function test_assign_instructor_ignores_a_legacy_assignment_type_field(): void
+    {
+        $instructor = $this->makeUser('instructor_practical');
+        $class = $this->makeClass();
+
+        foreach (['theory', 'practical', 'lab'] as $type) {
+            $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $instructor->id, 'assignment_type' => $type])
+                ->assertOk()->assertJsonPath('lecturer_id', $instructor->id);
+        }
+    }
+
     public function test_assign_instructor_requires_an_id(): void
     {
         $class = $this->makeClass();
 
-        $res = $this->putJson("/api/admin/classes/{$class->id}/instructor", ['assignment_type' => 'theory'])->assertStatus(422);
+        $res = $this->putJson("/api/admin/classes/{$class->id}/instructor", [])->assertStatus(422);
 
         $res->assertJsonPath('detail', 'Cần cung cấp instructor_id hoặc lecturer_id.');
         $this->assertSame(0, ActivityLog::where('action', 'like', "Assigned instructor % to class {$class->id}")->count());
     }
 
-    public function test_assign_unassigned_removes_that_type(): void
+    public function test_assign_unassigned_removes_the_instructor(): void
     {
         $instructor = $this->makeUser('instructor_practical');
         $class = $this->makeClass();
@@ -667,92 +663,21 @@ class AdminClassControllerTest extends TestCase
         $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => 'Unassigned'])
             ->assertOk()->assertJsonPath('lecturer', 'Unassigned');
 
-        $this->assertSame(0, DB::table('class_instructors')->where('class_id', $class->id)->count());
-        $this->assertLogged("Assigned instructor Unassigned (practical) to class {$class->id}");
+        $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => null]);
+        $this->assertLogged("Assigned instructor Unassigned to class {$class->id}");
     }
 
-    public function test_assign_instructor_rejects_invalid_type_inactive_and_unknown_class(): void
+    public function test_assign_instructor_rejects_inactive_and_unknown_class(): void
     {
         $class = $this->makeClass();
         $inactive = $this->makeUser('instructor_practical', 'Inactive');
         $instructor = $this->makeUser('instructor_practical');
 
-        $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $instructor->id, 'assignment_type' => 'lab'])
-            ->assertStatus(422)->assertJsonValidationErrors('assignment_type', 'errors');
         $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $inactive->id])->assertStatus(422);
         $this->putJson('/api/admin/classes/khong-ton-tai/instructor', ['instructor_id' => $instructor->id])->assertStatus(404);
 
-        $this->assertSame(0, DB::table('class_instructors')->where('class_id', $class->id)->count());
+        $this->assertDatabaseHas('classes', ['id' => $class->id, 'instructor_id' => null]);
         $this->assertSame(0, ActivityLog::where('action', 'like', "Assigned instructor % to class {$class->id}")->count());
-    }
-
-    // ───────────────────────── syncInstructors ─────────────────────────
-
-    public function test_sync_instructors_replaces_everything_and_logs(): void
-    {
-        [$old, $theory, $practical] = [$this->makeUser('instructor_practical'), $this->makeUser('instructor_theory'), $this->makeUser('instructor_practical')];
-        $class = $this->makeClass();
-        $this->putJson("/api/admin/classes/{$class->id}/instructor", ['instructor_id' => $old->id])->assertOk();
-
-        $this->putJson("/api/admin/classes/{$class->id}/instructors", [
-            'theory_instructor_id' => $theory->id, 'practical_instructor_id' => $practical->id,
-        ])->assertOk()->assertJsonPath('lecturer_id', $practical->id);
-
-        $rows = DB::table('class_instructors')->where('class_id', $class->id)->pluck('instructor_id', 'assignment_type')->all();
-        $this->assertEquals(['theory' => $theory->id, 'practical' => $practical->id], $rows);
-        $this->assertLogged("Synced instructors for class {$class->id}");
-    }
-
-    public function test_sync_instructors_validates_both_ids(): void
-    {
-        $class = $this->makeClass();
-        $ok = $this->makeUser('instructor_theory');
-        $student = $this->makeUser('student');
-        $inactive = $this->makeUser('instructor_practical', 'Inactive');
-
-        $this->putJson("/api/admin/classes/{$class->id}/instructors", ['theory_instructor_id' => $ok->id])
-            ->assertStatus(422)->assertJsonValidationErrors('practical_instructor_id', 'errors');
-        $this->putJson("/api/admin/classes/{$class->id}/instructors", ['theory_instructor_id' => $student->id, 'practical_instructor_id' => $ok->id])
-            ->assertStatus(422)->assertJsonValidationErrors('theory_instructor_id', 'errors');
-        $this->putJson("/api/admin/classes/{$class->id}/instructors", ['theory_instructor_id' => $ok->id, 'practical_instructor_id' => $inactive->id])
-            ->assertStatus(422)->assertJsonValidationErrors('practical_instructor_id', 'errors');
-
-        $this->assertSame(0, DB::table('class_instructors')->where('class_id', $class->id)->count());
-        $this->assertSame(0, $this->logCount("Synced instructors for class {$class->id}"));
-    }
-
-    public function test_sync_instructors_unknown_class_is_404(): void
-    {
-        $a = $this->makeUser('instructor_theory');
-
-        $this->putJson('/api/admin/classes/khong-ton-tai/instructors', ['theory_instructor_id' => $a->id, 'practical_instructor_id' => $a->id])
-            ->assertStatus(404);
-    }
-
-    // ───────────────────────── removeInstructorAssignment ─────────────────────────
-
-    public function test_remove_assignment_keeps_the_other_type_and_updates_legacy_id(): void
-    {
-        $theory = $this->makeUser('instructor_theory');
-        $practical = $this->makeUser('instructor_practical');
-        $class = $this->makeClass();
-        $this->putJson("/api/admin/classes/{$class->id}/instructors", [
-            'theory_instructor_id' => $theory->id, 'practical_instructor_id' => $practical->id,
-        ])->assertOk();
-
-        $res = $this->deleteJson("/api/admin/classes/{$class->id}/instructors/practical")->assertOk();
-
-        $res->assertJsonPath('lecturer_id', $theory->id);
-        $this->assertSame(['theory'], DB::table('class_instructors')->where('class_id', $class->id)->pluck('assignment_type')->all());
-        $this->assertLogged("Removed practical instructor from class {$class->id}");
-    }
-
-    public function test_remove_assignment_rejects_unknown_type_and_class(): void
-    {
-        $class = $this->makeClass();
-
-        $this->deleteJson("/api/admin/classes/{$class->id}/instructors/lab")->assertStatus(404);
-        $this->deleteJson('/api/admin/classes/khong-ton-tai/instructors/theory')->assertStatus(404);
     }
 
     // ───────────────────────── destroy ─────────────────────────
@@ -768,7 +693,6 @@ class AdminClassControllerTest extends TestCase
         $this->deleteJson("/api/admin/classes/{$class->id}")->assertOk()->assertExactJson(['message' => 'Class deleted successfully']);
 
         $this->assertDatabaseMissing('classes', ['id' => $class->id]);
-        $this->assertDatabaseMissing('class_instructors', ['class_id' => $class->id]);
         $this->assertDatabaseMissing('class_enrollments', ['class_id' => $class->id]);
         $this->assertDatabaseHas('users', ['id' => $instructor->id]);
         $this->assertDatabaseHas('users', ['id' => $student->id]);

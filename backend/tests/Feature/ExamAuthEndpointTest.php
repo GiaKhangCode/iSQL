@@ -136,6 +136,16 @@ class ExamAuthEndpointTest extends TestCase
         $this->assertSame('issued', $this->admission->fresh()->status);
     }
 
+    public function test_exam_login_is_throttled_per_username_so_passwords_cannot_be_guessed(): void
+    {
+        for ($i = 0; $i < 10; $i++) {
+            $this->examLogin($this->admission->username, 'sai')->assertStatus(401);
+        }
+
+        $this->examLogin($this->admission->username)->assertStatus(429)->assertJsonStructure(['message', 'detail']);
+        $this->examLogin('K7_TEN_KHAC', 'sai')->assertStatus(401)->assertJsonPath('detail', self::BAD);
+    }
+
     public function test_username_is_trimmed_and_case_insensitive(): void
     {
         $this->examLogin('  ' . strtolower($this->admission->username) . '  ')->assertOk()->assertJsonPath('user.id', $this->student->id);

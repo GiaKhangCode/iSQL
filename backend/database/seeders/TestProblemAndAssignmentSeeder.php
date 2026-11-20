@@ -68,7 +68,6 @@ class TestProblemAndAssignmentSeeder extends Seeder
                 'term'                   => 'HK1 2026-2027',
                 'status'                 => 'Active',
                 'instructor_id'          => $teacher->id,
-                'practice_instructor_id' => $teacher->id,
                 'start_date'             => '2026-09-01',
                 'end_date'               => '2026-12-31',
             ]

@@ -97,11 +97,10 @@ export function AdminCoursesPage() {
     }).catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load classes.")).finally(() => setLoading(false));
   }, []);
 
-  const practicalLecturer = (item: AdminClass & { practice_lecturer?: string }) =>
-    item.practice_lecturer || item.lecturer;
+  const lecturerName = (item: AdminClass) => item.lecturer;
 
   const visibleRows = classes.filter((item) =>
-    dates.matches(item) && matchesListSearch(query, item.course, item.id, practicalLecturer(item)) &&
+    dates.matches(item) && matchesListSearch(query, item.course, item.id, lecturerName(item)) &&
     (semester === "All semesters" || item.semester === semester));
   const visible = order.apply(visibleRows, item => item.id);
   const semesters = [...new Set(classes.map((item) => item.semester).filter(Boolean))].sort().reverse();
@@ -180,7 +179,7 @@ export function AdminCoursesPage() {
               id: item.id,
               title: item.course,
               value: item.id,
-              description: `${item.id} · ${practicalLecturer(item)}`
+              description: `${item.id} · ${lecturerName(item)}`
             }))}
             search={query}
             onSearchChange={setQuery}
@@ -241,8 +240,8 @@ export function AdminCoursesPage() {
                       </button>
                       <small className="teacher-row-subtext">{item.id}</small>
                     </td>
-                    <td data-label={tr("LECTURER")} className={practicalLecturer(item) === "Unassigned" ? "admin-warning" : ""}>
-                      {practicalLecturer(item) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : practicalLecturer(item)}
+                    <td data-label={tr("LECTURER")} className={lecturerName(item) === "Unassigned" ? "admin-warning" : ""}>
+                      {lecturerName(item) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : lecturerName(item)}
                     </td>
                     <td data-label={tr("STUDENTS")}>{item.students}</td>
                     <td data-label={tr("STATUS")}><Status value={item.status} /></td>
@@ -324,8 +323,8 @@ export function AdminCoursesPage() {
                   </div>
                   <div>
                     <dt><TranslatedText>{tr("LECTURER")}</TranslatedText></dt>
-                    <dd className={practicalLecturer(selected) === "Unassigned" ? "admin-warning" : ""}>
-                      {practicalLecturer(selected) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : practicalLecturer(selected)}
+                    <dd className={lecturerName(selected) === "Unassigned" ? "admin-warning" : ""}>
+                      {lecturerName(selected) === "Unassigned" ? <TranslatedText>{tr("· Lecturer needed")}</TranslatedText> : lecturerName(selected)}
                     </dd>
                   </div>
                   <div>

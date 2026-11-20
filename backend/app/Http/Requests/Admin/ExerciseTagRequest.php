@@ -26,8 +26,6 @@ class ExerciseTagRequest extends FormRequest
             'name'        => [$isPost ? 'required' : 'sometimes', 'string', 'max:100'],
             'kind'        => [$isPost ? 'required' : 'sometimes', 'string', 'in:difficulty,category'],
             'part'        => ['nullable', 'string', 'in:ALL,DDL,DML,DQL,TRIGGER'],
-            'orderIndex'  => ['nullable', 'integer'],
-            'order_index' => ['nullable', 'integer'],
         ];
     }
 
@@ -49,10 +47,6 @@ class ExerciseTagRequest extends FormRequest
             $part = strtoupper(trim((string) ($data['part'] ?? 'ALL')));
             $payload['part'] = in_array($part, ['ALL', 'DDL', 'DML', 'DQL', 'TRIGGER'], true) ? $part : 'ALL';
         }
-        if (isset($data['orderIndex']) || isset($data['order_index'])) {
-            $payload['order_index'] = (int) ($data['orderIndex'] ?? $data['order_index']);
-        }
-
         return $payload;
     }
 }

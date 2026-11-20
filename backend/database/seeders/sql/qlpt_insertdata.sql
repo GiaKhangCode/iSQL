@@ -1,0 +1,93 @@
+INSERT INTO PHONGTRO (MaPT, TenPT, DienTich, LoaiPT, GiaPT, TinhTrangPT) VALUES
+    (N'PT001', N'Phòng A101', 18, N'Có gác xép', 3500000, N'Trống'),
+    (N'PT002', N'Phòng A102', 25, N'Không gác xép', 4200000, N'Đã cho thuê'),
+    (N'PT003', N'Phòng B201', 40, N'Kiot', 6500000, N'Đã cho thuê'),
+    (N'PT004', N'Phòng B202', 40, N'Kiot', 7000000, N'Đã cho thuê'),
+    (N'PT005', N'Phòng C301', 30, N'Có gác xép', 5500000, N'Đã cho thuê'),
+    (N'PT006', N'Phòng C302', 22, N'Không gác xép', 3800000, N'Đã cho thuê'),
+    (N'PT007', N'Phòng D401', 45, N'Kiot', 8500000, N'Đã cho thuê'),
+    (N'PT008', N'Phòng D402', 28, N'Có gác xép', 5200000, N'Đã cho thuê');
+
+INSERT INTO CUDAN (MaCD, HoTen, CCCD, DiaChi, SoDT, NgayThue, TrangThaiCD) VALUES
+    (N'CD001', N'Nguyễn Văn An', N'079201001001', N'12 Lê Lợi, Quận 1, Tp.HCM', N'0901000001', '20230110', N'Đang ở'),
+    (N'CD002', N'Trần Thị Bình', N'079201001002', N'45 Nguyễn Huệ, Quận 1, Tp.HCM', N'0901000002', '20240305', N'Đang ở'),
+    (N'CD003', N'Lê Hoàng Cường', N'079201001003', N'8 Trần Phú, Đà Nẵng', N'0901000003', '20220601', N'Đã rời đi'),
+    (N'CD004', N'Phạm Thu Dung', N'079201001004', N'27 Hai Bà Trưng, Hà Nội', N'0901000004', '20240701', N'Đang ở'),
+    (N'CD005', N'Võ Minh Em', N'079201001005', N'90 Lý Thường Kiệt, Cần Thơ', N'0901000005', '20220301', N'Đã rời đi'),
+    (N'CD006', N'Đặng Quốc Phong', N'079201001006', N'63 Điện Biên Phủ, Tp.HCM', N'0901000006', '20240515', N'Đang ở');
+
+INSERT INTO HOPDONG (MaHD, MaCD, MaPT, NgayKy, NgayHetHan, TrangThaiHD) VALUES
+    (N'HD001', N'CD001', N'PT001', '20230110', '20240109', N'Đã hết hạn'),
+    (N'HD002', N'CD001', N'PT002', '20240201', '20250131', N'Đang thuê'),
+    (N'HD003', N'CD002', N'PT003', '20240305', '20250304', N'Đang thuê'),
+    (N'HD004', N'CD002', N'PT004', '20240410', '20250409', N'Đang thuê'),
+    (N'HD005', N'CD003', N'PT005', '20220601', '20240531', N'Đã hết hạn'),
+    (N'HD006', N'CD004', N'PT007', '20240701', '20250630', N'Đang thuê'),
+    (N'HD007', N'CD004', N'PT005', '20240901', '20250831', N'Đang thuê'),
+    (N'HD008', N'CD005', N'PT008', '20220301', '20230228', N'Đã hết hạn'),
+    (N'HD009', N'CD005', N'PT006', '20230501', '20231231', N'Đã hết hạn'),
+    (N'HD010', N'CD006', N'PT008', '20240515', '20250514', N'Đang thuê'),
+    (N'HD011', N'CD003', N'PT001', '20240601', '20241231', N'Đã hết hạn'),
+    (N'HD012', N'CD001', N'PT006', '20241001', '20250930', N'Đang thuê'),
+    (N'HD013', N'CD005', N'PT006', '20240105', '20240630', N'Đã hết hạn');
+
+INSERT INTO DICHVU (MaDV, TenDV, DonGia) VALUES
+    (N'DV001', N'Điện', 3500),
+    (N'DV002', N'Nước', 18000),
+    (N'DV003', N'Internet', 150000),
+    (N'DV004', N'Rác', 30000),
+    (N'DV005', N'Giữ xe', 50000),
+    (N'DV006', N'Phí quản lý', 200000);
+
+INSERT INTO PHIEUTINHTIEN (MaPTT, MaHD, SoTienDichVu, SoTienThuePT, TongTienTT, NgayTinhTien, TinhTrangTT, PhuongThucTT) VALUES
+    (N'PT001', N'HD001', 1037000, 3500000, 4537000, '20240105', N'Đã thanh toán', N'Tiền mặt'),
+    (N'PT002', N'HD002', 354000, 4200000, 4554000, '20240810', N'Đã thanh toán', N'Chuyển khoản'),
+    (N'PT003', N'HD002', 348500, 4200000, 4548500, '20240910', N'Đã thanh toán', N'Tiền mặt'),
+    (N'PT004', N'HD002', 469000, 4200000, 4669000, '20241110', N'Đã thanh toán', N'Chuyển khoản'),
+    (N'PT005', N'HD002', 319500, 4200000, 4519500, '20241210', N'Đã thanh toán', N'Chuyển khoản'),
+    (N'PT006', N'HD003', 930000, 6500000, 7430000, '20241015', N'Đã thanh toán', N'Tiền mặt'),
+    (N'PT007', N'HD003', 1163000, 6500000, 7663000, '20241215', N'Đã thanh toán', N'Tiền mặt'),
+    (N'PT008', N'HD006', 1196000, 8500000, 9696000, '20241215', N'Đã thanh toán', N'Chuyển khoản'),
+    (N'PT009', N'HD006', 810500, 8500000, 9310500, '20241020', N'Đã thanh toán', N'Chuyển khoản'),
+    (N'PT010', N'HD004', 985000, 7000000, 7985000, '20241101', N'Đã thanh toán', N'Chuyển khoản'),
+    (N'PT011', N'HD007', 1018000, 5500000, 6518000, '20241125', N'Chưa thanh toán', N'Chuyển khoản'),
+    (N'PT012', N'HD010', 1210000, 5200000, 6410000, '20241005', N'Đã thanh toán', N'Chuyển khoản'),
+    (N'PT013', N'HD012', 180000, 3800000, 3980000, '20241102', N'Đã thanh toán', N'Tiền mặt'),
+    (N'PT014', N'HD011', 150000, 3500000, 3650000, '20240902', N'Đã thanh toán', N'Tiền mặt');
+
+INSERT INTO CHITIETTTDV (MaPTT, MaDV, ChiSoDV, ThanhTien) VALUES
+    (N'PT001', N'DV001', 250, 875000),
+    (N'PT001', N'DV002', 9, 162000),
+    (N'PT002', N'DV001', 60, 210000),
+    (N'PT002', N'DV002', 8, 144000),
+    (N'PT003', N'DV001', 55, 192500),
+    (N'PT003', N'DV002', 7, 126000),
+    (N'PT003', N'DV004', 1, 30000),
+    (N'PT004', N'DV001', 50, 175000),
+    (N'PT004', N'DV002', 8, 144000),
+    (N'PT004', N'DV003', 1, 150000),
+    (N'PT005', N'DV001', 45, 157500),
+    (N'PT005', N'DV002', 9, 162000),
+    (N'PT006', N'DV001', 200, 700000),
+    (N'PT006', N'DV002', 10, 180000),
+    (N'PT006', N'DV005', 1, 50000),
+    (N'PT007', N'DV001', 210, 735000),
+    (N'PT007', N'DV002', 11, 198000),
+    (N'PT007', N'DV003', 1, 150000),
+    (N'PT007', N'DV004', 1, 30000),
+    (N'PT007', N'DV005', 1, 50000),
+    (N'PT008', N'DV001', 180, 630000),
+    (N'PT008', N'DV002', 12, 216000),
+    (N'PT008', N'DV003', 1, 150000),
+    (N'PT008', N'DV006', 1, 200000),
+    (N'PT009', N'DV001', 175, 612500),
+    (N'PT009', N'DV002', 11, 198000),
+    (N'PT010', N'DV001', 230, 805000),
+    (N'PT010', N'DV002', 10, 180000),
+    (N'PT011', N'DV001', 260, 910000),
+    (N'PT011', N'DV002', 6, 108000),
+    (N'PT012', N'DV001', 320, 1120000),
+    (N'PT012', N'DV002', 5, 90000),
+    (N'PT013', N'DV003', 1, 150000),
+    (N'PT013', N'DV004', 1, 30000),
+    (N'PT014', N'DV003', 1, 150000);

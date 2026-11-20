@@ -35,16 +35,19 @@ export function Loading({
 }
 export function Empty({
   title = "No results",
+  description,
   children,
 }: {
   title?: string;
+  /** Short explanation under the title; used instead of children when both are given. */
+  description?: ReactNode;
   children?: ReactNode;
 }) {
   const { t } = useLanguage();
   return (
     <div className="empty-state">
       <h3><TranslatedText>{t(title)}</TranslatedText></h3>
-      {children && <p>{children}</p>}
+      {(description ?? children) && <p>{description ?? children}</p>}
     </div>
   );
 }

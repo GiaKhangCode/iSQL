@@ -13,6 +13,7 @@ use App\Models\TestCaseScript;
 use App\Models\User;
 use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
+use App\Services\Grading\QuestionScoring;
 use App\Services\SqlServer\QueryRewriter;
 use App\Services\SqlServer\SandboxService;
 use Illuminate\Support\Facades\DB;
@@ -1926,7 +1927,13 @@ class ProblemWorkspaceService
             }
         }
 
-        $score = $totalQuestions > 0 ? round($maximum * ($passedQuestions / $totalQuestions), 2) : 0;
+        $outcomes = [];
+        foreach ($sections as $section) {
+            foreach ($section['questions'] ?? [] as $question) {
+                $outcomes[] = ['part' => (string) $section['part'], 'id' => (string) $question['id'], 'passed' => ($question['status'] ?? '') === 'Accepted'];
+            }
+        }
+        $score = QuestionScoring::score($outcomes, $selection, $maximum);
         $overallResult = ($totalQuestions > 0 && $passedQuestions === $totalQuestions)
             ? 'Accepted'
             : ($passedQuestions > 0 ? 'Partial' : 'Wrong Answer');

@@ -47,11 +47,7 @@ class StatisticsService
         // 1. Resolve classes in role scope
         $baseClassesQuery = ClassModel::query();
         if (!$isOffice && !app(StaffAccess::class)->seesEverything($user)) {
-            $baseClassesQuery->where(function ($q) use ($user) {
-                $q->where('instructor_id', $user->id)
-                    ->orWhere('practice_instructor_id', $user->id)
-                    ->orWhereHas('instructors', fn ($iq) => $iq->where('users.id', $user->id));
-            });
+            $baseClassesQuery->where('instructor_id', $user->id);
         }
         $allScopedClasses = $baseClassesQuery->orderBy('course')->orderBy('id')->get();
 

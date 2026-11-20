@@ -131,20 +131,15 @@ class ProctorAccessTest extends TestCase
         $this->room($this->proctor)->assertStatus(403);
     }
 
-    public function test_teacher_of_a_session_class_may_enter_through_any_instructor_column(): void
+    public function test_the_instructor_of_a_session_class_may_enter(): void
     {
-        $viaInstructor = $this->makeAccount('instructor', ['exam.proctor']);
-        $viaPractice = $this->makeAccount('instructor', ['exam.proctor']);
-        $viaPivot = $this->makeAccount('instructor', ['exam.proctor']);
-        $this->classA->update(['instructor_id' => $viaInstructor->id, 'practice_instructor_id' => $viaPractice->id]);
-        DB::table('class_instructors')->insert(['class_id' => $this->classA->id, 'instructor_id' => $viaPivot->id]);
+        $teacher = $this->makeAccount('instructor', ['exam.proctor']);
+        $this->classA->update(['instructor_id' => $teacher->id]);
 
-        foreach ([$viaInstructor, $viaPractice, $viaPivot] as $teacher) {
-            $this->room($teacher)->assertOk();
-            $this->room($teacher, $this->classA->id)->assertOk();
-            // Không dạy phòng B thì không vào được khi lọc phòng B.
-            $this->room($teacher, $this->classB->id)->assertStatus(403);
-        }
+        $this->room($teacher)->assertOk();
+        $this->room($teacher, $this->classA->id)->assertOk();
+        // Không dạy phòng B thì không vào được khi lọc phòng B.
+        $this->room($teacher, $this->classB->id)->assertStatus(403);
     }
 
     public function test_teacher_of_a_class_outside_the_session_is_rejected(): void
@@ -233,7 +228,7 @@ class ProctorAccessTest extends TestCase
         ExamClassProctor::create(['session_id' => $this->session->id, 'class_id' => $this->classA->id, 'proctor_id' => $this->proctor->id, 'assigned_at' => now()]);
         $this->assertSame([$this->classA->id], array_column($this->listFor($this->proctor, [$this->session->id]), 'roomId'));
 
-        $this->classB->update(['practice_instructor_id' => $this->proctor->id]);
+        $this->classB->update(['instructor_id' => $this->proctor->id]);
         $rooms = array_column($this->listFor($this->proctor, [$this->session->id]), 'roomId');
         $this->assertEqualsCanonicalizing([$this->classA->id, $this->classB->id], $rooms);
     }

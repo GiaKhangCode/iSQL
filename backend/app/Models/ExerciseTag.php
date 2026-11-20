@@ -19,11 +19,9 @@ class ExerciseTag extends Model
         'kind',
         'name',
         'part',
-        'order_index',
     ];
 
     protected $casts = [
-        'order_index' => 'integer',
         'created_at'  => 'datetime',
         'updated_at'  => 'datetime',
     ];
@@ -48,8 +46,6 @@ class ExerciseTag extends Model
             'kind'        => (string) $this->kind,
             'name'        => (string) $this->name,
             'part'        => (string) ($this->part ?: 'ALL'),
-            'orderIndex'  => (int) ($this->order_index ?? 0),
-            'order_index' => (int) ($this->order_index ?? 0),
             'createdAt'   => $this->created_at ? $this->created_at->toISOString() : null,
             'created_at'  => $this->created_at ? $this->created_at->toISOString() : null,
         ];

@@ -3,12 +3,9 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\SyncClassInstructorsRequest;
 use App\Services\ClassService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class ClassController extends Controller
 {
@@ -76,40 +73,18 @@ class ClassController extends Controller
     public function assignInstructor(Request $request, string $id): JsonResponse
     {
         $data = $request->validate([
-            'assignment_type' => ['sometimes', 'nullable', Rule::in(['theory', 'practical'])],
             'instructor_id'   => ['sometimes', 'nullable', 'string'],
             'lecturer_id'     => ['sometimes', 'nullable', 'string'],
             'lecturerId'      => ['sometimes', 'nullable', 'string'],
         ]);
 
-        $assignmentType = $data['assignment_type'] ?? 'practical';
         $instructorId = $data['instructor_id'] ?? $data['lecturer_id'] ?? $data['lecturerId'] ?? null;
 
         if ($instructorId === null) {
             abort(422, 'Cần cung cấp instructor_id hoặc lecturer_id.');
         }
 
-        $class = $this->classService->assignInstructor($id, $assignmentType, $instructorId);
-
-        return response()->json($this->classService->formatClassResponse($class));
-    }
-
-    public function syncInstructors(SyncClassInstructorsRequest $request, string $id): JsonResponse
-    {
-        $data = $request->validated();
-
-        $class = $this->classService->syncInstructorAssignments(
-            $id,
-            $data['theory_instructor_id'],
-            $data['practical_instructor_id']
-        );
-
-        return response()->json($this->classService->formatClassResponse($class));
-    }
-
-    public function removeInstructorAssignment(Request $request, string $id, string $assignmentType): JsonResponse
-    {
-        $class = $this->classService->removeInstructorAssignment($id, $assignmentType);
+        $class = $this->classService->assignInstructor($id, $instructorId);
 
         return response()->json($this->classService->formatClassResponse($class));
     }

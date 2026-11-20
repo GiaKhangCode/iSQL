@@ -8,6 +8,8 @@ import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
 import { WORKSPACE_PARTS, WORKSPACE_PART_LABELS } from "@/shared/lib/workspace/workspaceParts";
 import { catalogOf, type BuilderProblemDetail, type QuestionOption, type QuestionSelection } from "@/features/teacher/builder/BuilderProblemSettings";
 import "@/features/teacher/builder/BuilderManualQuestionPicker.css";
+import { SCORING_CUSTOM, SCORING_EQUAL, plainSelection as plainSelectionOf, type ScoringMode } from "@/features/teacher/builder/questionScoring";
+import { QuestionPointInput } from "@/features/teacher/builder/BuilderScoring";
 
 const DIFFICULTY_ALIASES: Record<string, string> = { easy: "dễ", medium: "trung bình", hard: "khó" };
 const difficultyKey = (value?: string) => {
@@ -15,18 +17,17 @@ const difficultyKey = (value?: string) => {
   return DIFFICULTY_ALIASES[key] || key;
 };
 
-/** A selection of explicit question ids only: no auto rules, no variants (which would deal questions out at random). */
-function plainSelection(selection: QuestionSelection | undefined): QuestionSelection {
-  return Object.fromEntries(Object.entries(selection || {}).filter(([key]) => !key.startsWith("_"))) as QuestionSelection;
-}
+/** A selection of explicit question ids only (see plainSelection in questionScoring: points are kept). */
+const plainSelection = (selection: QuestionSelection | undefined) => plainSelectionOf(selection) as QuestionSelection;
 
-export function BuilderManualQuestionPicker({ detail, parts, questionSelection, onChange, lockedQuestionSelection, lockedParts }: {
+export function BuilderManualQuestionPicker({ detail, parts, questionSelection, onChange, lockedQuestionSelection, lockedParts, scoringMode = SCORING_EQUAL }: {
   detail: BuilderProblemDetail;
   parts: WorkspacePart[];
   questionSelection?: QuestionSelection;
   onChange: (patch: { questionSelection: QuestionSelection; workspaceParts: WorkspacePart[] }) => void;
   lockedQuestionSelection?: QuestionSelection;
   lockedParts?: WorkspacePart[];
+  scoringMode?: ScoringMode;
 }) {
   const { t: tr } = useLanguage("teacher");
   const catalog = useMemo(() => catalogOf(detail), [detail]);
@@ -147,7 +148,7 @@ export function BuilderManualQuestionPicker({ detail, parts, questionSelection, 
             </button>
           </div>
           {!folded && <ul id={listId}>
-            {questions.map(question => <li key={question.id}>
+            {questions.map(question => <li key={question.id} className="builder-manual-picker-question-row">
               <label className="builder-manual-picker-question">
                 <input type="checkbox" checked={selected.has(question.id)} disabled={lockedSet.has(question.id)} title={lockedSet.has(question.id) ? tr("Published assignment questions cannot be removed") : undefined} aria-label={tr("Select question {value0}", { value0: question.name })} onChange={event => setMany([question], event.target.checked)} />
                 <span>
@@ -159,6 +160,13 @@ export function BuilderManualQuestionPicker({ detail, parts, questionSelection, 
                   {question.description && <ProblemMarkdown>{tr(question.description)}</ProblemMarkdown>}
                 </span>
               </label>
+              {scoringMode === SCORING_CUSTOM && selected.has(question.id) && <QuestionPointInput
+                selection={questionSelection}
+                part={activeTab}
+                questionId={question.id}
+                questionName={question.name}
+                onChange={selection => onChange({ questionSelection: { ...selection, [activeTab]: selectedIds(activeTab) }, workspaceParts: parts })}
+              />}
             </li>)}
           </ul>}
         </section>;

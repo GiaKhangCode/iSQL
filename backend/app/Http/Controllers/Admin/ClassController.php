@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AssignClassInstructorRequest;
 use App\Http\Requests\Admin\StoreClassRequest;
-use App\Http\Requests\Admin\SyncClassInstructorsRequest;
 use App\Http\Requests\Admin\UpdateClassRequest;
 use App\Services\ActivityLogService;
 use App\Services\ClassService;
@@ -59,43 +58,15 @@ class ClassController extends Controller
 
     public function assignInstructor(AssignClassInstructorRequest $request, string $id): JsonResponse
     {
-        $assignmentType = $request->assignmentType();
         $instructorId = $request->instructorId();
 
         if ($instructorId === null) {
             abort(422, 'Cần cung cấp instructor_id hoặc lecturer_id.');
         }
 
-        $class = $this->classService->assignInstructor($id, $assignmentType, $instructorId);
+        $class = $this->classService->assignInstructor($id, $instructorId);
 
-        $this->activityLog->record(
-            $request->user()?->id,
-            "Assigned instructor {$instructorId} ({$assignmentType}) to class {$id}"
-        );
-
-        return response()->json($this->classService->formatClassResponse($class));
-    }
-
-    public function syncInstructors(SyncClassInstructorsRequest $request, string $id): JsonResponse
-    {
-        $data = $request->validated();
-
-        $class = $this->classService->syncInstructorAssignments(
-            $id,
-            $data['theory_instructor_id'],
-            $data['practical_instructor_id']
-        );
-
-        $this->activityLog->record($request->user()?->id, "Synced instructors for class {$id}");
-
-        return response()->json($this->classService->formatClassResponse($class));
-    }
-
-    public function removeInstructorAssignment(Request $request, string $id, string $assignmentType): JsonResponse
-    {
-        $class = $this->classService->removeInstructorAssignment($id, $assignmentType);
-
-        $this->activityLog->record($request->user()?->id, "Removed {$assignmentType} instructor from class {$id}");
+        $this->activityLog->record($request->user()?->id, "Assigned instructor {$instructorId} to class {$id}");
 
         return response()->json($this->classService->formatClassResponse($class));
     }

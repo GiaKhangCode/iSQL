@@ -36,6 +36,8 @@ import { examSessions, type ProctorOption } from "@/shared/api/examSessions";
 import { BuilderSelectedQuestions, selectedQuestions } from "@/features/teacher/builder/BuilderSelectedQuestions";
 import { DEFAULT_SUBMISSION_LIMIT, SubmissionLimitControl } from "@/features/teacher/submissions/SubmissionLimitControl";
 import { assignmentSeed, examSessionSeed, assignmentWorkspaceParts, DateTimeInput, ActivityPreview, type BuilderDraft, type BuilderProblem } from "@/features/teacher/builder/BuilderShared";
+import { SCORING_CUSTOM, customScoringSummary, examPapers, normalizeScoringMode, problemForSave, questionPointsOf, type ScoredProblem } from "@/features/teacher/builder/questionScoring";
+import { CustomScoreTotal, ScoringModeControl } from "@/features/teacher/builder/BuilderScoring";
 
 export function AssignmentBuilderPage() {
   return <BuilderPage examSession={false} />;
@@ -113,7 +115,7 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
   const [problemsError, setProblemsError] = useState("");
   const [draftError, setDraftError] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
-  const retrySave = useRef<(published: boolean, destination?: string) => Promise<void>>(async () => {});
+  const retrySave = useRef<(published: boolean, destination?: string) => Promise<unknown>>(async () => {});
   const [saveState, setSaveState] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const hasUnsavedChangesRef = useRef(false);
@@ -379,7 +381,8 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
             workspaceParts: assignmentWorkspaceParts(item.workspaceParts),
           })),
           studentOptions: { ...(examSession ? examSessionSeed.studentOptions : assignmentSeed.studentOptions), ...data.studentOptions, ...(examination?{examMode:true}:{}) },
-          published: data.published
+          published: data.published,
+          scoringMode: normalizeScoringMode(data.scoringMode),
         });
         if (!examination && !examSession && data.published) {
           const snapshot: Record<string, { workspaceParts: WorkspacePart[]; questionSelection?: QuestionSelection }> = {};
@@ -395,7 +398,7 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
         }
         const saved=readLocalDraft();
         if(saved){
-          const serverIds = new Set((data.problemList || []).map((item: BuilderProblem) => item.id));
+          const serverIds = new Set<string>((data.problemList || []).map((item: BuilderProblem) => item.id));
           const savedIds = new Set((saved.draft.problems || []).map((item: BuilderProblem) => item.id));
           const compatibleWithPublished = !data.published || [...serverIds].every((pid) => savedIds.has(pid));
           if (!compatibleWithPublished) {
@@ -630,7 +633,19 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
 
   const selectedCounts = draft.problems.map(item => Object.values(selectedQuestions(problemDetails[item.id] || null, item.workspaceParts || [], item.questionSelection)).reduce((sum, questions) => sum + questions.length, 0));
   const totalQuestions = selectedCounts.reduce((sum, count) => sum + count, 0);
-  const weightedProblems = draft.problems.map((item, index) => ({...item, points: totalQuestions ? 10 * selectedCounts[index] / totalQuestions : 0}));
+  // "Tùy chỉnh điểm": điểm của bài = tổng điểm từng câu (đề đầu tiên); chia đều thì theo số câu như cũ.
+  const customScoring = normalizeScoringMode(draft.scoringMode) === SCORING_CUSTOM;
+  const scoredProblem = (item: BuilderProblem): ScoredProblem => {
+    const selected = selectedQuestions(problemDetails[item.id] || null, item.workspaceParts || [], item.questionSelection);
+    const ids = Object.fromEntries(Object.entries(selected).map(([part, list]) => [part, list.map(question => question.id)]));
+    return { title: item.id, papers: examPapers(item.questionSelection, ids), points: questionPointsOf(item.questionSelection) };
+  };
+  const customSummary = customScoringSummary(draft.problems.map(scoredProblem));
+  const sessionScoring = examination ? examinationPlan.sessions.map(slot => customScoringSummary((slot.problems || []).map(scoredProblem))) : [];
+  const weightedProblems = draft.problems.map((item, index) => ({
+    ...item,
+    points: customScoring ? customSummary.problemPoints[index] : totalQuestions ? 10 * selectedCounts[index] / totalQuestions : 0,
+  }));
   const scheduleValid =
     !!draft.opens && !!draft.closes && new Date(draft.opens) < new Date(draft.closes);
   const durationMinutes = scheduleValid ? Math.round((new Date(draft.closes).getTime() - new Date(draft.opens).getTime()) / 60000) : 0;
@@ -677,6 +692,11 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
       if (draft.problems.some((item, index) => !problemDetails[item.id] || !selectedCounts[index])) issues.push("Select at least one question for each problem.");
       if (draft.problems.some((item) => !(item.workspaceParts?.length))) issues.push("Select at least one section for each problem.");
     }
+    if (customScoring) {
+      for (const summary of examination ? sessionScoring : [customSummary]) {
+        summary.issues.forEach(issue => { if (!issues.includes(issue)) issues.push(issue); });
+      }
+    }
     if (!draft.opens || !Number.isFinite(new Date(draft.opens).getTime())) issues.push(examSession ? "Enter a valid start date and time." : "Enter a valid opening date and time.");
     if (!draft.closes || !Number.isFinite(new Date(draft.closes).getTime())) issues.push(examSession ? "Enter a valid end date and time." : "Enter a valid due date and time.");
     if (draft.opens && draft.closes && Number.isFinite(new Date(draft.opens).getTime()) && Number.isFinite(new Date(draft.closes).getTime()) && new Date(draft.opens) >= new Date(draft.closes)) {
@@ -703,6 +723,8 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
     setSaveState("Saving to server...");
     const notification = toast.show({ variant: "loading", title: "Saving…", description: draft.title });
     try {
+      const scoringMode = normalizeScoringMode(draft!.scoringMode);
+      const problemsToSave = weightedProblems.map(item => problemForSave(item, scoringMode));
       const payload = {
         title: draft!.title,
         classIds: draft!.classIds || [],
@@ -716,8 +738,8 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
         instructions: examSession ? "" : draft!.instructions,
         opens: draft!.opens ? new Date(draft!.opens).toISOString() : null,
         closes: draft!.closes ? new Date(draft!.closes).toISOString() : null,
-        problems: examination ? [] : weightedProblems,
-        scoringMode: "equal_questions",
+        problems: examination ? [] : problemsToSave,
+        scoringMode,
         studentOptions: examSession
           ? { leaderboard: draft!.studentOptions.leaderboard, hints: draft!.studentOptions.hints ?? true, aiAllowed: draft!.studentOptions.aiAllowed ?? true, examMode: draft!.studentOptions.examMode, examViolationLimit: draft!.studentOptions.examViolationLimit ?? 2, showScoresAfterSubmit: draft!.studentOptions.showScoresAfterSubmit, maxSubmissions: draft!.studentOptions.maxSubmissions }
           : { comments: draft!.studentOptions.comments, hints: draft!.studentOptions.hints ?? true, aiAllowed: draft!.studentOptions.aiAllowed ?? true, examMode: draft!.studentOptions.examMode, examViolationLimit: draft!.studentOptions.examViolationLimit ?? 2, showScoresAfterSubmit: draft!.studentOptions.showScoresAfterSubmit, maxSubmissions: draft!.studentOptions.maxSubmissions },
@@ -731,16 +753,19 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
           title: payload.title,
           template: {
             ...payload,
-            problems: weightedProblems
+            problems: problemsToSave
           },
-          problems: weightedProblems,
-          sessions: examinationPlan.sessions.map(s => {
-            const sessionProblems = (s.problems && s.problems.length > 0)
+          problems: problemsToSave,
+          sessions: examinationPlan.sessions.map((s, sessionIndex) => {
+            const sessionProblems = ((s.problems && s.problems.length > 0)
               ? s.problems.map((sp: any) => {
-                  const match = weightedProblems.find((wp: any) => wp.id === sp.id);
+                  const match = problemsToSave.find((wp: any) => wp.id === sp.id);
                   return match ? { ...sp, ...match, questionSelection: match.questionSelection } : sp;
                 })
-              : weightedProblems;
+              : problemsToSave
+            ).map((sp: any, problemIndex: number) => customScoring && s.problems?.length
+              ? { ...sp, points: sessionScoring[sessionIndex]?.problemPoints[problemIndex] ?? sp.points }
+              : problemForSave(sp, scoringMode));
             return {
               ...s,
               problems: sessionProblems,
@@ -1219,6 +1244,8 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
               problemDetails={problemDetails}
               catalogErrors={catalogErrors}
               onRetryCatalog={() => setCatalogRetry(v => v + 1)}
+              scoringMode={normalizeScoringMode(draft.scoringMode)}
+              onScoringModeChange={mode => update("scoringMode", mode)}
               onChange={plan => {
                 setHighlightError(null);
                 const sessionClassIds = [...new Set(plan.sessions.flatMap(slot => slot.classIds || []))];
@@ -1273,10 +1300,13 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
             id={examSession ? "exam-session-problems" : "assignment-problems"}
           >
             <TeacherSectionTitle title={tr(examSession ? "Exam content" : "Assignment content")} />
-            <GlidingTooltipGroup className="builder-scoring-summary" label={tr("Equal scoring")} role="group" multiline>
-              <strong><TranslatedText>{tr("Total: 10 points")}</TranslatedText></strong>
+            <GlidingTooltipGroup className="builder-scoring-summary" label={tr(customScoring ? "Custom points" : "Equal scoring")} role="group" multiline>
+              <ScoringModeControl value={normalizeScoringMode(draft.scoringMode)} onChange={mode => update("scoringMode", mode)} />
+              {customScoring
+                ? <CustomScoreTotal total={customSummary.total} />
+                : <strong><TranslatedText>{tr("Total: 10 points")}</TranslatedText></strong>}
               <span><TranslatedText>{tr("{value0} selected questions", { value0: totalQuestions })}</TranslatedText></span>
-              <button type="button" className="builder-scoring-help" aria-label={tr("Equal scoring")} data-tooltip={tr("Each selected question has the same weight, across all problems and SQL types.")}><CircleHelp size={14} aria-hidden="true" /></button>
+              <button type="button" className="builder-scoring-help" aria-label={tr(customScoring ? "Custom points" : "Equal scoring")} data-tooltip={tr(customScoring ? "Enter the points of every selected question. Every exam variant must add up to 10 points." : "Each selected question has the same weight, across all problems and SQL types.")}><CircleHelp size={14} aria-hidden="true" /></button>
             <button
               className="button primary teacher-small-button builder-library-trigger"
               type="button"
@@ -1340,6 +1370,7 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
                       detail={problemDetails[item.id] || null}
                       parts={item.workspaceParts || []}
                       questionSelection={item.questionSelection}
+                      scoringMode={normalizeScoringMode(draft.scoringMode)}
                       locked={isLockedProblem}
                       lockedQuestionSelection={lockedSnapshot?.questionSelection}
                       lockedParts={lockedSnapshot?.workspaceParts}

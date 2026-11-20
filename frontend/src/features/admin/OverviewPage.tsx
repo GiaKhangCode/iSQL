@@ -7,202 +7,11 @@ import { Loading } from "@/shared/ui/ui";
 import { type AdminClass, type AdminLecturerRequest } from "@/data/adminPolicy";
 import { adminService, userRoleNames, type AdminUser } from "@/features/admin/adminService";
 import { localTime, parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
+import { formatActivityAction, formatGradingError } from "@/features/admin/activityText";
 
 import { PageIntro, Split, Field, Notice, AddUserDialog, BulkImportDialog, BulkImportMembersDialog, AdminListPagination } from "@/features/admin/AdminShared";
 
 
-function formatActivityAction(action: string): string {
-  if (!action) return "Hoạt động không xác định";
-
-  // access:save_role:<name>
-  if (action.startsWith("access:save_role:")) {
-    const roleName = action.slice("access:save_role:".length);
-    return `Lưu vai trò: ${roleName}`;
-  }
-
-  // access:assign_roles:<user_id>
-  if (action.startsWith("access:assign_roles:")) {
-    return "Phân quyền người dùng";
-  }
-
-  // identity:set_student_code:<user_id>
-  if (action.startsWith("identity:set_student_code:")) {
-    return "Cập nhật mã số sinh viên";
-  }
-
-  // labs:save:<room>
-  if (action.startsWith("labs:save:")) {
-    const room = action.slice("labs:save:".length);
-    return `Cập nhật phòng thực hành: ${room}`;
-  }
-
-  // exam_admission:duplicate_login:<id>:generation=<gen>
-  if (action.startsWith("exam_admission:duplicate_login:")) {
-    return "Cảnh báo: Đăng nhập thi trùng thiết bị";
-  }
-
-  // exam_admission:reissue_export:<id>:generation=<gen>(:reason)?
-  if (action.startsWith("exam_admission:reissue_export:")) {
-    const parts = action.split(":");
-    const reason = parts.length > 4 ? parts.slice(4).join(":") : "";
-    return reason ? `Cấp lại và xuất tài khoản thi (${reason})` : "Cấp lại và xuất tài khoản thi";
-  }
-
-  // exam_admission:reissue:<id>:generation=<gen>(:reason)?
-  if (action.startsWith("exam_admission:reissue:")) {
-    const parts = action.split(":");
-    const reason = parts.length > 4 ? parts.slice(4).join(":") : "";
-    return reason ? `Cấp lại mật khẩu thi (${reason})` : "Cấp lại mật khẩu thi";
-  }
-
-  // exam_admission:export:<id>:generation=<gen>
-  if (action.startsWith("exam_admission:export:")) {
-    return "Xuất danh sách tài khoản thi";
-  }
-
-  // exam_rooms:save:<session_id>
-  if (action.startsWith("exam_rooms:save:")) {
-    return "Lưu phân bổ phòng thi";
-  }
-
-  // exam_rooms:confirm:<session_id>
-  if (action.startsWith("exam_rooms:confirm:")) {
-    return "Xác nhận chốt phòng thi";
-  }
-
-  // exam_rooms:reopen:<session_id>(:reason)?
-  if (action.startsWith("exam_rooms:reopen:")) {
-    const parts = action.split(":");
-    const reason = parts.length > 3 ? parts.slice(3).join(":") : "";
-    return reason ? `Mở lại phân bổ phòng thi (${reason})` : "Mở lại phân bổ phòng thi";
-  }
-
-  // exam_rooms:add_students:<session_id>:count=<count>
-  if (action.startsWith("exam_rooms:add_students:")) {
-    const match = /count=(\d+)/.exec(action);
-    return match ? `Thêm ${match[1]} sinh viên vào phòng thi` : "Thêm sinh viên vào phòng thi";
-  }
-
-  // proctor:unlock:<session_id>:<student_id>
-  if (action.startsWith("proctor:unlock:")) {
-    return "Giám thị mở khóa bài thi cho sinh viên";
-  }
-
-  // proctor:add_student:<session_id>:<student_id>
-  if (action.startsWith("proctor:add_student:")) {
-    return "Giám thị thêm sinh viên vào ca thi";
-  }
-
-  // Saved examination <id> with <N> sessions
-  const savedExamMatch = /^Saved examination\s+([\w-]+)\s+with\s+(\d+)\s+sessions$/i.exec(action);
-  if (savedExamMatch) {
-    return `Lưu kỳ thi (${savedExamMatch[2]} ca thi)`;
-  }
-
-  // Updated examination session <id>
-  if (/^Updated examination session/i.test(action)) {
-    return "Cập nhật thông tin ca thi";
-  }
-
-  // Moved classes <classes> from session <X> to session <Y> of examination <id>
-  const moveClassMatch = /^Moved classes\s+(.+?)\s+from session\s+(\w+)\s+to session\s+(\w+)/i.exec(action);
-  if (moveClassMatch) {
-    return `Chuyển lớp ${moveClassMatch[1]} từ ca ${moveClassMatch[2]} sang ca ${moveClassMatch[3]}`;
-  }
-
-  // Removed examination sessions <ids> from <id>
-  if (/^Removed examination sessions/i.test(action)) {
-    return "Xóa ca thi khỏi kỳ thi";
-  }
-
-  // content:share:<kind>:<id>:<target>:edit=<can_edit>
-  if (action.startsWith("content:share:")) {
-    return "Chia sẻ nội dung trong thư viện";
-  }
-
-  // content:revoke:<kind>:<id>:<target>
-  if (action.startsWith("content:revoke:")) {
-    return "Thu hồi chia sẻ nội dung";
-  }
-
-  // content:copy:<kind>:<id>
-  if (action.startsWith("content:copy:")) {
-    return "Sao chép bài tập từ thư viện";
-  }
-
-  // results:publish:<id>
-  if (action.startsWith("results:publish:")) {
-    return "Công bố kết quả thi / bài tập";
-  }
-
-  // Created class <id>
-  const createClassMatch = /^Created class\s+(.+)$/i.exec(action);
-  if (createClassMatch) {
-    return `Tạo lớp học ${createClassMatch[1]}`;
-  }
-
-  // Updated class <id>
-  const updateClassMatch = /^Updated class\s+(.+)$/i.exec(action);
-  if (updateClassMatch) {
-    return `Cập nhật lớp học ${updateClassMatch[1]}`;
-  }
-
-  // Changed role of <user> from <prev> to <new>
-  const roleChangeMatch = /^Changed role of\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)$/i.exec(action);
-  if (roleChangeMatch) {
-    return `Đổi vai trò người dùng thành ${roleChangeMatch[3]}`;
-  }
-
-  // Created user <user>
-  const createUserMatch = /^Created user\s+(.+)$/i.exec(action);
-  if (createUserMatch) {
-    return `Tạo tài khoản: ${createUserMatch[1]}`;
-  }
-
-  // Updated user <user>
-  const updateUserMatch = /^Updated user\s+(.+)$/i.exec(action);
-  if (updateUserMatch) {
-    return `Cập nhật tài khoản: ${updateUserMatch[1]}`;
-  }
-
-  // Deactivated user <user>
-  const deactUserMatch = /^Deactivated user\s+(.+)$/i.exec(action);
-  if (deactUserMatch) {
-    return `Vô hiệu hóa tài khoản: ${deactUserMatch[1]}`;
-  }
-
-  // Activated user <user>
-  const actUserMatch = /^Activated user\s+(.+)$/i.exec(action);
-  if (actUserMatch) {
-    return `Kích hoạt tài khoản: ${actUserMatch[1]}`;
-  }
-
-  // Approved lecturer <user>
-  const appLectMatch = /^Approved lecturer\s+(.+)$/i.exec(action);
-  if (appLectMatch) {
-    return `Phê duyệt giảng viên: ${appLectMatch[1]}`;
-  }
-
-  // Rejected lecturer <user>
-  const rejLectMatch = /^Rejected lecturer\s+(.+)$/i.exec(action);
-  if (rejLectMatch) {
-    return `Từ chối duyệt giảng viên: ${rejLectMatch[1]}`;
-  }
-
-  return action;
-}
-
-function formatGradingError(errorType: string): string {
-  if (!errorType) return "Lỗi không xác định";
-  const lower = errorType.toLowerCase();
-  if (lower.includes("runtime")) return "Lỗi thực thi (Runtime Error)";
-  if (lower.includes("syntax")) return "Lỗi cú pháp (Syntax Error)";
-  if (lower.includes("timeout") || lower.includes("time limit")) return "Quá thời gian thực thi (Time Limit)";
-  if (lower.includes("memory")) return "Quá giới hạn bộ nhớ (Memory Limit)";
-  if (lower.includes("wrong answer")) return "Sai kết quả (Wrong Answer)";
-  return errorType;
-}
-
 function OverviewPagination({ total, page, onPageChange, label }: { total: number; page: number; onPageChange: (page: number) => void; label: string }) {
   const { t: tr } = useLanguage("admin");
   const pageSize = 10;
@@ -319,7 +128,7 @@ function OverviewActivityPanel({ activity, onClose }: { activity: any; onClose: 
 
   return <div className="admin-overview-details">
     <div className="admin-overview-panel-header"><h2><TranslatedText>{tr("Activity details")}</TranslatedText></h2><button type="button" className="text-button" onClick={onClose}><TranslatedText>{tr("Close")}</TranslatedText></button></div>
-    <h3 className="admin-detail-title">{formatActivityAction(activity.action)}</h3>{formatActivityAction(activity.action) !== activity.action && <p className="admin-muted" style={{ fontSize: "11px", marginTop: "4px", wordBreak: "break-all" }}>{activity.action}</p>}
+    <h3 className="admin-detail-title">{formatActivityAction(activity.action)}</h3>
     <dl className="teacher-list-detail-facts">
       <div><dt><TranslatedText>{tr("Performed by")}</TranslatedText></dt><dd><TranslatedText>{activity.by || tr("System")}</TranslatedText></dd></div>
       <div><dt><TranslatedText>{tr("Time")}</TranslatedText></dt><dd><TranslatedText>{activity.time ? parseServerDateTime(activity.time).toLocaleString(uiLocale) : tr("Unknown")}</TranslatedText></dd></div>
@@ -345,7 +154,6 @@ function OverviewActivityPanel({ activity, onClose }: { activity: any; onClose: 
         <dl className="teacher-list-detail-facts"><div><dt><TranslatedText>{tr("Email")}</TranslatedText></dt><dd>{actor.email}</dd></div><div><dt><TranslatedText>{tr("Role")}</TranslatedText></dt><dd>{userRoleNames(actor)}</dd></div><div><dt><TranslatedText>{tr("Status")}</TranslatedText></dt><dd><TranslatedText>{tr(actor.status)}</TranslatedText></dd></div><div><dt><TranslatedText>{tr("Joined")}</TranslatedText></dt><dd>{actor.joined}</dd></div>{actor.detail && <div><dt><TranslatedText>{tr("Department")}</TranslatedText></dt><dd>{actor.detail}</dd></div>}</dl>
       </>}
     </>}
-    <details className="admin-overview-record-reference"><summary><TranslatedText>{tr("Record reference")}</TranslatedText></summary><p className="admin-muted">{activity.id}</p></details>
   </div>;
 }
 
@@ -488,7 +296,7 @@ export function AdminOverviewPage() {
       adminService.getActivities().then(setActivities).catch(console.error);
     }} /> : selection?.type === "attention" && selection.id === "unassigned" ? <OverviewUnassignedClassesPanel onClose={() => setSelection(null)} /> : selectedActivity ? <OverviewActivityPanel key={selectedActivity.id} activity={selectedActivity} onClose={() => setSelection(null)} /> : <>
       <h2><TranslatedText>{tr("Grading health")}</TranslatedText></h2><p className={stats.gradingErrors === 0 ? "admin-health" : "admin-health admin-warning"}><TranslatedText>{stats.gradingErrors === 0 ? tr("Operational") : tr("Needs Attention")}</TranslatedText></p><p className="admin-muted">{stats.submissionsToday} <TranslatedText>{tr("submitted today /")}</TranslatedText> {stats.gradingErrors} <TranslatedText>{tr("need attention")}</TranslatedText></p><div className="admin-detail-divider" /><h3 className="admin-subheading"><TranslatedText>{tr("Recent errors")}</TranslatedText></h3>
-      {errors.length > 0 ? errors.map(err => <p key={err.id} className="admin-warning admin-error">#{err.id.substring(0, 8)} · {formatGradingError(err.errorType)}<br />{err.problemTitle}</p>) : <p className="admin-muted"><TranslatedText>{tr("No errors recently")}</TranslatedText></p>}
+      {errors.length > 0 ? errors.map(err => <p key={err.id} className="admin-warning admin-error"><strong>{formatGradingError(err.errorType)}</strong><br />{err.problemTitle}{err.studentName ? " · " + err.studentName : ""}{err.submittedAt ? <><br /><span className="admin-muted">{parseServerDateTime(err.submittedAt).toLocaleString(uiLocale)}</span></> : null}</p>) : <p className="admin-muted"><TranslatedText>{tr("No errors recently")}</TranslatedText></p>}
     </>} />
   </div>;
 }

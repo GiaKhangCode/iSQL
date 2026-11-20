@@ -336,13 +336,12 @@ class ExaminationService
 
     public function ensureSessionStudentAccounts(Assignment $session, ?string $examinationId = null): array
     {
-        $session->loadMissing(['classes.instructor', 'classes.practiceInstructor', 'selectedStudents', 'assignmentProblems']);
+        $session->loadMissing(['classes.instructor', 'selectedStudents', 'assignmentProblems']);
 
         $classIds = $session->classes->pluck('id')->all();
         $classesMap = $session->classes->keyBy('id');
 
         $instructorIds = $session->classes->pluck('instructor_id')
-            ->merge($session->classes->pluck('practice_instructor_id'))
             ->push($session->instructor_id)
             ->filter()
             ->unique()
@@ -407,7 +406,7 @@ class ExaminationService
             $mssv = $this->studentCode($student->email, $student->id);
             $sortMssvKey = $mssv ?: $student->name;
 
-            $tId = $cObj ? ($cObj->practice_instructor_id ?: $cObj->instructor_id) : $session->instructor_id;
+            $tId = $cObj ? $cObj->instructor_id : $session->instructor_id;
             $tObj = $tId ? $instructorsMap->get($tId) : null;
             $tName = $tObj ? $tObj->name : (is_array($session->proctors) && !empty($session->proctors) ? implode(', ', $session->proctors) : '');
 
@@ -739,7 +738,9 @@ class ExaminationService
             }
 
             $qPoints = [];
-            $rawPoints = $rule['questionPoints'] ?? $rule['question_points'] ?? [];
+            // Điểm từng câu: trong cấu hình của phần (`questionPoints`) hoặc ở cấp trên cùng (`_questionPoints[PHẦN]`),
+            // cách sau dùng được khi phần chỉ là mảng mã câu như giao diện soạn kỳ thi lưu.
+            $rawPoints = $rule['questionPoints'] ?? $rule['question_points'] ?? $raw['_questionPoints'][$part] ?? [];
             if (is_array($rawPoints)) {
                 foreach ($ids as $qid) {
                     if (isset($rawPoints[$qid]) && is_numeric($rawPoints[$qid]) && (float) $rawPoints[$qid] > 0) {

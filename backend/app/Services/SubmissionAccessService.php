@@ -11,7 +11,6 @@ use App\Models\Submission;
 use App\Models\SubmissionRegradeAssignment;
 use App\Models\User;
 use App\Services\Access\StaffAccess;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Ai được xem / chấm bài nộp và bài làm của sinh viên (phạm vi theo dữ liệu; quyền capability do StaffAccess).
@@ -63,16 +62,10 @@ class SubmissionAccessService
         return $sub !== null && in_array($sub->source, ['ExamSession'], true);
     }
 
-    /** Id các lớp mà giảng viên dạy THỰC HÀNH (cột practice_instructor_id hoặc class_instructors loại practical). */
+    /** Id các lớp mà giảng viên dạy (cột classes.instructor_id: một lớp một giảng viên). */
     protected function practicalClassIds(User $viewer): array
     {
-        return ClassModel::where(function ($q) use ($viewer) {
-            $q->where('practice_instructor_id', $viewer->id)
-                ->orWhereIn('id', DB::table('class_instructors')
-                    ->where('instructor_id', $viewer->id)
-                    ->where('assignment_type', 'practical')
-                    ->select('class_id'));
-        })->pluck('id')->all();
+        return ClassModel::where('instructor_id', $viewer->id)->pluck('id')->all();
     }
 
     public function isPracticalClassInstructorForStudent(User $viewer, string $studentId, Assignment $activity): bool
@@ -122,11 +115,7 @@ class SubmissionAccessService
         $classIds = $activity->classes()->pluck('classes.id')->all();
         if (!empty($classIds)) {
             $teachesAssignedClass = ClassModel::whereIn('id', $classIds)
-                ->where(function ($q) use ($viewer) {
-                    $q->where('instructor_id', $viewer->id)
-                        ->orWhere('practice_instructor_id', $viewer->id)
-                        ->orWhereHas('instructors', fn ($iq) => $iq->where('users.id', $viewer->id));
-                })
+                ->where('instructor_id', $viewer->id)
                 ->exists();
             if ($teachesAssignedClass) {
                 return true;

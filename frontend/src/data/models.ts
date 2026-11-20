@@ -50,6 +50,11 @@ export type Problem = {
 
 export type Assignment = {
   createdAt?: string | null;
+  /** ISO time the assignment opens; before it, problemIds is empty and only problemCount is known. */
+  opens?: string | null;
+  /** ISO deadline (date/time below are the same instant split for display). */
+  closes?: string | null;
+  problemCount?: number;
   examMode?: boolean;
   showScoresAfterSubmit?: boolean;
   maxSubmissions?: number | null;

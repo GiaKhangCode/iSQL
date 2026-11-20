@@ -41,7 +41,7 @@ class ClassRosterService
             return $this->classService->getClass($classId);
         }
 
-        return $this->classService->getClassTaughtBy($classId, $user->id);
+        return $this->classService->getClass($classId, $user->id);
     }
 
     public function classForManaging(User $user, string $classId): ClassModel

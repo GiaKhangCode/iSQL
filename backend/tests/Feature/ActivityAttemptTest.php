@@ -1445,6 +1445,90 @@ class ActivityAttemptTest extends TestCase
         $this->assertSame('SELECT 1 AS x', $payload['questions']['SQL'][$solution->id]);
     }
 
+    /** Bài có 2 câu SQL, điểm câu 3 + 7 qua `questionPoints` của cấu hình chọn câu; SV chỉ làm đúng câu $passIndex. */
+    private function submitWeightedSqlAttempt(int $passIndex, array $questionPoints = [3, 7]): array
+    {
+        $student = $this->makeStudent();
+        $activity = $this->makeActivity($student);
+        $problem = $this->makeProblem();
+        $s = [$this->addSolution($problem, 'q1', 0), $this->addSolution($problem, 'q2', 1)];
+        $member = $this->addMember($activity, $problem, 0, 10);
+        $member->update(['question_selection' => ['SQL' => [
+            'mode'           => 'manual',
+            'questionIds'    => [$s[0]->id, $s[1]->id],
+            'questionPoints' => [$s[0]->id => $questionPoints[0], $s[1]->id => $questionPoints[1]],
+        ]]]);
+        Sanctum::actingAs($student);
+        $this->postJson($this->url($activity, '/start'), [])->assertOk();
+        $this->postJson($this->url($activity, '/save'), [
+            'drafts' => [$problem->id => ['questions' => ['SQL' => [
+                $s[0]->id => $passIndex === 0 ? 'SELECT 1 AS x' : 'SELECT 2 AS x',
+                $s[1]->id => $passIndex === 1 ? 'SELECT 1 AS x' : 'SELECT 2 AS x',
+            ]]]],
+        ])->assertOk();
+
+        return $this->postJson($this->url($activity, '/submit'), [])->assertOk()->json('submissions.0');
+    }
+
+    public function test_question_points_weigh_the_score_instead_of_splitting_it_equally(): void
+    {
+        $this->assertEquals(3, $this->submitWeightedSqlAttempt(0)['score'], 'đúng câu 3đ');
+        $this->assertEquals(7, $this->submitWeightedSqlAttempt(1)['score'], 'đúng câu 7đ');
+    }
+
+    public function test_points_in_the_top_level_question_points_map_work_with_plain_id_lists_and_variants(): void
+    {
+        // Đúng dạng giao diện soạn kỳ thi lưu: mỗi phần là mảng mã câu, mã đề chứa mảng mã câu, điểm ở _questionPoints.
+        $student = $this->makeStudent();
+        $activity = $this->makeActivity($student);
+        $problem = $this->makeProblem();
+        $s = [$this->addSolution($problem, 'q1', 0), $this->addSolution($problem, 'q2', 1)];
+        $this->addMember($activity, $problem, 0, 10)->update(['question_selection' => [
+            'SQL'             => [$s[0]->id, $s[1]->id],
+            '_variants'       => [['code' => '1', 'questions' => ['SQL' => [$s[0]->id, $s[1]->id]]]],
+            '_questionPoints' => ['SQL' => [$s[0]->id => 3, $s[1]->id => 7]],
+        ]]);
+        Sanctum::actingAs($student);
+        $this->postJson($this->url($activity, '/start'), [])->assertOk();
+        $this->postJson($this->url($activity, '/save'), [
+            'drafts' => [$problem->id => ['questions' => ['SQL' => [$s[0]->id => 'SELECT 2 AS x', $s[1]->id => 'SELECT 1 AS x']]]],
+        ])->assertOk();
+
+        $row = $this->postJson($this->url($activity, '/submit'), [])->assertOk()->json('submissions.0');
+
+        $this->assertEquals(7, $row['score'], 'đúng câu 7đ, sai câu 3đ');
+    }
+
+    public function test_question_points_are_normalized_to_the_member_points(): void
+    {
+        $row = $this->submitWeightedSqlAttempt(1, [1, 1]);
+
+        $this->assertEquals(5, $row['score'], 'hai câu ngang điểm = chia đều');
+        $this->assertEquals(7.5, $this->submitWeightedSqlAttempt(1, [1, 3])['score'], 'câu đúng chiếm 3/4 tổng điểm câu');
+    }
+
+    public function test_workspace_submit_weighs_the_score_by_question_points_too(): void
+    {
+        $student = $this->makeStudent();
+        $activity = $this->makeActivity($student, ['exam_mode' => false]);
+        $problem = $this->makeProblem();
+        $s = [$this->addSolution($problem, 'q1', 0), $this->addSolution($problem, 'q2', 1)];
+        $this->addMember($activity, $problem, 0, 10)->update(['question_selection' => ['SQL' => [
+            'mode'           => 'manual',
+            'questionIds'    => [$s[0]->id, $s[1]->id],
+            'questionPoints' => [$s[0]->id => 3, $s[1]->id => 7],
+        ]]]);
+        Sanctum::actingAs($student);
+
+        $res = $this->postJson("/api/problems/{$problem->id}/workspace/submit", [
+            'source'  => 'Assignments',
+            'context' => $activity->id,
+            'query'   => "-- solution:{$s[0]->id}\nSELECT 2 AS x\n-- solution:{$s[1]->id}\nSELECT 1 AS x",
+        ])->assertOk();
+
+        $this->assertEquals(7, $res->json('score'), 'đúng câu 7đ, sai câu 3đ');
+    }
+
     public function test_activity_without_problems_submits_with_empty_results(): void
     {
         $student = $this->makeStudent();

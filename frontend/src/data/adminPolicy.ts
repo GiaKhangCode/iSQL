@@ -11,7 +11,6 @@ export type AdminClass = {
   courseCode?: string;
   theoryClass?: string;
   practiceClass?: string;
-  practiceLecturer?: string;
   lecturer: string;
   lecturerId?: string;
   students: number;

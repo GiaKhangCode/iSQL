@@ -142,12 +142,6 @@ class User extends Authenticatable
         return $this->hasMany(ClassModel::class, 'instructor_id');
     }
 
-    public function assignedClasses()
-    {
-        return $this->belongsToMany(ClassModel::class, 'class_instructors', 'instructor_id', 'class_id')
-            ->withPivot('assigned_at');
-    }
-
     public function favorites()
     {
         return $this->hasMany(Favorite::class);

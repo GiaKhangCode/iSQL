@@ -367,9 +367,12 @@ class ProblemCrudTest extends TestCase
 
     public function test_validate_reference_solution(): void
     {
-        // Valid reference solution
+        // Valid reference solution. Tự dựng bảng bằng schema + seedData: sandbox không có sẵn
+        // bảng nào, và validateSolution rollback toàn bộ sau khi chạy.
         Sanctum::actingAs($this->instructor1);
         $resp = $this->postJson('/api/problems/validate', [
+            'schema'            => 'CREATE TABLE Customers (Id int, Name varchar(40), Country varchar(40));',
+            'seedData'          => "INSERT INTO Customers VALUES (1, 'A', 'Vietnam'), (2, 'B', 'Laos');",
             'referenceSolution' => 'SELECT * FROM Customers WHERE Country = \'Vietnam\';',
         ]);
         $resp->assertStatus(200);
