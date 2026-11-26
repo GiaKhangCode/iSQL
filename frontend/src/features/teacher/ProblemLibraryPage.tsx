@@ -8,7 +8,6 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { LanguageText } from "@/shared/ui/LanguageSwitch";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Share2 } from "lucide-react";
 import { ErrorState } from "@/shared/ui/ui";
 import { teacherService } from "@/shared/api/teacherService";
 import { parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
@@ -97,21 +96,19 @@ export function ProblemLibraryPage() {
     <section className="teacher-page teacher-library-page compact-teacher-library">
       <h1 className="sr-only"><TranslatedText>{t("Problem library")}</TranslatedText></h1>
       {loading ? (
-        <TeacherListLoading label={t("Loading problems…")} columns={3} createLabel={t("New problem")} createTo="/teacher/problems/new"  />
+        <TeacherListLoading label={t("Loading problems…")} columns={3} createLabel={t("New question set")} createTo="/teacher/problems/new"  />
       ) : loadError ? <ErrorState title={t("Could not load problems")} message={t(loadError)} onRetry={() => window.location.reload()} /> : problems.length === 0 ? (
         <TeacherEmptyState
           title={t("No problems yet")}
           description={t("Create your first SQL problem with a schema, seed data and a reference solution. You can reuse it in any assignment or exam session.")}
-          primaryLabel={t("New problem")}
+          primaryLabel={t("New question set")}
           primaryTo="/teacher/problems/new"
         />
       ) : <>
         <div className="teacher-list-detail-layout teacher-filter-layout">
           <div className="teacher-list-detail-main">
             <TeacherListFilters order={order} suggestions={filtered.map(item=>({id:item.id,title:item.title,description:`${item.number} · ${item.topics}`}))} dates={dates} search={search} onSearchChange={setSearch} searchLabel={t("Search ID, title or topic…")}
-              actionsTarget={problemActionsTarget} createLabel={t("New problem")} createTo="/teacher/problems/new"
-              secondaryAction={<Link className="button" to="/teacher/shared"><Share2 size={15} aria-hidden="true" /><span>Được chia sẻ với tôi</span></Link>}
-
+              actionsTarget={problemActionsTarget} createLabel={t("New question set")} createTo="/teacher/problems/new"
               />
             <div ref={tableScrollRef} className="teacher-table-scroll teacher-list-table-scroll sticky-list-table-wrap">
               <Table className="teacher-table teacher-library-table teacher-library-column-table sticky-list-table">

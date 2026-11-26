@@ -3,12 +3,11 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { authService, validEmail } from "@/features/auth/authService";
-import { AuthLayout, PasswordField } from "@/features/auth/AuthParts";
+import { PasswordField } from "@/features/auth/AuthParts";
+import { LoginLayout } from "@/features/auth/LoginLayout";
+import { notify } from "@/shared/ui/notify";
 
 const RESEND_SECONDS = 60;
-
-const errorText = (error: unknown, fallback: string) =>
-  error instanceof Error && error.message ? error.message : fallback;
 
 export function ForgotPasswordPage() {
   const { t: tr } = useLanguage("auth");
@@ -32,19 +31,18 @@ export function ForgotPasswordPage() {
     setBusy(true);
     try {
       await authService.requestPasswordReset(value);
+      notify.success(tr("Verification code sent"), value);
       navigate("/verify-otp", { state: { email: value, sentAt: Date.now() } });
     } catch (err) {
-      setError(errorText(err, "Could not send the verification code. Try again."));
+      notify.fail(tr("Could not send the verification code. Try again."), err, tr);
       setBusy(false);
     }
   }
 
   return (
-    <AuthLayout
-      title={tr("Forgot your password?")}
-      compact
-      subtitle="Enter your email and we’ll send you a verification code."
-      showTeacherNote={false}
+    <LoginLayout
+      title={tr("Forgot password")}
+      subtitle={tr("Enter your email and we’ll send you a verification code.")}
     >
       <form onSubmit={submit} noValidate>
         <label className="field" htmlFor="recovery-email"><TranslatedText>{tr("Email")}</TranslatedText><input
@@ -63,7 +61,7 @@ export function ForgotPasswordPage() {
         </button>
       </form>
       <p className="auth-switch"><Link to="/login"><TranslatedText>{tr("← Back to sign in")}</TranslatedText></Link></p>
-    </AuthLayout>
+    </LoginLayout>
   );
 }
 
@@ -76,7 +74,6 @@ export function VerifyOtpPage() {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const cells = useRef<Array<HTMLInputElement | null>>([]);
   const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useState(() => {
     const elapsed = state?.sentAt ? Math.floor((Date.now() - state.sentAt) / 1000) : RESEND_SECONDS;
@@ -97,18 +94,16 @@ export function VerifyOtpPage() {
     if (busy) return;
     const otp = code.join("");
     if (otp.length !== 6) {
-      setInfo("");
       setError("Enter the 6-digit code.");
       return;
     }
     setError("");
-    setInfo("");
     setBusy(true);
     try {
       await authService.verifyResetOtp(email, otp);
       navigate("/reset-password", { state: { email, otp }, replace: true });
     } catch (err) {
-      setError(errorText(err, "Could not verify the code. Try again."));
+      notify.fail(tr("Could not verify the code. Try again."), err, tr);
       setBusy(false);
     }
   }
@@ -116,27 +111,24 @@ export function VerifyOtpPage() {
   async function resend() {
     if (busy || cooldown > 0) return;
     setError("");
-    setInfo("");
     setBusy(true);
     try {
       await authService.requestPasswordReset(email);
       setCode(["", "", "", "", "", ""]);
       setCooldown(RESEND_SECONDS);
-      setInfo("A new verification code has been sent.");
+      notify.success(tr("A new verification code has been sent."));
       cells.current[0]?.focus();
     } catch (err) {
-      setError(errorText(err, "Could not send the verification code. Try again."));
+      notify.fail(tr("Could not send the verification code. Try again."), err, tr);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <AuthLayout
+    <LoginLayout
       title={tr("Verify your email")}
-      subtitle={`Enter the 6-digit code sent to ${email}.`}
-      showTeacherNote={false}
-      centered
+      subtitle={tr("Enter the 6-digit code sent to {value0}.", { value0: email })}
     >
       <form onSubmit={submit}>
         <fieldset className="otp-fieldset">
@@ -186,13 +178,12 @@ export function VerifyOtpPage() {
             : <button type="button" className="forgot-link" onClick={resend} disabled={busy}><TranslatedText>{tr("Resend code")}</TranslatedText></button>}
         </p>
         {error && <p className="form-message" role="alert"><TranslatedText>{tr(error)}</TranslatedText></p>}
-        {info && <p className="form-message" role="status"><TranslatedText>{tr(info)}</TranslatedText></p>}
         <button className="button primary full" type="submit" disabled={busy}>
           <TranslatedText>{tr("Verify")}</TranslatedText>
         </button>
       </form>
       <p className="auth-switch"><Link to="/forgot-password" state={{ email }}><TranslatedText>{tr("← Back")}</TranslatedText></Link></p>
-    </AuthLayout>
+    </LoginLayout>
   );
 }
 
@@ -220,27 +211,26 @@ export function ResetPasswordPage() {
     setBusy(true);
     try {
       await authService.resetPassword(email, otp, password);
+      notify.success(tr("Password updated"));
       setDone(true);
     } catch (err) {
-      setError(errorText(err, "Could not update the password. Try again."));
+      notify.fail(tr("Could not update the password. Try again."), err, tr);
       setBusy(false);
     }
   }
 
   if (done) {
     return (
-      <AuthLayout title={tr("Set a new password")} showTeacherNote={false} centered>
-        <p className="form-message" role="status"><TranslatedText>{tr("Your password has been updated. Sign in with your new password.")}</TranslatedText></p>
+      <LoginLayout title={tr("Password updated")} subtitle={tr("Your password has been updated. Sign in with your new password.")}>
         <Link className="button primary full" to="/login"><TranslatedText>{tr("Back to sign in")}</TranslatedText></Link>
-      </AuthLayout>
+      </LoginLayout>
     );
   }
 
   return (
-    <AuthLayout
+    <LoginLayout
       title={tr("Set a new password")}
-      subtitle="Choose a new password for your account."
-      showTeacherNote={false}
+      subtitle={tr("Choose a new password for your account.")}
     >
       <form onSubmit={submit} noValidate>
         <PasswordField
@@ -270,6 +260,6 @@ export function ResetPasswordPage() {
         </button>
       </form>
       <p className="auth-switch"><Link to="/login"><TranslatedText>{tr("← Back to sign in")}</TranslatedText></Link></p>
-    </AuthLayout>
+    </LoginLayout>
   );
 }

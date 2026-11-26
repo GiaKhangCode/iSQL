@@ -24,14 +24,15 @@ export function parseProblemTopics(value: unknown): string[] {
 }
 
 export function comparableSolutions(solutions: TeacherSqlSolution[] = []) {
-  return solutions.map(solution => [solution.id, solution.name, solution.query, solution.setupSql || "", solution.description || "", solution.enabled,
+  return solutions.map(solution => [solution.id, solution.query, solution.setupSql || "", solution.description || "", solution.enabled,
     solution.timeLimitMs, solution.expectedOutputVisible !== false, solution.difficulty || "", solution.category || "",
+    solution.checkRowOrder ?? null, Boolean(solution.ignoreColumnNames),
     (solution.expectedOutputs || []).map(table => [table.name, table.columns, table.rows])]);
 }
 
 export function comparableStageExercise(exercise?: TeacherStageExercise) {
-  return (exercise?.questions || []).map((question: TeacherStageQuestion) => [question.id, question.name, question.description,
-    question.answer, question.enabled, question.startFrom, question.setupDdl, question.setupDml, question.difficulty || "", question.category || "", (question.probes || []).join("\u0000")]);
+  return (exercise?.questions || []).map((question: TeacherStageQuestion) => [question.id, question.description,
+    question.answer, question.enabled, question.startFrom, question.setupDdl, question.setupDml, question.difficulty || "", question.category || "", (question.probes || []).join("\u0000"), Boolean(question.checkColumnOrder)]);
 }
 
 export function problemPayloadWasSaved(data: any, payload: any) {

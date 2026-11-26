@@ -28,6 +28,11 @@ import "@/styles/workspace-viewport.css";
 import { WorkspaceExitDialog } from "@/features/workspace/components/WorkspaceExitDialog";
 import { useWorkspaceContextTitle } from "@/features/workspace/useWorkspaceContextTitle";
 import { readRunHistory, saveRunHistory, readWorkspaceSelection } from "@/shared/lib/workspace/workspaceRunHistory";
+import { notify } from "@/shared/ui/notify";
+import { WorkspacePaneTitle, WorkspaceTitleProvider, useWorkspaceTitle } from "@/features/workspace/components/WorkspaceTitle";
+import { ArrowLeft } from "lucide-react";
+import { WorkspaceHeaderStatus } from "@/features/workspace/components/WorkspaceHeaderStatus";
+import { WorkspaceRunSlotProvider } from "@/features/workspace/components/WorkspaceRunSlot";
 
 function readSubmittedWorkspaceScripts(value: string | undefined) {
   if (!value) return null;
@@ -61,7 +66,6 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   const [confirmExit, setConfirmExit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [questionSubmitting,setQuestionSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
   const [reviewMode, setReviewMode] = useState(false);
   const [editedSinceSubmission, setEditedSinceSubmission] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(Boolean(exam?.enabled));
@@ -78,6 +82,7 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   useEffect(() => { saveRunHistory(draftKey + ":runs",submissionAttempts); },[draftKey,submissionAttempts]);
   const parts = workspaceParts(problem.workspaceParts);
   const sqlOnly = parts.length === 1 && parts[0] === "SQL";
+  const [runSlot, setRunSlot] = useState<HTMLElement | null>(null);
   const activityTitle = useWorkspaceContextTitle(source, context, params.get("contextTitle"), !sqlOnly);
   const [focus, setFocus] = useState(false);
   const [active, setActive] = useState<WorkspacePart>(parts.includes(savedSelection.part as WorkspacePart) ? savedSelection.part as WorkspacePart : parts[0] || "SQL");
@@ -105,14 +110,14 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
     const key = stageScriptKey(part);
     const checks = stageChecks(part);
     if (!checks.length) return scripts[key];
-    return readQuestionDrafts(scripts[key], checks.map(check => check.id))[id] || "";
+    return readQuestionDrafts(scripts[key], checks.map(check => check.id), { keepTrailing: true })[id] || "";
   };
   function updateStageDraft(part: StagePart, id: string, value: string) {
     const key = stageScriptKey(part);
     const checks = stageChecks(part);
     const ids = checks.map(check => check.id);
     if (!ids.length) { updateScripts({ [key]: value }); return; }
-    const answers = readQuestionDrafts(scripts[key], ids);
+    const answers = readQuestionDrafts(scripts[key], ids, { keepTrailing: true });
     updateScripts({ [key]: writeQuestionDrafts({ ...answers, [id]: value }, ids) });
   }
   const stageDatabase = (part: StagePart) => {
@@ -185,18 +190,19 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   }, [problem.id, source, context, exam?.enabled, draftKey, sqlOnly]);
   async function submitQuestion(attempt: WorkspaceAttempt) {
     if (questionSubmitting || submitting || isReadOnly || !attempt.part || !attempt.result.questionId || !attempt.script?.trim()) return;
-    setQuestionSubmitting(true);setSubmitError("");
+    setQuestionSubmitting(true);
     try {
       const result=await studentApi.submitWorkspaceQuestion(problem.id,{part:attempt.part,solutionId:attempt.result.questionId,script:attempt.script,source,context});
-      if(result.alreadySubmitted)return result;
+      if(result.alreadySubmitted){notify.info(tr("This question was already submitted."));return result;}
       setSubmissionAttempts(previous => [{id:Date.now() + ++submissionCounter.current,kind:"submit" as const,part:attempt.part,result,script:attempt.script},...previous].slice(0,200));
       setSubmissionSignal(value => value + 1);
-    } catch(error) {setSubmitError(error instanceof Error ? error.message : tr("Unable to submit this question."));}
+      notify.success(tr("Question submitted"));
+    } catch(error) {notify.fail(tr("Unable to submit this question."), error, tr);}
     finally {setQuestionSubmitting(false);}
   }
   async function submitWork(exitAfter = false) {
     if (submitting || questionSubmitting || busy || sqlBusy) return;
-    setSubmitting(true); setSubmitError("");
+    setSubmitting(true); 
     try {
       const submittedQuery = storage.get(draftKey + ":SQL") || "";
       const result = await studentApi.submitWorkspace(problem.id, { part: parts[0] || "SQL", ...scripts, query: submittedQuery, source, context });
@@ -208,9 +214,10 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
       setSubmissionAttempts(previous => [{ id: Date.now() + ++submissionCounter.current, kind: "submit" as const, result }, ...previous].slice(0, 60));
       setSubmissionSignal(value => value + 1);
       setConfirmSubmit(false);
+      notify.success(tr("Submission received"));
       if (exitAfter) { setConfirmExit(false); navigate(exitDestination); }
       else if (result.id) navigate(`/submissions?submission=${encodeURIComponent(result.id)}`);
-    } catch (error) { setSubmitError((error as Error).message); }
+    } catch (error) { notify.fail(tr("Could not submit your work."), error, tr); }
     finally { setSubmitting(false); }
   }
   async function run(part: StagePart, selection?: string, questionId?: string) {
@@ -251,37 +258,39 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
     const question=stageChecks(part).find(question=>question.id===id);
     const Editor=part==="DDL"?DdlWorkspace:part==="DML"?DmlWorkspace:TriggerWorkspace;
     return <Editor database={stageDatabase(part)} problem={problem} value={stageDraft(part,id)} questionId={id}
-      questionName={question?.name} questionDescription={question?.description} questionStartFrom={question?.startFrom}
+      questionDescription={question?.description} questionStartFrom={question?.startFrom}
       onQuestionChange={id=>{setSelectedStageQuestionIds(previous=>({...previous,[part]:id}));setResults(previous=>({...previous,[part]:undefined}));}}
       questions={stageChecks(part)} questionGroups={questionGroups} selectedQuestionIds={{...selectedStageQuestionIds,SQL:selectedSolutionId}}
-      onSubmitQuestion={!exam?.enabled && !isReadOnly?submitQuestion:undefined}
+      onSubmitQuestion={!isReadOnly?submitQuestion:undefined}
       onChange={value=>updateStageDraft(part,id,value)} onReset={()=>{updateStageDraft(part,id,"");setResults(previous=>({...previous,[part]:undefined}));setErrors(previous=>({...previous,[part]:""}));}}
       onRun={selection=>run(part,selection,stageChecks(part).length?id:undefined)} busy={busy}
       result={results[part]?.questionId===id || !stageChecks(part).length?results[part]:undefined} error={errors[part]}
       readOnly={isReadOnly} submitted={reviewMode} submissionAttempts={submissionAttempts} submissionBusy={submitting || questionSubmitting}
-      submissionNotice={submitError} submissionSignal={submissionSignal} submissionsUsed={submissionsUsed} maxSubmissions={maxSubmissions}/>;
+      submissionSignal={submissionSignal} submissionsUsed={submissionsUsed} maxSubmissions={maxSubmissions}/>;
   }
   if (sqlOnly) return <SqlWorkspace problem={problem} />;
   if (!parts.length) return <p role="alert"><TranslatedText>{tr("No practice sections have been configured.")}</TranslatedText></p>;
-  return <ProblemWorkspaceLayoutProvider value={{ preferences, setPreferences, focus, setFocus }}><div className="problem-workspace">
+  return <WorkspaceTitleProvider value={activityTitle}><WorkspaceRunSlotProvider value={{ node: runSlot, activePart: active }}><ProblemWorkspaceLayoutProvider value={{ preferences, setPreferences, focus, setFocus }}><div className="problem-workspace">
     <AppHeader
       workspaceProblemNavigation={<ProblemQuestionNavigation header part={active} questions={questionGroups[active]} selectedId={active === "SQL" ? selectedSolutionId : stageQuestionId(active)} disabled={busy || sqlBusy || submitting || questionSubmitting} variantCode={problem.assignedVariantCode} onChange={id => {
         if (active === "SQL") setSelectedSolutionId(id);
         else {setSelectedStageQuestionIds(previous=>({...previous,[active]:id}));setResults(previous=>({...previous,[active]:undefined}));}
       }} />}
       workspace={{ title: problem.title, number: problem.number, topic: problem.topic || "SQL", source, context: activityTitle || problem.title }}
+      onWorkspaceExit={!exam?.enabled ? () => { if (!(busy || sqlBusy || submitting || questionSubmitting || !historyLoaded)) setConfirmExit(true); } : undefined}
+      workspaceExit={!exam?.enabled ? <button type="button" className="button workspace-exit-button" title={tr("Submit your current work before leaving the workspace.")} disabled={busy || sqlBusy || submitting || questionSubmitting || !historyLoaded} onClick={() => setConfirmExit(true)}><ArrowLeft size={15} aria-hidden="true" /><TranslatedText>{tr("Exit")}</TranslatedText></button> : undefined}
       workspaceActions={<><WorkspaceNavigation parts={parts} active={active} onChange={setActive} questionGroups={questionGroups} selectedQuestionIds={{...selectedStageQuestionIds,SQL:selectedSolutionId}} onQuestionChange={(part, id) => {
         if (part === "SQL") setSelectedSolutionId(id);
         else {setSelectedStageQuestionIds(previous=>({...previous,[part]:id}));setResults(previous=>({...previous,[part]:undefined}));}
-      }} isQuestionDone={isQuestionDone} disabled={busy || sqlBusy || submitting || questionSubmitting} /><WorkspaceExamFinishButton />{!exam?.enabled && <GlidingTooltipGroup label={tr("Workspace actions")} role="group" multiline className="workspace-action-tooltips"><button data-tooltip={tr(activityClosed ? "Assignment deadline has passed" : reviewMode ? "Continue editing your submitted scripts. Submit again to update your work." : "Submit DDL, DML and DQL together. Results are shown separately.")} className={`button ${reviewMode ? "" : "primary"} workspace-submit-exit`} disabled={busy || sqlBusy || submitting || questionSubmitting || activityClosed || (!reviewMode && submissionLimitReached) || !historyLoaded} title={activityClosed ? tr("Assignment deadline has passed") : submissionLimitReached && !reviewMode ? tr("Submission limit reached") : undefined} onClick={() => reviewMode ? setReviewMode(false) : setConfirmSubmit(true)}><TranslatedText>{tr(activityClosed ? "Submissions closed" : reviewMode ? "Edit again" : "Submit")}</TranslatedText></button><button data-tooltip={tr("Submit your current work before leaving the workspace.")} className="button workspace-submit-exit" disabled={busy || sqlBusy || submitting || questionSubmitting || !historyLoaded} onClick={() => { setSubmitError(""); setConfirmExit(true); }}><TranslatedText>{tr("Exit")}</TranslatedText></button></GlidingTooltipGroup>}</>}
+      }} isQuestionDone={isQuestionDone} disabled={busy || sqlBusy || submitting || questionSubmitting} /><div className="workspace-run-slot" ref={setRunSlot} /><WorkspaceHeaderStatus submissionsUsed={submissionsUsed} maxSubmissions={maxSubmissions} /><WorkspaceExamFinishButton />{!exam?.enabled && <GlidingTooltipGroup label={tr("Workspace actions")} role="group" multiline className="workspace-action-tooltips"><button data-tooltip={tr(activityClosed ? "Assignment deadline has passed" : reviewMode ? "Continue editing your submitted scripts. Submit again to update your work." : "Submit DDL, DML and DQL together. Results are shown separately.")} className={`button ${reviewMode ? "" : "primary"} workspace-submit-exit`} disabled={busy || sqlBusy || submitting || questionSubmitting || activityClosed || (!reviewMode && submissionLimitReached) || !historyLoaded} title={activityClosed ? tr("Assignment deadline has passed") : submissionLimitReached && !reviewMode ? tr("Submission limit reached") : undefined} onClick={() => reviewMode ? setReviewMode(false) : setConfirmSubmit(true)}><TranslatedText>{tr(activityClosed ? "Submissions closed" : reviewMode ? "Edit again" : "Submit")}</TranslatedText></button></GlidingTooltipGroup>}</>}
     />
     <main id="main-content" className="problem-workspace-body">
     {parts.map(part => <div key={part} id={`workspace-stage-${part}`} className="problem-workspace-stage" hidden={active !== part}>
       {part !== "SQL" ? renderStage(part)
-        : <SqlWorkspace onRunAttempt={attempt => setSubmissionAttempts(previous => [attempt,...previous].slice(0,200))} onSubmitQuestion={!exam?.enabled && !isReadOnly ? submitQuestion : undefined} selectedQuestionIds={{...selectedStageQuestionIds,SQL:selectedSolutionId}} problem={problem} selectedSolutionId={selectedSolutionId} onSolutionChange={setSelectedSolutionId} onBusyChange={setSqlBusy} embedded setupScripts={scripts} database={databaseView} readOnly={isReadOnly} submitted={reviewMode} onUserEdit={() => setEditedSinceSubmission(true)} submissionAttempts={submissionAttempts} submissionBusy={submitting || questionSubmitting} submissionNotice={submitError} submissionSignal={submissionSignal} submissionsUsed={submissionsUsed} maxSubmissions={maxSubmissions} />}
+        : <SqlWorkspace onRunAttempt={attempt => setSubmissionAttempts(previous => [attempt,...previous].slice(0,200))} onSubmitQuestion={!isReadOnly ? submitQuestion : undefined} selectedQuestionIds={{...selectedStageQuestionIds,SQL:selectedSolutionId}} problem={problem} selectedSolutionId={selectedSolutionId} onSolutionChange={setSelectedSolutionId} onBusyChange={setSqlBusy} embedded setupScripts={scripts} database={databaseView} readOnly={isReadOnly} submitted={reviewMode} onUserEdit={() => setEditedSinceSubmission(true)} submissionAttempts={submissionAttempts} submissionBusy={submitting || questionSubmitting} submissionSignal={submissionSignal} submissionsUsed={submissionsUsed} maxSubmissions={maxSubmissions} />}
     </div>)}
     </main>
-    {confirmSubmit && <Dialog title={tr("Submit work?")} onClose={() => { if (!submitting) setConfirmSubmit(false); }}><p><TranslatedText>{tr("Submit all enabled sections of this problem for automatic grading?")}</TranslatedText></p>{submitError && <p role="alert">{submitError}</p>}<div className="workspace-finish-actions"><button className="button" disabled={submitting} onClick={() => setConfirmSubmit(false)}><TranslatedText>{tr("Cancel")}</TranslatedText></button><button className="button primary" disabled={submitting} onClick={() => void submitWork()}><TranslatedText>{tr(submitting ? "Submitting…" : "Submit")}</TranslatedText></button></div></Dialog>}
-    {confirmExit && <WorkspaceExitDialog saved={exitSaved} blockedReason={exitSaved ? undefined : exitBlockedReason} busy={submitting} error={submitError} onClose={() => setConfirmExit(false)} onConfirm={() => { if (exitSaved || exitBlockedReason) navigate(exitDestination); else void submitWork(true); }} />}
-  </div></ProblemWorkspaceLayoutProvider>;
+    {confirmSubmit && <Dialog title={tr("Submit work?")} onClose={() => { if (!submitting) setConfirmSubmit(false); }}><p><TranslatedText>{tr("Submit all enabled sections of this problem for automatic grading?")}</TranslatedText></p><div className="workspace-finish-actions"><button className="button" disabled={submitting} onClick={() => setConfirmSubmit(false)}><TranslatedText>{tr("Cancel")}</TranslatedText></button><button className="button primary" disabled={submitting} onClick={() => void submitWork()}><TranslatedText>{tr(submitting ? "Submitting…" : "Submit")}</TranslatedText></button></div></Dialog>}
+    {confirmExit && <WorkspaceExitDialog saved={exitSaved} blockedReason={exitSaved ? undefined : exitBlockedReason} busy={submitting} onClose={() => setConfirmExit(false)} onLeaveDraft={() => navigate(exitDestination)} onConfirm={() => { if (exitSaved || exitBlockedReason) navigate(exitDestination); else void submitWork(true); }} />}
+  </div></ProblemWorkspaceLayoutProvider></WorkspaceRunSlotProvider></WorkspaceTitleProvider>;
 }

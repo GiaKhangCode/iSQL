@@ -101,6 +101,24 @@ class ProblemController extends Controller
         return response()->json($result);
     }
 
+    public function expectedOutput(Request $request, string $id): JsonResponse
+    {
+        $result = $this->problemService->getExpectedOutput($id, $request->all(), $request->user());
+        return response()->json($result);
+    }
+
+    public function studentDatabase(Request $request, string $id): JsonResponse
+    {
+        $result = $this->problemService->getStudentDatabase($id, $request->all(), $request->user());
+        return response()->json($result);
+    }
+
+    public function resetStudentDatabase(Request $request, string $id): JsonResponse
+    {
+        $result = $this->problemService->resetStudentDatabase($id, $request->all(), $request->user());
+        return response()->json($result);
+    }
+
     public function submitWorkspace(Request $request, string $id): JsonResponse
     {
         $result = $this->problemService->submitWorkspace($id, $request->all(), $request->user());

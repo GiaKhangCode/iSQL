@@ -260,7 +260,7 @@ class ExamAuthEndpointTest extends TestCase
 
     public function test_only_active_student_accounts_can_sign_in(): void
     {
-        $this->student->update(['status' => 'Pending']);
+        $this->student->update(['status' => 'Inactive']);
         $this->examLogin($this->admission->username)->assertStatus(403)->assertJsonPath('detail', 'Tài khoản sinh viên không khả dụng.');
 
         $this->student->update(['status' => 'Active']);

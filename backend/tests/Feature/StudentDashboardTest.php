@@ -17,8 +17,8 @@ use Tests\TestCase;
  * Test đặc tả cho GET /api/student/dashboard (Student\DashboardController::index).
  *
  * Khóa hành vi trước và sau khi tách logic sang StudentDashboardService (lộ trình 2.1).
- * Thay đổi có chủ ý so với bản đầu: hỗ trợ tz_offset (biểu đồ theo ngày địa phương) và
- * bỏ hẳn tính năng chuỗi ngày (streak). Các test có ghi chú "KHÁC SQL-UIT" khóa những chỗ
+ * Thay đổi có chủ ý so với bản đầu: bỏ hẳn biểu đồ hoạt động theo ngày (submissionsPerDay,
+ * tham số tz_offset) và tính năng chuỗi ngày (streak). Các test có ghi chú "KHÁC SQL-UIT" khóa những chỗ
  * Laravel vẫn khác bản gốc SQL-UIT.
  */
 class StudentDashboardTest extends TestCase
@@ -107,7 +107,6 @@ class StudentDashboardTest extends TestCase
             ->assertJsonPath('hard', 0)
             ->assertJsonPath('continuing', [])
             ->assertJsonPath('deadlines', [])
-            ->assertJsonPath('submissionsPerDay', [])
             ->assertJsonPath('recent_submissions', []);
     }
 
@@ -251,94 +250,6 @@ class StudentDashboardTest extends TestCase
         $res->assertOk()->assertJsonCount(1, 'continuing');
         $this->assertSame([$stillTrying->id], array_column($res->json('continuing'), 'id'));
         $res->assertJsonPath('solved', 1);
-    }
-
-    // ── Hoạt động theo ngày ─────────────────────────────────────────────────
-
-    public function test_submissions_per_day_groups_by_date_ascending_with_an_alias(): void
-    {
-        $problem = $this->makeProblem();
-        $day1 = now()->subDays(5)->setTime(12, 0);
-        $day2 = now()->subDays(2)->setTime(12, 0);
-
-        $this->submit($this->student, $problem, 'Rejected', $day2->copy());
-        $this->submit($this->student, $problem, 'Rejected', $day1->copy());
-        $this->submit($this->student, $problem, 'Accepted', $day1->copy()->setTime(15, 30));
-        $this->submit($this->other, $problem, 'Accepted', $day1->copy());   // của người khác
-
-        $res = $this->dashboard();
-        $res->assertOk();
-
-        $expected = [
-            ['date' => $day1->format('Y-m-d'), 'count' => 2],
-            ['date' => $day2->format('Y-m-d'), 'count' => 1],
-        ];
-        $this->assertSame($expected, $res->json('submissionsPerDay'));
-        $this->assertSame($expected, $res->json('submissions_per_day'));
-    }
-
-    public function test_submissions_per_day_only_covers_the_last_26_weeks(): void
-    {
-        $problem = $this->makeProblem();
-        $inside = now()->subWeeks(25)->setTime(12, 0);
-        $outside = now()->subWeeks(27)->setTime(12, 0);
-
-        $this->submit($this->student, $problem, 'Rejected', $inside->copy());
-        $this->submit($this->student, $problem, 'Rejected', $outside->copy());
-
-        $this->dashboard()
-            ->assertOk()
-            ->assertJsonCount(1, 'submissionsPerDay')
-            ->assertJsonPath('submissionsPerDay.0.date', $inside->format('Y-m-d'));
-    }
-
-    /**
-     * tz_offset (số phút UTC trừ giờ địa phương, như Date.getTimezoneOffset() của trình
-     * duyệt) dịch thời điểm nộp sang NGÀY ĐỊA PHƯƠNG của sinh viên khi gộp theo ngày.
-     * Thời gian trong DB là UTC.
-     */
-    public function test_tz_offset_groups_submissions_by_the_students_local_day(): void
-    {
-        $problem = $this->makeProblem();
-        $evening = now()->utc()->subDays(3)->setTime(18, 30);   // 18:30 UTC
-        $earlyMorning = now()->utc()->subDays(6)->setTime(2, 0); // 02:00 UTC
-
-        $this->submit($this->student, $problem, 'Rejected', $evening->copy());
-        $this->submit($this->student, $problem, 'Rejected', $earlyMorning->copy());
-
-        $day = fn (Carbon $c, int $shiftDays = 0) => $c->copy()->addDays($shiftDays)->format('Y-m-d');
-
-        // UTC: giữ nguyên ngày.
-        $this->assertSame(
-            [['date' => $day($earlyMorning), 'count' => 1], ['date' => $day($evening), 'count' => 1]],
-            $this->dashboard()->json('submissionsPerDay')
-        );
-
-        // UTC+7 (gửi -420): 18:30 UTC thành 01:30 ngày hôm sau; 02:00 UTC thành 09:00 cùng ngày.
-        $this->assertSame(
-            [['date' => $day($earlyMorning), 'count' => 1], ['date' => $day($evening, 1), 'count' => 1]],
-            $this->dashboard('?tz_offset=-420')->json('submissionsPerDay')
-        );
-
-        // UTC-5 (gửi 300): 18:30 UTC thành 13:30 cùng ngày; 02:00 UTC thành 21:00 ngày hôm trước.
-        $this->assertSame(
-            [['date' => $day($earlyMorning, -1), 'count' => 1], ['date' => $day($evening), 'count' => 1]],
-            $this->dashboard('?tz_offset=300')->json('submissionsPerDay')
-        );
-    }
-
-    public function test_tz_offset_is_optional_and_validated(): void
-    {
-        $this->dashboard()->assertOk();
-        $this->dashboard('?tz_offset=')->assertOk();      // rỗng được coi như không gửi
-        $this->dashboard('?tz_offset=-840')->assertOk();   // UTC+14
-        $this->dashboard('?tz_offset=720')->assertOk();    // UTC-12
-
-        foreach (['abc', '1.5', '721', '-841', '99999'] as $bad) {
-            $this->dashboard("?tz_offset={$bad}")
-                ->assertStatus(422)
-                ->assertJsonValidationErrors(['tz_offset']);
-        }
     }
 
     // ── Không còn chuỗi ngày (streak) ───────────────────────────────────────

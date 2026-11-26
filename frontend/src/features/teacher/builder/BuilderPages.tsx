@@ -36,8 +36,9 @@ import { examSessions, type ProctorOption } from "@/shared/api/examSessions";
 import { BuilderSelectedQuestions, selectedQuestions } from "@/features/teacher/builder/BuilderSelectedQuestions";
 import { DEFAULT_SUBMISSION_LIMIT, SubmissionLimitControl } from "@/features/teacher/submissions/SubmissionLimitControl";
 import { assignmentSeed, examSessionSeed, assignmentWorkspaceParts, DateTimeInput, ActivityPreview, type BuilderDraft, type BuilderProblem } from "@/features/teacher/builder/BuilderShared";
-import { SCORING_CUSTOM, customScoringSummary, examPapers, normalizeScoringMode, problemForSave, questionPointsOf, type ScoredProblem } from "@/features/teacher/builder/questionScoring";
+import { SCORING_CUSTOM, customScoringSummary, examPapers, groupScore, normalizeScoringMode, problemForSave, questionPointsOf, type ScoredProblem } from "@/features/teacher/builder/questionScoring";
 import { CustomScoreTotal, ScoringModeControl } from "@/features/teacher/builder/BuilderScoring";
+import { notify } from "@/shared/ui/notify";
 
 export function AssignmentBuilderPage() {
   return <BuilderPage examSession={false} />;
@@ -629,6 +630,7 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
     setSaveState("Unsaved changes");
     setAlertText("");
     closeCrop();
+    notify.success(tr("Banner uploaded"));
   }
 
   const selectedCounts = draft.problems.map(item => Object.values(selectedQuestions(problemDetails[item.id] || null, item.workspaceParts || [], item.questionSelection)).reduce((sum, questions) => sum + questions.length, 0));
@@ -638,7 +640,7 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
   const scoredProblem = (item: BuilderProblem): ScoredProblem => {
     const selected = selectedQuestions(problemDetails[item.id] || null, item.workspaceParts || [], item.questionSelection);
     const ids = Object.fromEntries(Object.entries(selected).map(([part, list]) => [part, list.map(question => question.id)]));
-    return { title: item.id, papers: examPapers(item.questionSelection, ids), points: questionPointsOf(item.questionSelection) };
+    return { title: item.id, papers: examPapers(item.questionSelection, ids), points: questionPointsOf(item.questionSelection), groups: groupScore(item.questionSelection) };
   };
   const customSummary = customScoringSummary(draft.problems.map(scoredProblem));
   const sessionScoring = examination ? examinationPlan.sessions.map(slot => customScoringSummary((slot.problems || []).map(scoredProblem))) : [];
@@ -670,6 +672,10 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
       if (examinationPlan.sessions.length === 0) {
         issues.push("Add at least one exam session.");
       } else {
+        const missingProctor = examinationPlan.sessions.some((slot) =>
+          (slot.classIds || []).some((classId) => !(slot.classProctors?.[classId]?.length)),
+        );
+        if (missingProctor) issues.push("Each class needs at least one proctor.");
         const missingSessionProblem = examinationPlan.sessions.some((slot) => !(slot.problems && slot.problems.length > 0));
         if (missingSessionProblem) {
           issues.push("Add at least one problem to every session.");
@@ -933,6 +939,8 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
   }
 
   function addProblem(problemId: string, parts: WorkspacePart[] = [...WORKSPACE_PARTS], visibility = { databaseStructureVisible: true, databaseDescriptionVisible: true }, datasetVisibility: Record<string, boolean> = {}, questionSelection?: QuestionSelection) {
+    // Mỗi bài thi chỉ có một bài toán (nhiều câu hỏi nhưng cùng thuộc bài toán đó).
+    if (examSession && !examination && draft!.problems.length >= 1) return;
     if (!draft!.problems.some((item) => item.id === problemId)) {
       update("problems", [...draft!.problems, {
         id: problemId,
@@ -1199,10 +1207,6 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
                 <span className="teacher-setting-label" tabIndex={0} data-tooltip={tr("Students can see their scores once their work has been graded.")}><b><TranslatedText>{tr("Show scores after submission")}</TranslatedText></b><CircleHelp size={13} aria-hidden="true" /></span>
                 <button type="button" role="switch" disabled={Boolean(parentExaminationId)} aria-label={tr("Show scores after submission")} aria-checked={draft.studentOptions.showScoresAfterSubmit} className={`teacher-toggle${draft.studentOptions.showScoresAfterSubmit ? " is-on" : ""}`} onClick={() => update("studentOptions", { ...draft.studentOptions, showScoresAfterSubmit: !draft.studentOptions.showScoresAfterSubmit })}><span /></button>
               </div>
-              <div className="teacher-option-row teacher-submission-limit">
-                <span className="teacher-setting-label" tabIndex={0} data-tooltip={tr("Choose unlimited submissions or set a limit per problem.")}><b><TranslatedText>{tr("Submission limit")}</TranslatedText></b><CircleHelp size={13} aria-hidden="true" /></span>
-                <SubmissionLimitControl compact disabled={Boolean(parentExaminationId)} value={draft.studentOptions.maxSubmissions} onChange={maxSubmissions => update("studentOptions", { ...draft.studentOptions, maxSubmissions })} />
-              </div>
               <div className="teacher-option-row">
                 <span className="teacher-setting-label" tabIndex={0} data-tooltip={tr("Start in full screen. The configured violation limit automatically submits all exam work.")}><b><TranslatedText>{tr("Exam mode")}</TranslatedText></b><CircleHelp size={13} aria-hidden="true" /></span>
                 <button type="button" role="switch" aria-label={tr("Exam mode")} disabled={examination || Boolean(parentExaminationId)} aria-checked={Boolean(draft.studentOptions.examMode)} className={`teacher-toggle${draft.studentOptions.examMode ? " is-on" : ""}`} onClick={() => update("studentOptions", { ...draft.studentOptions, examMode: !draft.studentOptions.examMode, maxSubmissions: !draft.studentOptions.examMode ? DEFAULT_SUBMISSION_LIMIT : draft.studentOptions.maxSubmissions })}><span /></button>
@@ -1273,14 +1277,12 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
 
           {!examination && !parentExaminationId && <div>
           <GlidingTooltipGroup className="teacher-exam-mode-setting" label={tr("Submission settings")} role="group" multiline>
-            <div className="teacher-option-row">
-              <span className="teacher-setting-label" tabIndex={0} data-tooltip={tr("Students can see their scores once their work has been graded.")}><b><TranslatedText>{tr("Show scores after submission")}</TranslatedText></b><CircleHelp size={13} aria-hidden="true" /></span>
-              <button type="button" role="switch" disabled={Boolean(parentExaminationId)} aria-label={tr("Show scores after submission")} aria-checked={draft.studentOptions.showScoresAfterSubmit} className={`teacher-toggle${draft.studentOptions.showScoresAfterSubmit ? " is-on" : ""}`} onClick={() => update("studentOptions", { ...draft.studentOptions, showScoresAfterSubmit: !draft.studentOptions.showScoresAfterSubmit })}><span /></button>
-            </div>
+            {!examSession && (
             <div className="teacher-option-row teacher-submission-limit">
               <span className="teacher-setting-label" tabIndex={0} data-tooltip={tr("Choose unlimited submissions or set a limit per problem.")}><b><TranslatedText>{tr("Submission limit")}</TranslatedText></b><CircleHelp size={13} aria-hidden="true" /></span>
               <SubmissionLimitControl compact disabled={Boolean(parentExaminationId)} value={draft.studentOptions.maxSubmissions} onChange={maxSubmissions => update("studentOptions", { ...draft.studentOptions, maxSubmissions })} />
             </div>
+            )}
             <div className="teacher-option-row">
               <span className="teacher-setting-label" tabIndex={0} data-tooltip={tr("Start in full screen. The configured violation limit automatically submits all exam work.")}><b><TranslatedText>{tr("Exam mode")}</TranslatedText></b><CircleHelp size={13} aria-hidden="true" /></span>
               <button type="button" role="switch" aria-label={tr("Exam mode")} disabled={examination || Boolean(parentExaminationId)} aria-checked={Boolean(draft.studentOptions.examMode)} className={`teacher-toggle${draft.studentOptions.examMode ? " is-on" : ""}`} onClick={() => update("studentOptions", { ...draft.studentOptions, examMode: !draft.studentOptions.examMode, maxSubmissions: !draft.studentOptions.examMode ? DEFAULT_SUBMISSION_LIMIT : draft.studentOptions.maxSubmissions })}><span /></button>
@@ -1310,7 +1312,8 @@ function BuilderPage({ examSession, examination=false }: { examSession: boolean;
             <button
               className="button primary teacher-small-button builder-library-trigger"
               type="button"
-              disabled={problemsLoading || !!problemsError}
+              disabled={problemsLoading || !!problemsError || (examSession && !examination && draft.problems.length >= 1)}
+              title={examSession && !examination && draft.problems.length >= 1 ? tr("An exam has only one problem.") : undefined}
               ref={libraryTrigger}
               aria-expanded={addProblemOpen && !libraryClosing}
               aria-controls="builder-problem-library"

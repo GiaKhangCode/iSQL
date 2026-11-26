@@ -6,6 +6,7 @@ import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { Select } from "@/shared/ui/Select";
 import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
 import { WORKSPACE_PARTS, WORKSPACE_PART_LABELS } from "@/shared/lib/workspace/workspaceParts";
+import { questionLabel } from "@/shared/lib/workspace/questionLabel";
 import { catalogOf, type BuilderProblemDetail, type QuestionOption, type QuestionSelection } from "@/features/teacher/builder/BuilderProblemSettings";
 import "@/features/teacher/builder/BuilderManualQuestionPicker.css";
 import { SCORING_CUSTOM, SCORING_EQUAL, plainSelection as plainSelectionOf, type ScoringMode } from "@/features/teacher/builder/questionScoring";
@@ -73,8 +74,6 @@ export function BuilderManualQuestionPicker({ detail, parts, questionSelection, 
   }, [visible]);
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const groupKeys = groups.map(([name]) => `${activeTab}|${name}`);
-  const allCollapsed = groupKeys.length > 0 && groupKeys.every(key => collapsed.has(key));
 
   function commit(part: WorkspacePart, ids: Set<string>) {
     const merged = new Set([...ids, ...lockedIdsFor(part)]);
@@ -107,7 +106,6 @@ export function BuilderManualQuestionPicker({ detail, parts, questionSelection, 
         </button>;
       })}
     </div>
-    <p className="muted builder-manual-picker-hint"><TranslatedText>{tr("Choose the exact questions every student will solve. Nothing is picked at random.")}</TranslatedText></p>
     {totalSelected === 0 && <p className="teacher-state-failed" role="alert"><TranslatedText>{tr("Select at least one section.")}</TranslatedText></p>}
     {choices.length === 0 ? <p className="muted"><TranslatedText>{tr("No questions are available in this section.")}</TranslatedText></p> : <>
       <div className="builder-manual-picker-toolbar">
@@ -119,18 +117,8 @@ export function BuilderManualQuestionPicker({ detail, parts, questionSelection, 
           <option value="ALL">{tr("All difficulties")}</option>
           {difficulties.map(name => <option key={name} value={name}>{name}</option>)}
         </Select>
-        <button type="button" className="button subtle teacher-small-button" disabled={visible.every(question => selected.has(question.id))} onClick={() => setMany(visible, true)}>
-          <TranslatedText>{tr("Select all shown")}</TranslatedText>
-        </button>
-        <button type="button" className="button subtle teacher-small-button" disabled={visible.every(question => !selected.has(question.id) || lockedSet.has(question.id))} onClick={() => setMany(visible, false)}>
-          <TranslatedText>{tr("Clear shown")}</TranslatedText>
-        </button>
       </div>
-      <p className="builder-manual-picker-count"><TranslatedText>{tr("{value0}/{value1} questions", { value0: choices.filter(question => selected.has(question.id)).length, value1: choices.length })}</TranslatedText></p>
       {groups.length === 0 && <p className="muted"><TranslatedText>{tr("No questions match the filters.")}</TranslatedText></p>}
-      {groups.length > 1 && <button type="button" className="button subtle teacher-small-button builder-manual-picker-fold-all" onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groupKeys))}>
-        <TranslatedText>{tr(allCollapsed ? "Expand all groups" : "Collapse all groups")}</TranslatedText>
-      </button>}
       {groups.map(([name, questions]) => {
         const picked = questions.filter(question => selected.has(question.id)).length;
         const key = `${activeTab}|${name}`;
@@ -148,12 +136,12 @@ export function BuilderManualQuestionPicker({ detail, parts, questionSelection, 
             </button>
           </div>
           {!folded && <ul id={listId}>
-            {questions.map(question => <li key={question.id} className="builder-manual-picker-question-row">
+            {questions.map((question, questionIndex) => <li key={question.id} className="builder-manual-picker-question-row">
               <label className="builder-manual-picker-question">
-                <input type="checkbox" checked={selected.has(question.id)} disabled={lockedSet.has(question.id)} title={lockedSet.has(question.id) ? tr("Published assignment questions cannot be removed") : undefined} aria-label={tr("Select question {value0}", { value0: question.name })} onChange={event => setMany([question], event.target.checked)} />
+                <input type="checkbox" checked={selected.has(question.id)} disabled={lockedSet.has(question.id)} title={lockedSet.has(question.id) ? tr("Published assignment questions cannot be removed") : undefined} aria-label={tr("Select question {value0}", { value0: questionLabel(questionIndex, question.description, tr("Question")) })} onChange={event => setMany([question], event.target.checked)} />
                 <span>
                   <span className="builder-manual-picker-question-title">
-                    <TranslatedText>{question.kind === "schema" ? tr("Create tables and keys") : question.kind === "seed" ? tr("Import original data") : question.name}</TranslatedText>
+                    <TranslatedText>{question.kind === "schema" ? tr("Create tables and keys") : question.kind === "seed" ? tr("Import original data") : tr("Question {value0}", { value0: questionIndex + 1 })}</TranslatedText>
                     {question.difficulty && <span className="builder-q-tag difficulty">{question.difficulty}</span>}
                     {question.kind && <small><TranslatedText>{tr("From original database")}</TranslatedText></small>}
                   </span>
@@ -164,7 +152,7 @@ export function BuilderManualQuestionPicker({ detail, parts, questionSelection, 
                 selection={questionSelection}
                 part={activeTab}
                 questionId={question.id}
-                questionName={question.name}
+                questionName={questionLabel(questionIndex, question.description, tr("Question"))}
                 onChange={selection => onChange({ questionSelection: { ...selection, [activeTab]: selectedIds(activeTab) }, workspaceParts: parts })}
               />}
             </li>)}

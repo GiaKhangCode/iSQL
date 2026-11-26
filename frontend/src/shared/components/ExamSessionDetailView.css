@@ -63,3 +63,14 @@
 @container exam-session-workflow (max-width:900px) {
   .exam-session-detail-workflow .exam-session-detail-content-grid { grid-template-columns:minmax(0,1fr); }
 }
+/* Lưu ý trước khi làm bài */
+.exam-session-detail-workflow .exam-session-briefing { padding:16px; }
+.exam-session-detail-workflow .exam-session-briefing-facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:0 0 18px; }
+.exam-session-detail-workflow .exam-session-briefing-facts > div { margin:0; padding:10px 12px; border:1px solid var(--border-subtle); border-radius:6px; }
+.exam-session-detail-workflow .exam-session-briefing-facts dt { margin-bottom:4px; font-size:10px; color:var(--muted); }
+.exam-session-detail-workflow .exam-session-briefing-facts dd { margin:0; font-size:13px; font-weight:600; text-align:left; }
+.exam-session-detail-workflow .exam-session-briefing-notes { display:grid; gap:8px; margin:0; padding-left:18px; list-style:disc; font-size:12px; line-height:1.7; }
+.exam-session-detail-workflow .exam-session-detail-content-grid.is-single { grid-template-columns:minmax(0,1fr); }
+.exam-session-detail-workflow .exam-session-briefing-overview { margin-top:18px; padding-top:14px; border-top:1px solid var(--border-subtle); }
+.exam-session-detail-workflow .exam-session-briefing-overview h3 { margin:0 0 10px; font-size:13px; line-height:20px; }
+.exam-session-detail-workflow .exam-session-briefing-overview .exam-session-markdown { font-size:12px; line-height:1.7; }

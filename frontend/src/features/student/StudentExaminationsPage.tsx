@@ -14,12 +14,7 @@ import { Empty, ErrorState, Loading, Status } from "@/shared/ui/ui";
 import { ExamSessionSwipeTabs } from "@/shared/components/ExamSessionSwipeTabs";
 import { ExamSessionCountdown } from "@/shared/components/ExamSessionCountdown";
 import { selectFeaturedExamSessions } from "@/shared/lib/exam-session/featuredExamSessions";
-import {
-  FeaturedExamSessions,
-  selectHallOfFame,
-  completionMonth,
-  ordinal,
-} from "@/features/student/ExaminationHighlights";
+import { FeaturedExamSessions } from "@/features/student/ExaminationHighlights";
 import { DoorOpen } from "lucide-react";
 
 const EXAM_PAGE_SIZE = 10;
@@ -29,7 +24,7 @@ export function StudentExaminationsPage() {
   if (session && !session.examSessionId && session.account_type === "student") {
     return <Navigate to="/dashboard" replace />;
   }
-  const { t: tr, locale: uiLocale } = useLanguage("student");
+  const { t: tr } = useLanguage("student");
   const navigate = useNavigate();
   const { data = [], loading, error, mutate } = useLoad<ExamSession[]>(studentApi.getExaminations);
 
@@ -70,7 +65,6 @@ export function StudentExaminationsPage() {
   };
 
   const featured = selectFeaturedExamSessions(data);
-  const hallOfFame = selectHallOfFame(data);
 
   function openExam(exam: ExamSession) {
     navigate(`/examinations/${exam.id}`);
@@ -120,39 +114,7 @@ export function StudentExaminationsPage() {
             <ListDateFilters dates={dates} />
           </>
         }
-        aside={
-          <aside className="hall-of-fame" aria-label={tr("Hall of Fame")}>
-            <h2>
-              <TranslatedText>{tr("Hall of Fame")}</TranslatedText>
-            </h2>
-            <p className="fame-description">
-              <TranslatedText>{tr("Recent public achievements")}</TranslatedText>
-            </p>
-            {hallOfFame.length > 0 ? (
-              <ol className="fame-list">
-                {hallOfFame.map((entry, index) => (
-                  <li className="fame-row" key={`${entry.examSession.id}-${entry.rank}-${entry.student}`}>
-                    <b>{String(index + 1).padStart(2, "0")}</b>
-                    <div>
-                      <strong>{entry.student}</strong>
-                      <small className="fame-place">
-                        <TranslatedText>
-                          {uiLocale === "vi-VN" ? tr("Rank {rank}", { rank: entry.rank }) : `${ordinal(entry.rank)} place`}
-                        </TranslatedText>
-                      </small>
-                      <small className="fame-exam-session">{entry.examSession.title}</small>
-                      <time className="fame-date">{completionMonth(entry.examSession, uiLocale)}</time>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="fame-empty">
-                <TranslatedText>{tr("Published results will appear here after a leaderboard exam session closes.")}</TranslatedText>
-              </p>
-            )}
-          </aside>
-        }
+        className="exam-session-list-simple"
       >
         {(panelTab, active) => {
           const filteredRows = data.filter(

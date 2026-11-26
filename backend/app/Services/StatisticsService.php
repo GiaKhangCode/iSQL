@@ -10,8 +10,7 @@ use App\Models\ClassEnrollment;
 use App\Models\ClassModel;
 use App\Models\Examination;
 use App\Models\Submission;
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\ExamRegrade;
 use App\Models\User;
 use App\Services\Access\StaffAccess;
 use App\Models\WorkspaceSubmissionResult;
@@ -130,7 +129,10 @@ class StatisticsService
                 ->whereDoesntHave('workspaceResult', function ($q) {
                     $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
                 });
-            if (!empty($classIds) || $term !== '' || $course !== '') {
+            // Giảng viên chỉ thống kê sinh viên thuộc lớp mình dạy; bộ lọc học kỳ/môn/lớp thu hẹp thêm.
+            $limitToScopeStudents = (!$isOffice && !app(StaffAccess::class)->seesEverything($user))
+                || !empty($classIds) || $term !== '' || $course !== '';
+            if ($limitToScopeStudents) {
                 if (!empty($allStudentIds)) {
                     $subsQuery->whereIn('user_id', $allStudentIds);
                 } else {
@@ -148,17 +150,25 @@ class StatisticsService
 
         // Map assignment problem points
         $apPointsMap = [];
+        $actProblemPoints = [];
+        $examActivityIds = [];
         foreach ($selectedActivities as $act) {
+            if ($act->examination_id || $act->exam_mode) {
+                $examActivityIds[(string) $act->id] = true;
+            }
             foreach ($act->assignmentProblems as $ap) {
-                $apPointsMap["{$act->id}:{$ap->problem_id}"] = max(1.0, (float) $ap->points);
+                $pts = max(1.0, (float) $ap->points);
+                $apPointsMap["{$act->id}:{$ap->problem_id}"] = $pts;
+                $actProblemPoints[(string) $act->id][(string) $ap->problem_id] = $pts;
             }
         }
 
-        // Latest official submission per (activity, user, problem)
+        // Lượt đại diện cho mỗi (hoạt động, sinh viên, bài toán): điểm tự động cao nhất, bằng điểm thì lượt nộp sau
+        // cùng (cùng quy tắc với trang chấm bài). $subs đã sắp theo thời gian nộp mới nhất trước.
         $latestSubs = [];
         foreach ($subs as $sub) {
             $key = "{$sub->context}:{$sub->user_id}:{$sub->problem_id}";
-            if (!isset($latestSubs[$key])) {
+            if (!isset($latestSubs[$key]) || (float) ($sub->score ?? 0) > (float) ($latestSubs[$key]->score ?? 0)) {
                 $latestSubs[$key] = $sub;
             }
         }
@@ -184,17 +194,24 @@ class StatisticsService
         ];
 
         $activityDoneUsers = [];
+        $activityPartialUsers = [];
         $activityScores = [];
+        $perActivityStudent = [];
         foreach ($latestList as $sub) {
-            $maxPts = $apPointsMap["{$sub->context}:{$sub->problem_id}"] ?? 10.0;
+            $act = (string) $sub->context;
+            $uid = (string) $sub->user_id;
+            $pid = (string) $sub->problem_id;
+            $maxPts = $apPointsMap["{$act}:{$pid}"] ?? 10.0;
             $rawScore = $sub->evaluated_score !== null ? (float) $sub->evaluated_score : (float) ($sub->score ?? 0);
             $norm10 = round(min(10.0, max(0.0, ($rawScore / $maxPts) * 10.0)), 2);
 
-            $studentScores[(string) $sub->user_id][] = $norm10;
-            $activityDoneUsers[(string) $sub->context][(string) $sub->user_id] = true;
-            $activityScores[(string) $sub->context][] = $norm10;
+            if (isset($actProblemPoints[$act][$pid])) {
+                $perActivityStudent[$act][$uid]['raw'] = ($perActivityStudent[$act][$uid]['raw'] ?? 0.0) + min($maxPts, max(0.0, $rawScore));
+                $perActivityStudent[$act][$uid]['problems'][$pid] = true;
+            }
 
-            if ($sub->evaluated_score === null) {
+            // Chờ chấm tay chỉ áp dụng cho bài thi; bài tập thường đã có điểm tự động.
+            if ($sub->evaluated_score === null && isset($examActivityIds[$act])) {
                 $pendingGrading++;
             }
 
@@ -206,6 +223,23 @@ class StatisticsService
                 $verdictCounts['Partial']++;
             } else {
                 $verdictCounts['Wrong Answer']++;
+            }
+        }
+
+        // Điểm theo hoạt động: tổng điểm đạt / tổng điểm của cả bài * 10. Chỉ tính là "đã nộp" khi nộp đủ mọi bài
+        // toán của hoạt động; nộp thiếu thì chưa tính điểm.
+        foreach ($perActivityStudent as $act => $byUser) {
+            $totalProblems = count($actProblemPoints[$act] ?? []);
+            $totalPoints = array_sum($actProblemPoints[$act] ?? []);
+            foreach ($byUser as $uid => $info) {
+                if ($totalProblems > 0 && count($info['problems']) >= $totalProblems) {
+                    $score10 = round(min(10.0, max(0.0, ($info['raw'] / $totalPoints) * 10.0)), 2);
+                    $studentScores[(string) $uid][] = $score10;
+                    $activityDoneUsers[$act][(string) $uid] = true;
+                    $activityScores[$act][] = $score10;
+                } else {
+                    $activityPartialUsers[$act][(string) $uid] = true;
+                }
             }
         }
 
@@ -261,6 +295,9 @@ class StatisticsService
             foreach (array_keys($doneSet) as $sid) {
                 $eligibleSet[$sid] = true;
             }
+            foreach (array_keys($activityPartialUsers[(string) $act->id] ?? []) as $sid) {
+                $eligibleSet[$sid] = true;
+            }
 
             $total = count($eligibleSet);
             if ($total === 0) {
@@ -269,7 +306,7 @@ class StatisticsService
             $done = count($doneSet);
             $inProgress = 0;
             foreach (array_keys($eligibleSet) as $sid) {
-                if (!isset($doneSet[$sid]) && isset($attemptMap[(string) $act->id][$sid])) {
+                if (!isset($doneSet[$sid]) && (isset($attemptMap[(string) $act->id][$sid]) || isset($activityPartialUsers[(string) $act->id][$sid]))) {
                     $inProgress++;
                 }
             }
@@ -399,36 +436,21 @@ class StatisticsService
                 ];
             }
 
-            $appeals = !empty($latestIds)
-                ? SubmissionAppeal::whereIn('submission_id', $latestIds)->get()->keyBy('submission_id')
-                : collect();
-            $regrades = !empty($latestIds)
-                ? SubmissionRegradeAssignment::whereIn('submission_id', $latestIds)->get()->keyBy('submission_id')
-                : collect();
-
+            // Phúc khảo gắn với cả bài thi (ca thi, sinh viên); khóa theo id bài nộp mới nhất của sinh viên đó.
+            $regrades = ExamRegrade::mapForSubmissions($latestList);
             $latestById = [];
             foreach ($latestList as $s) {
                 $latestById[(string) $s->id] = $s;
             }
-            $allRegradeIds = array_values(array_unique(array_merge(
-                $appeals->keys()->all(),
-                $regrades->keys()->all()
-            )));
 
-            $unassignedAppealsCount = 0;
             $awaitingRegradeCount = 0;
             $completedRegradeCount = 0;
             $scoreChangedCount = 0;
-
-            foreach ($allRegradeIds as $sid) {
-                $app = $appeals->get($sid);
-                $reg = $regrades->get($sid);
+            foreach ($regrades as $sid => $reg) {
                 $subObj = $latestById[(string) $sid] ?? null;
-
-                $isDone = ($reg && $reg->completed_at !== null) || ($app && $app->resolved_at !== null);
-                if ($isDone) {
+                if ($reg->completed_at !== null) {
                     $completedRegradeCount++;
-                    $prevManual = $reg?->previous_evaluated_score ?? $app?->previous_evaluated_score;
+                    $prevManual = $reg->previous_evaluated_score;
                     if (
                         $subObj
                         && $prevManual !== null
@@ -437,19 +459,16 @@ class StatisticsService
                     ) {
                         $scoreChangedCount++;
                     }
-                } elseif ($reg) {
+                } else {
                     $awaitingRegradeCount++;
-                } elseif ($app) {
-                    $unassignedAppealsCount++;
                 }
             }
 
             $regradeSummary = [
-                'totalAppeals'      => $appeals->count(),
-                'unassignedAppeals' => $unassignedAppealsCount,
-                'awaitingRegrade'   => $awaitingRegradeCount,
-                'completedRegrade'  => $completedRegradeCount,
-                'scoreChanged'      => $scoreChangedCount,
+                'totalRegrades'    => $regrades->count(),
+                'awaitingRegrade'  => $awaitingRegradeCount,
+                'completedRegrade' => $completedRegradeCount,
+                'scoreChanged'     => $scoreChangedCount,
             ];
 
             $gradingByActivity = [];
@@ -460,11 +479,10 @@ class StatisticsService
                 $awaitingRegrade = 0;
                 $regraded = 0;
                 foreach ($actSubs as $s) {
-                    $app = $appeals->get($s->id);
                     $reg = $regrades->get($s->id);
-                    if (($reg && $reg->completed_at) || ($app && $app->resolved_at)) {
+                    if ($reg && $reg->completed_at) {
                         $regraded++;
-                    } elseif ($reg || $app) {
+                    } elseif ($reg) {
                         $awaitingRegrade++;
                     } elseif ($s->evaluated_score !== null) {
                         $graded++;

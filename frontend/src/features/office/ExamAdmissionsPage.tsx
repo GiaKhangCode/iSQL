@@ -8,6 +8,7 @@ import {teacherService} from '@/shared/api/teacherService';
 import {examAdmission,downloadExamCredentials,type ExamCredential} from '@/shared/api/examAdmission';
 import '@/styles/exam-admission.css';
 import '@/styles/examinations.css';
+import { notify } from "@/shared/ui/notify";
 
 type Allocation=SessionPlan;
 /** Credentials are exported per class; a student is listed under the first class they belong to in the session ('' = added individually). */
@@ -16,6 +17,7 @@ const groupLabel=(id:string)=>id||'Sinh viên tự do';
 const groupsOf=(plan:Allocation|null)=>{const ids=new Set((plan?.students||[]).map(groupOf));return [...ids].sort((a,b)=>(a===''?1:0)-(b===''?1:0)||a.localeCompare(b));};
 const statusText:Record<ExamCredential['status'],string>={not_issued:'Chưa cấp',issued:'Đã cấp',claimed:'Đã đăng nhập',revoked:'Đã thu hồi'};
 const actionText={reissue:'Cấp lại',transfer:'Cho phép đổi máy',revoke:'Thu hồi'} as const;
+const actionDone={reissue:'Đã cấp lại tài khoản thi.',transfer:'Đã cho phép đổi máy.',revoke:'Đã thu hồi tài khoản thi.'} as const;
 export function ExamAdmissionsPage({embedded=false,examinationId,sessionId,active=true}:{embedded?:boolean;examinationId?:string;sessionId?:string;active?:boolean}={}){
   const managementRoot=useManagementLocation().pathname.startsWith("/admin/")?"/admin":"/office";
   const {examId:routeExamId}=useParams();const examId=examinationId||routeExamId;const [params]=useSearchParams();
@@ -30,9 +32,9 @@ export function ExamAdmissionsPage({embedded=false,examinationId,sessionId,activ
   useEffect(()=>{if(!active||!examId||!slot?.id)return;let stale=false;setFetching(true);setFailure('');
     Promise.all([examSessions.plan(slot.id),examAdmission.list(examId,slot.id)]).then(([data,credentials])=>{if(stale)return;setAllocation(data);setRows(credentials);setSelected(current=>{const groups=groupsOf(data);return current!==null&&groups.includes(current)?current:groups[0]??null;});}).catch(e=>{if(!stale)setFailure(e instanceof Error?e.message:'Không thể tải danh sách tài khoản.');}).finally(()=>{if(!stale)setFetching(false);});return()=>{stale=true;};
   },[active,examId,slot?.id,version]);
-  async function runExport(classId:string|null,reissue:boolean){if(!examId||!slot?.id||busy)return;setBusy(true);setFailure('');try{await examAdmission.exportClass(examId,slot.id,classId,reissue);setConfirmExport(null);setVersion(v=>v+1);}catch(e){setFailure(e instanceof Error?e.message:'Không thể xuất tài khoản.');setConfirmExport(null);}finally{setBusy(false);}}
+  async function runExport(classId:string|null,reissue:boolean){if(!examId||!slot?.id||busy)return;setBusy(true);setFailure('');try{await examAdmission.exportClass(examId,slot.id,classId,reissue);notify.success('Đã xuất tài khoản thi.');setConfirmExport(null);setVersion(v=>v+1);}catch(e){notify.fail('Không thể xuất tài khoản.',e);setConfirmExport(null);}finally{setBusy(false);}}
   function requestExport(classId:string|null){const ids=new Set(allocation?.students.filter(s=>classId===null||groupOf(s)===classId).map(s=>s.id));const count=rows.filter(r=>ids.has(r.studentId)&&r.status!=='not_issued').length;if(count)setConfirmExport({classId,count});else void runExport(classId,false);}
-  async function manage(){if(!examId||!slot?.id||!pending?.row.id||busy)return;setBusy(true);setFailure('');try{const result=await examAdmission.manage(examId,slot.id,pending.row.id,pending.action,reason.trim());if(typeof result==='string')downloadExamCredentials(result,slot.index);setPending(null);setReason('');setVersion(v=>v+1);}catch(e){setFailure(e instanceof Error?e.message:'Không thể cập nhật tài khoản.');}finally{setBusy(false);}}
+  async function manage(){if(!examId||!slot?.id||!pending?.row.id||busy)return;setBusy(true);setFailure('');try{const result=await examAdmission.manage(examId,slot.id,pending.row.id,pending.action,reason.trim());if(typeof result==='string')downloadExamCredentials(result,slot.index);notify.success(actionDone[pending.action]);setPending(null);setReason('');setVersion(v=>v+1);}catch(e){notify.fail('Không thể cập nhật tài khoản.',e);}finally{setBusy(false);}}
   if(loading)return <Loading/>;if(error||!exam)return <ErrorState title="Không thể tải kỳ thi" message={error}/>;
   const groups=groupsOf(allocation);const current=selected!==null&&groups.includes(selected)?selected:null;const members=allocation?.students.filter(s=>groupOf(s)===selected)||[];
   const status=(id:string)=>rows.find(row=>row.studentId===id)?.status||'not_issued';

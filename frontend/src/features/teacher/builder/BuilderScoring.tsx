@@ -51,6 +51,24 @@ export function CustomScoreTotal({ total, target = 10 }: { total: number; target
   );
 }
 
+/** Ô nhập điểm của một nhóm câu hỏi (điểm mỗi câu) hoặc của một câu chung. Trống = chưa có điểm. */
+export function PointsField({ value, label, onChange, disabled = false }: {
+  value: string | number | undefined;
+  label: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useLanguage("teacher");
+  const text = value === undefined ? "" : String(value);
+  const missing = !(Number(text.replace(",", ".")) > 0);
+  return (
+    <span className={`builder-question-points${missing ? " is-missing" : ""}`}>
+      <input type="text" inputMode="decimal" value={text} disabled={disabled} placeholder="—" aria-label={label} onChange={event => onChange(event.target.value)} />
+      <span aria-hidden="true"><TranslatedText>{t("pts")}</TranslatedText></span>
+    </span>
+  );
+}
+
 /** Ô nhập điểm của một câu; ghi vào `_questionPoints` của cấu hình chọn câu. Để trống = chưa có điểm. */
 export function QuestionPointInput({ selection, part, questionId, questionName, onChange, disabled = false }: {
   selection?: QuestionSelection;

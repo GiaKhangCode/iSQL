@@ -4,7 +4,8 @@ import { storage } from "@/shared/api/storage";
 
 function readPane(key: string): WorkspacePane {
   const pane=storage.get(key);
-  return pane === "Database" || pane === "Run" || pane === "Submission" ? pane : "Description";
+  // "Run" (tab Vừa chạy cũ, nay là panel kết quả dưới editor) còn lưu trong trình duyệt thì quay về Đề bài.
+  return pane === "Database" || pane === "Submission" ? pane : "Description";
 }
 export function useWorkspacePane(key: string) {
   const [state,setState]=useState(() => ({key,pane:readPane(key)}));

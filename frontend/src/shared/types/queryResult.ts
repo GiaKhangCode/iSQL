@@ -17,7 +17,7 @@ export type QueryResult = {
   expectedTables?: DataTable[];
   comparisons?: { dataset: number; question?: number; actualTable?: DataTable; expectedTable?: DataTable; matched?: boolean }[];
   questionId?: string;
-  questions?: { id: string; name: string; description?: string; message?: string; comparisons?: QueryResult["comparisons"]; ratio: number; status: string; datasets: { dataset: number; correct: boolean; runtimeError?: boolean; message: string }[] }[];
+  questions?: { id: string; manualScore?: number; manualMaxScore?: number; manualFeedback?: string; description?: string; message?: string; comparisons?: QueryResult["comparisons"]; ratio: number; status: string; datasets: { dataset: number; correct: boolean; runtimeError?: boolean; message: string }[] }[];
   passed?: number;
   total?: number;
   score?: number | null;
@@ -26,6 +26,8 @@ export type QueryResult = {
   submissionsUsed?: number | null;
   maxSubmissions?: number | null;
   executionTimeMs?: number;
+  /** Số dòng của từng câu lệnh khi chạy DDL/DML, theo thứ tự (giống "(n rows affected)" của SSMS). */
+  rowCounts?: number[];
   schemaTables?: SchemaTable[];
   tables?: DataTable[];
   status: string;

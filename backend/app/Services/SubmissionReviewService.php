@@ -6,8 +6,7 @@ use App\Models\Assignment;
 use App\Models\AssignmentProblem;
 use App\Models\Problem;
 use App\Models\Submission;
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\ExamRegrade;
 use App\Models\User;
 use App\Models\WorkspaceSubmissionResult;
 use Illuminate\Support\Collection;
@@ -19,14 +18,8 @@ class SubmissionReviewService
         protected ExaminationService $examinationService,
     ) {}
 
-    public function reviewStatus(
-        Submission $sub,
-        ?SubmissionAppeal $appeal = null,
-        ?SubmissionRegradeAssignment $regrade = null
-    ): string {
-        if ($appeal) {
-            return $appeal->resolved_at ? 'Regraded' : 'Awaiting regrade';
-        }
+    public function reviewStatus(Submission $sub, ?ExamRegrade $regrade = null): string
+    {
         if ($regrade) {
             return $regrade->completed_at ? 'Regraded' : 'Awaiting regrade';
         }
@@ -209,7 +202,6 @@ class SubmissionReviewService
                 if (!isset($known[$aid]) && trim((string) $aSql) !== '') {
                     $questions[] = [
                         'id'          => $aid,
-                        'name'        => "{$aid}.sql",
                         'description' => '',
                         'answer'      => '',
                     ];
@@ -265,7 +257,6 @@ class SubmissionReviewService
 
                 $rows[] = [
                     'id'                => $qid,
-                    'name'              => (string) ($q['name'] ?? "{$part}.sql"),
                     'description'       => (string) ($q['description'] ?? ''),
                     'startFrom'         => $q['startFrom'] ?? null,
                     'kind'              => $q['kind'] ?? null,
@@ -307,11 +298,14 @@ class SubmissionReviewService
                 $setupSql = is_array($s->expected) ? (string) ($s->expected['_setupSql'] ?? '') : '';
                 $list[] = [
                     'id'          => (string) $s->id,
-                    'name'        => (string) $s->name,
                     'description' => (string) ($s->description ?? ''),
                     'answer'      => (string) $s->query,
                     'timeLimitMs' => (int) ($s->time_limit_ms ?? 5000),
                     'setupSql'    => $setupSql,
+                    'compareOptions' => $this->workspaceService->sqlCompareOptions(
+                        is_array($s->expected) ? $s->expected : null,
+                        (string) $s->query
+                    ),
                 ];
             }
             if (!empty($list)) {
@@ -320,7 +314,6 @@ class SubmissionReviewService
             $tc = $problem->testCases->sortBy('order_index')->first();
             return [[
                 'id'          => '__legacy_sql__',
-                'name'        => 'sql.sql',
                 'description' => (string) ($problem->description ?? ''),
                 'answer'      => (string) ($tc?->expected_query ?? ''),
                 'timeLimitMs' => 5000,
@@ -339,7 +332,6 @@ class SubmissionReviewService
         foreach ($questions as $q) {
             $list[] = [
                 'id'          => (string) ($q['id'] ?? 'q1'),
-                'name'        => (string) ($q['name'] ?? "{$part}.sql"),
                 'description' => (string) ($q['description'] ?? ''),
                 'answer'      => (string) ($q['answer'] ?? ''),
                 'startFrom'   => $q['startFrom'] ?? $q['start_from'] ?? ($part === 'DDL' ? 'empty' : 'provided'),
@@ -347,6 +339,7 @@ class SubmissionReviewService
                 'setupDdl'    => (string) ($q['setupDdl'] ?? $q['setup_ddl'] ?? ''),
                 'setupDml'    => (string) ($q['setupDml'] ?? $q['setup_dml'] ?? ''),
                 'probes'      => is_array($q['probes'] ?? null) ? $q['probes'] : [],
+                'checkColumnOrder' => !empty($q['checkColumnOrder']),
                 'timeLimitMs' => 5000,
             ];
         }
@@ -359,7 +352,6 @@ class SubmissionReviewService
         $script = $tc?->scripts->first();
         return [[
             'id'          => '__legacy_' . strtolower($part) . '__',
-            'name'        => strtolower($part) . '.sql',
             'description' => '',
             'answer'      => $part === 'DDL' ? (string) ($script?->create_script ?? '') : ($part === 'DML' ? (string) ($script?->insert_script ?? '') : ''),
             'startFrom'   => $part === 'DDL' ? 'empty' : 'structure',
@@ -433,7 +425,7 @@ class SubmissionReviewService
                         ? ('Reference: ' . ($expected['message'] ?? 'Error'))
                         : (string) ($actual['message'] ?? 'Runtime error');
                 } else {
-                    [$matched, $message] = $this->workspaceService->compareResults($actual['table'] ?? [], $expected['table'] ?? []);
+                    [$matched, $message] = $this->workspaceService->compareResults($actual['table'] ?? [], $expected['table'] ?? [], $question['compareOptions'] ?? []);
                     $row['matched'] = $matched;
                     $row['message'] = $message;
                     $row['actualTable'] = $actual['table'] ?? null;
@@ -479,7 +471,6 @@ class SubmissionReviewService
                     'prepareOnly' => false,
                     'question'    => [
                         'id'        => 'inspect',
-                        'name'      => "{$part}.sql",
                         'answer'    => $sql,
                         'startFrom' => $mode,
                         'setupDdl'  => $setupDdl,
@@ -508,11 +499,11 @@ class SubmissionReviewService
                     $scenarios = [];
                     foreach ($expScenarios as $idx => $es) {
                         $as = $actScenarios[$idx] ?? [];
-                        $ok = !empty($as['ok']) && !empty($es['ok']) && ($as['changedTables'] ?? []) == ($es['changedTables'] ?? []);
+                        $ok = $this->workspaceService->triggerScenarioMatches($as, $es);
                         $scenarios[] = [
                             'scenario' => $idx + 1,
                             'matched'  => $ok,
-                            'message'  => $ok ? 'Matches the reference result.' : ($as['message'] ?? 'The data after the trigger fired differs from the reference.'),
+                            'message'  => $ok ? 'Matches the reference result.' : (($as['message'] ?? '') ?: 'The data after the trigger fired differs from the reference.'),
                         ];
                     }
                     $row['gradingMode'] = 'behavior';
@@ -525,7 +516,7 @@ class SubmissionReviewService
             } elseif ($part === 'DDL') {
                 $actualSchema = $actual['schemaTables'] ?? [];
                 $expectedSchema = $expected['schemaTables'] ?? [];
-                $row['matched'] = $this->workspaceService->schemasMatch($actualSchema, $expectedSchema);
+                $row['matched'] = $this->workspaceService->schemasMatch($actualSchema, $expectedSchema, !empty($question['checkColumnOrder']));
 
                 $affected = array_unique(array_merge(
                     array_map(fn ($c) => strtolower((string) ($c['name'] ?? '')), $expected['schemaChanges'] ?? []),
@@ -544,8 +535,7 @@ class SubmissionReviewService
             } else {
                 $actualTables = $actual['tables'] ?? [];
                 $expectedTables = $expected['tables'] ?? [];
-                $changes = $this->workspaceService->computeDataChanges($expectedTables, $actualTables);
-                $row['matched'] = empty($changes);
+                $row['matched'] = $this->workspaceService->dataMatchesExpected($expectedTables, $actualTables);
 
                 $affected = array_unique(array_merge(
                     array_map(fn ($c) => strtolower((string) ($c['name'] ?? '')), $expected['dataChanges'] ?? []),
@@ -560,7 +550,8 @@ class SubmissionReviewService
                     $expectedTables = $filter($expectedTables);
                 }
 
-                $changedNames = array_flip(array_map(fn ($c) => strtolower((string) ($c['name'] ?? '')), $changes));
+                // $affected đã là danh sách tên bảng bị thay đổi (chữ thường) của bên đáp án và bên sinh viên.
+                $changedNames = array_flip($affected);
                 $sortChangedFirst = function (array $tables) use ($changedNames): array {
                     usort($tables, function ($a, $b) use ($changedNames) {
                         $aDiff = isset($changedNames[strtolower((string) ($a['name'] ?? ''))]) ? 0 : 1;

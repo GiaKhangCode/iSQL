@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PUT /api/regrade-assignments/{submissionId}: người chấm phúc khảo và ghi chú.
+ * PUT /api/regrade-assignments/{activityId}/{studentId}: người chấm phúc khảo và ghi chú.
  * Người chấm có thể được gửi dưới bốn tên khóa (reviewerId, reviewer_id, instructorId, instructor_id).
  * Không có "required": vì khóa có bốn tên nên thiếu hoặc sai người chấm được service kiểm và trả 422
  * (errors.reviewerId: "Không tìm thấy giảng viên chấm phúc khảo.") sau khi đã xác nhận bài nộp tồn tại.

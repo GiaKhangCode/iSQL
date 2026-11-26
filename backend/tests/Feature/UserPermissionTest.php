@@ -34,7 +34,7 @@ class UserPermissionTest extends TestCase
 
         if ($permissions !== null) {
             DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-            $role = AccessRole::create(['name' => 'Role ' . uniqid(), 'is_super' => false]);
+            $role = AccessRole::create(['name' => 'Role ' . uniqid()]);
             $role->syncPermissions($permissions);
             $user->accessRoles()->attach($role->id);
             app(AccessControlService::class)->forget();
@@ -43,14 +43,11 @@ class UserPermissionTest extends TestCase
         return $user;
     }
 
-    /** Làm cho $user là siêu quản trị Active duy nhất (khóa mọi siêu quản trị khác trong transaction của test). */
-    private function makeLastSuperAdmin(User $user): void
+    /** Làm cho $user là người Active duy nhất giữ access.manage (khóa mọi người giữ quyền này khác trong transaction của test). */
+    private function makeLastAccessManager(User $user): void
     {
-        $otherSupers = DB::table('user_access_roles as uar')
-            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
-            ->where('ar.is_super', true)->where('uar.user_id', '!=', $user->id)
-            ->pluck('uar.user_id');
-        User::whereIn('id', $otherSupers)->update(['status' => 'Inactive']);
+        $others = app(AccessControlService::class)->holdersOf('access.manage')->pluck('user_id')->filter(fn ($id) => $id !== $user->id);
+        User::whereIn('id', $others)->update(['status' => 'Inactive']);
         app(AccessControlService::class)->forget();
     }
 
@@ -88,7 +85,7 @@ class UserPermissionTest extends TestCase
         $this->getJson('/api/admin/access')->assertStatus(403);
     }
 
-    public function test_class_manage_opens_classes_courses_terms_and_exercise_tags_only(): void
+    public function test_class_manage_opens_classes_courses_and_terms_only(): void
     {
         $registrar = $this->makeUser('student', ['class.manage']);
         Sanctum::actingAs($registrar);
@@ -96,14 +93,24 @@ class UserPermissionTest extends TestCase
         $this->getJson('/api/admin/classes')->assertOk();
         $this->getJson('/api/admin/courses')->assertOk();
         $this->getJson('/api/admin/terms')->assertOk();
-        $this->getJson('/api/admin/exercise-tags')->assertOk();
-        $this->postJson('/api/admin/exercise-tags', ['name' => 'Thẻ ' . uniqid(), 'kind' => 'category'])->assertStatus(201);
+        $this->getJson('/api/admin/exercise-tags')->assertStatus(403);
         $this->getJson('/api/admin/users')->assertStatus(403);
     }
 
-    public function test_exercise_tag_management_is_denied_without_class_manage_even_for_instructors(): void
+    public function test_tag_manage_opens_exercise_tags_only(): void
     {
-        $instructor = $this->makeUser('instructor');                      // mặc định không có class.manage
+        $head = $this->makeUser('instructor', ['tag.manage']);
+        Sanctum::actingAs($head);
+
+        $this->getJson('/api/admin/exercise-tags')->assertOk();
+        $this->postJson('/api/admin/exercise-tags', ['name' => 'Thẻ ' . uniqid(), 'kind' => 'category'])->assertStatus(201);
+        $this->getJson('/api/admin/classes')->assertStatus(403);
+        $this->getJson('/api/admin/users')->assertStatus(403);
+    }
+
+    public function test_exercise_tag_management_is_denied_without_tag_manage_even_for_instructors_and_admins(): void
+    {
+        $instructor = $this->makeUser('instructor', ['problem.create', 'class.manage']);
         Sanctum::actingAs($instructor);
 
         $this->postJson('/api/admin/exercise-tags', ['name' => 'Thẻ ' . uniqid(), 'kind' => 'category'])->assertStatus(403);
@@ -111,22 +118,24 @@ class UserPermissionTest extends TestCase
         $this->getJson('/api/exercise-tags')->assertOk();
     }
 
-    public function test_overview_is_open_to_any_admin_area_permission(): void
+    public function test_overview_needs_system_overview(): void
     {
+        Sanctum::actingAs($this->makeUser('student', ['system.overview']));
+        $this->getJson('/api/admin/overview/attention')->assertOk();
         foreach (['user.manage', 'class.manage', 'access.manage'] as $permission) {
             Sanctum::actingAs($this->makeUser('student', [$permission]));
-            $this->getJson('/api/admin/overview/stats')->assertOk();
+            $this->getJson('/api/admin/overview/attention')->assertStatus(403);
         }
         Sanctum::actingAs($this->makeUser('admin', ['problem.create']));
-        $this->getJson('/api/admin/overview/stats')->assertStatus(403);
+        $this->getJson('/api/admin/overview/attention')->assertStatus(403);
     }
 
-    // ───────────── bảo vệ siêu quản trị cuối cùng ─────────────
+    // ───────────── bảo vệ người giữ access.manage cuối cùng ─────────────
 
-    public function test_the_last_active_super_admin_cannot_be_deleted_or_locked(): void
+    public function test_the_last_active_access_manager_cannot_be_deleted_or_locked(): void
     {
         $admin = $this->makeUser('admin');
-        $this->makeLastSuperAdmin($admin);
+        $this->makeLastAccessManager($admin);
         $actor = $this->makeUser('student', ['user.manage']);
         Sanctum::actingAs($actor);
 
@@ -138,11 +147,11 @@ class UserPermissionTest extends TestCase
         $this->assertSame('Active', $admin->fresh()->status);
     }
 
-    public function test_a_super_admin_can_be_removed_when_another_active_one_exists(): void
+    public function test_an_access_manager_can_be_removed_when_another_active_one_exists(): void
     {
         $first = $this->makeUser('admin');
         $second = $this->makeUser('admin');
-        $this->makeLastSuperAdmin($first);
+        $this->makeLastAccessManager($first);
         User::where('id', $second->id)->update(['status' => 'Active']);
         app(AccessControlService::class)->forget();
 
@@ -191,14 +200,14 @@ class UserPermissionTest extends TestCase
 
         Sanctum::actingAs($this->makeUser('student', ['user.manage']));
         $rows = $this->getJson('/api/admin/users/role-options')->assertOk()->json();
-        $this->assertSame(['id', 'name', 'isSuper'], array_keys($rows[0]));
+        $this->assertSame(['id', 'name'], array_keys($rows[0]));
         $this->assertSame(AccessRole::count(), count($rows));
         $this->assertSame(array_unique(array_column($rows, 'id')), array_column($rows, 'id'), 'không trùng');
     }
 
     public function test_creating_an_account_with_a_chosen_role_and_account_type(): void
     {
-        $custom = AccessRole::create(['name' => 'Tùy chỉnh ' . uniqid(), 'is_super' => false]);
+        $custom = AccessRole::create(['name' => 'Tùy chỉnh ' . uniqid()]);
         $custom->syncPermissions(['library.manage']);
         Sanctum::actingAs($this->makeUser('student', ['user.manage']));
         $payload = fn (array $extra) => array_merge([
@@ -222,12 +231,11 @@ class UserPermissionTest extends TestCase
         $this->postJson('/api/admin/users', $payload(['account_type' => 'staff', 'role_id' => 'khong-co']))->assertStatus(422)->assertJsonValidationErrors('role_id', 'errors');
     }
 
-    public function test_granting_a_role_with_access_manage_or_super_needs_access_manage(): void
+    public function test_granting_a_role_with_access_manage_needs_access_manage(): void
     {
-        $adminRole = AccessRole::where('is_super', true)->firstOrFail();
-        $manager = AccessRole::create(['name' => 'QL vai trò ' . uniqid(), 'is_super' => false]);
+        $manager = AccessRole::create(['name' => 'QL vai trò ' . uniqid()]);
         $manager->syncPermissions(['access.manage']);
-        $plain = AccessRole::create(['name' => 'Thường ' . uniqid(), 'is_super' => false]);
+        $plain = AccessRole::create(['name' => 'Thường ' . uniqid()]);
         $plain->syncPermissions(['practice.solve']);
         $make = fn (AccessRole $role) => [
             'email' => 'gr_' . uniqid() . '@uit.edu.vn', 'password' => 'password123', 'name' => 'GR',
@@ -235,12 +243,10 @@ class UserPermissionTest extends TestCase
         ];
 
         Sanctum::actingAs($this->makeUser('student', ['user.manage']));
-        $this->postJson('/api/admin/users', $make($adminRole))->assertStatus(403);
         $this->postJson('/api/admin/users', $make($manager))->assertStatus(403);
         $this->postJson('/api/admin/users', $make($plain))->assertStatus(201);
 
         Sanctum::actingAs($this->makeUser('student', ['user.manage', 'access.manage']));
         $this->postJson('/api/admin/users', $make($manager))->assertStatus(201);
-        $this->postJson('/api/admin/users', $make($adminRole))->assertStatus(201);
     }
 }

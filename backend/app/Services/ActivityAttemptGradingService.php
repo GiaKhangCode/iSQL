@@ -55,6 +55,7 @@ class ActivityAttemptGradingService
         $totalQuestions = 0;
         $passedQuestions = 0;
         $outcomes = [];
+        $bestQuestionResults = $this->bestQuestionSubmissions($user, $activity, $problem);
 
         foreach ($parts as $part) {
             $part = strtoupper((string) $part);
@@ -67,6 +68,7 @@ class ActivityAttemptGradingService
             } else {
                 continue;
             }
+            $graded = $this->applyBestQuestionSubmissions($graded, $part, $bestQuestionResults);
 
             $sections[] = $graded['section'];
             $totalQuestions += $graded['total'];
@@ -114,6 +116,91 @@ class ActivityAttemptGradingService
     }
 
     /**
+     * Lần nộp từng câu tốt nhất của sinh viên trong kỳ thi, theo "PHẦN:mã câu": điểm cao nhất, bằng điểm thì lần mới nhất.
+     * Bài tập thường không dùng (nộp từng câu ở đó không đổi điểm chính thức). Mỗi câu chỉ được tính tối đa một lần.
+     *
+     * @return array<string, Submission>
+     */
+    protected function bestQuestionSubmissions(User $user, Assignment $activity, Problem $problem): array
+    {
+        if (!($activity->examination_id || $activity->exam_mode)) {
+            return [];
+        }
+
+        $subs = Submission::where('user_id', $user->id)
+            ->where('context', $activity->id)
+            ->where('problem_id', $problem->id)
+            ->whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
+            ->whereHas('workspaceResult', function ($q) {
+                $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
+            })
+            ->with('workspaceResult')
+            ->orderBy('submitted_at')
+            ->get();
+
+        $best = [];
+        foreach ($subs as $sub) {
+            $meta = $sub->workspaceResult?->sections[0]['_questionSubmission'] ?? null;
+            if (!is_array($meta) || empty($meta['part']) || !isset($meta['questionId'])) {
+                continue;
+            }
+            $key = strtoupper((string) $meta['part']) . ':' . $meta['questionId'];
+            // Duyệt từ cũ đến mới nên ">=" cho lần mới nhất khi bằng điểm.
+            if (!isset($best[$key]) || (float) $sub->score >= (float) $best[$key]->score) {
+                $best[$key] = $sub;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Câu mà lần nộp từng câu tốt nhất đúng (Accepted) thì tính đúng dù bài lúc nộp toàn bài chưa đúng: kết quả mỗi câu là
+     * tốt hơn trong hai (bài lúc nộp toàn bài, lần nộp từng câu tốt nhất). Cập nhật cả thống kê của phần.
+     *
+     * @param  array{section: array, total: int, passed: int}  $graded
+     * @param  array<string, Submission>  $best
+     * @return array{section: array, total: int, passed: int}
+     */
+    protected function applyBestQuestionSubmissions(array $graded, string $part, array $best): array
+    {
+        if ($best === []) {
+            return $graded;
+        }
+
+        $changed = false;
+        foreach ($graded['section']['questions'] as $i => $question) {
+            $sub = $best[$part . ':' . ($question['id'] ?? '')] ?? null;
+            if (!$sub || ($question['status'] ?? '') === 'Accepted' || $sub->result !== 'Accepted') {
+                continue;
+            }
+            $graded['section']['questions'][$i] = array_merge($question, [
+                'status'                 => 'Accepted',
+                'message'                => 'Passed in a question submission during the exam.',
+                'passed'                 => max(1, (int) ($question['total'] ?? 1)),
+                'ratio'                  => 1.0,
+                'query'                  => (string) $sub->query_text,
+                'fromQuestionSubmission' => $sub->id,
+            ]);
+            $changed = true;
+        }
+
+        if ($changed) {
+            $section = &$graded['section'];
+            $passed = count(array_filter($section['questions'], fn ($q) => ($q['status'] ?? '') === 'Accepted'));
+            $section['passed'] = $passed;
+            $section['status'] = $passed === (int) $section['total'] && $section['questions'] !== []
+                ? 'Accepted'
+                : ($passed > 0 ? 'Partial' : 'Wrong Answer');
+            $section['message'] = "{$passed}/{$section['total']} câu đúng.";
+            $graded['passed'] = $passed;
+            unset($section);
+        }
+
+        return $graded;
+    }
+
+    /**
      * @return array{section: array, total: int, passed: int}
      */
     protected function gradeSqlPart(
@@ -142,7 +229,6 @@ class ActivityAttemptGradingService
             if ($studentSql === '') {
                 $qResults[] = [
                     'id'          => $sol->id,
-                    'name'        => $sol->name,
                     'description' => $sol->description ?? '',
                     'status'      => 'Not Answered',
                     'message'     => 'No query submitted for this question.',
@@ -174,7 +260,6 @@ class ActivityAttemptGradingService
             }
             $qResults[] = [
                 'id'              => $sol->id,
-                'name'            => $sol->name,
                 'description'     => $sol->description ?? '',
                 'status'          => $matched ? 'Accepted' : (($run['status'] ?? '') === 'Runtime Error' ? 'Runtime Error' : 'Wrong Answer'),
                 'message'         => $matched ? 'Passed all checks.' : ($run['message'] ?? 'Wrong Answer'),
@@ -240,7 +325,6 @@ class ActivityAttemptGradingService
             if ($studentScript === '') {
                 $qResults[] = [
                     'id'          => $qid,
-                    'name'        => $q['name'] ?? "{$part}.sql",
                     'description' => $q['description'] ?? '',
                     'status'      => 'Not Answered',
                     'message'     => 'No SQL submitted for this question.',
@@ -273,9 +357,9 @@ class ActivityAttemptGradingService
                     'prepareOnly' => false,
                     'schemaName'  => $schemaName,
                     'persist'     => $caseIdx === 0,
+                    'isolated'    => $caseIdx === 0, // chấm trong schema tạm, không đụng schema sinh viên đang làm bài
                     'question'    => [
                         'id'        => $qid,
-                        'name'      => $q['name'] ?? "{$part}.sql",
                         'answer'    => $studentScript,
                         'startFrom' => $startFrom,
                         'setupDdl'  => $setupDdl,
@@ -301,7 +385,6 @@ class ActivityAttemptGradingService
                     'prepareOnly' => false,
                     'question'    => [
                         'id'        => $qid,
-                        'name'      => $q['name'] ?? "{$part}.sql",
                         'answer'    => $expectedAnswer,
                         'startFrom' => $startFrom,
                         'setupDdl'  => $setupDdl,
@@ -312,11 +395,11 @@ class ActivityAttemptGradingService
                 if ($part === 'DDL') {
                     $caseMatched = $this->workspaceService->schemasMatch(
                         $caseRun['schemaTables'] ?? [],
-                        $expectedRun['schemaTables'] ?? []
+                        $expectedRun['schemaTables'] ?? [],
+                        !empty($q['checkColumnOrder'])
                     );
                 } elseif ($part === 'DML') {
-                    $changes = $this->workspaceService->computeDataChanges($expectedRun['tables'] ?? [], $caseRun['tables'] ?? []);
-                    $caseMatched = empty($changes);
+                    $caseMatched = $this->workspaceService->dataMatchesExpected($expectedRun['tables'] ?? [], $caseRun['tables'] ?? []);
                 } else {
                     $caseMatched = $this->workspaceService->triggerMatchesExpected($caseRun, $expectedRun, $probes);
                 }
@@ -333,7 +416,6 @@ class ActivityAttemptGradingService
 
             $qResults[] = [
                 'id'              => $qid,
-                'name'            => $q['name'] ?? "{$part}.sql",
                 'description'     => $q['description'] ?? '',
                 'status'          => $matched ? 'Accepted' : (($actualRun['status'] ?? '') === 'Error' ? 'Runtime Error' : 'Wrong Answer'),
                 'message'         => $msg,

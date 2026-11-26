@@ -134,7 +134,7 @@ class DatabaseLibraryTest extends TestCase
         $delRes->assertStatus(403);
     }
 
-    public function test_admin_can_view_update_and_delete_any_entry(): void
+    public function test_the_admin_role_has_no_access_to_the_database_library(): void
     {
         // Instructor 1 creates entry
         Sanctum::actingAs($this->instructor1);
@@ -143,24 +143,14 @@ class DatabaseLibraryTest extends TestCase
         ]);
         $entryId = $postRes->json('id');
 
-        // Admin views
+        // Admin chỉ có 4 quyền quản trị: không có library.manage nên mọi thao tác bị chặn.
         Sanctum::actingAs($this->adminUser);
-        $getRes = $this->getJson("/api/teacher/database-library/{$entryId}");
-        $getRes->assertStatus(200);
+        $this->getJson('/api/teacher/database-library')->assertStatus(403);
+        $this->getJson("/api/teacher/database-library/{$entryId}")->assertStatus(403);
+        $this->putJson("/api/teacher/database-library/{$entryId}", ['title' => 'Admin Updated Title'])->assertStatus(403);
+        $this->deleteJson("/api/teacher/database-library/{$entryId}")->assertStatus(403);
 
-        // Admin updates
-        $putRes = $this->putJson("/api/teacher/database-library/{$entryId}", [
-            'title' => 'Admin Updated Title',
-        ]);
-        $putRes->assertStatus(200);
-        $this->assertEquals('Admin Updated Title', $putRes->json('title'));
-
-        // Admin deletes
-        $delRes = $this->deleteJson("/api/teacher/database-library/{$entryId}");
-        $delRes->assertStatus(200);
-        $this->assertTrue($delRes->json('ok'));
-
-        $this->assertDatabaseMissing('database_library_entries', ['id' => $entryId]);
+        $this->assertDatabaseHas('database_library_entries', ['id' => $entryId, 'title' => 'Instructor 1 Normal DB']);
     }
 
     public function test_store_rejects_dangerous_sql_statements(): void
@@ -278,10 +268,12 @@ class DatabaseLibraryTest extends TestCase
         $this->assertTrue($ids->contains($system->id));
         $this->assertFalse($ids->contains($others->id));
 
-        Sanctum::actingAs($this->adminUser);
+        // Không còn ngoại lệ cho siêu quản trị: ai có library.manage cũng chỉ thấy của mình và mẫu hệ thống.
+        Sanctum::actingAs($this->instructor2);
         $ids = collect($this->getJson('/api/teacher/database-library')->assertOk()->json())->pluck('id');
-        $this->assertTrue($ids->contains($mine->id));
         $this->assertTrue($ids->contains($others->id));
+        $this->assertTrue($ids->contains($system->id));
+        $this->assertFalse($ids->contains($mine->id));
     }
 
     public function test_instructor_can_view_but_not_edit_or_delete_system_entry(): void
@@ -391,7 +383,7 @@ class DatabaseLibraryTest extends TestCase
     private function onlyPermissions(User $user, array $permissions): User
     {
         \Illuminate\Support\Facades\DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-        $role = \App\Models\AccessRole::create(['name' => 'Test ' . uniqid(), 'is_super' => false]);
+        $role = \App\Models\AccessRole::create(['name' => 'Test ' . uniqid()]);
         $role->syncPermissions($permissions);
         $user->accessRoles()->attach($role->id);
         app(\App\Services\Access\AccessControlService::class)->forget();
@@ -434,14 +426,14 @@ class DatabaseLibraryTest extends TestCase
         $this->deleteJson("/api/teacher/database-library/{$entry->id}")->assertStatus(403);
     }
 
-    public function test_super_admin_scope_comes_from_the_admin_role_and_can_edit_system_entries(): void
+    public function test_system_entries_cannot_be_edited_through_the_api(): void
     {
-        $system = $this->makeEntry(null, 'Mẫu hệ thống sửa bởi admin');
+        $system = $this->makeEntry(null, 'Mẫu hệ thống');
 
         Sanctum::actingAs($this->adminUser);
-        $this->putJson("/api/teacher/database-library/{$system->id}", ['title' => 'Đã sửa'])->assertOk();
+        $this->putJson("/api/teacher/database-library/{$system->id}", ['title' => 'Đã sửa'])->assertStatus(403);
 
-        // Người có library.manage nhưng không phải siêu quản trị không sửa được mẫu hệ thống.
+        // Người có library.manage cũng không sửa được mẫu hệ thống.
         Sanctum::actingAs($this->instructor1);
         $this->putJson("/api/teacher/database-library/{$system->id}", ['title' => 'Không được'])->assertStatus(403);
     }

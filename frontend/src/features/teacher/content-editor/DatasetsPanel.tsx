@@ -5,7 +5,6 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { DatasetDataPreview } from "@/shared/components/DatasetDataPreview";
 import { ProblemSqlEditor } from "@/features/teacher/problem-editor/ProblemSqlEditor";
 import { SqlFileNameInput } from "@/features/teacher/problem-editor/SqlFileNameInput";
-import { SqlFileNameField } from "@/features/teacher/DatabaseLibraryParts";
 import type { ContentEditorVariant } from "@/features/teacher/content-editor/SchemaPanel";
 
 export type DatasetDraft = { fileName: string; sql: string; isHidden?: boolean };
@@ -45,7 +44,6 @@ export function DatasetsPanel({ variant, datasets, onEdit, onAdd, onRemove, show
         <div className="teacher-database-library-dataset-heading">
           <div className="teacher-database-library-dataset-identity">
             <strong><TranslatedText>{tr("Dataset {value0}", { value0: index + 1 })}</TranslatedText></strong>
-            <SqlFileNameField compact label={tr("Dataset file name")} value={dataset.fileName} onChange={value => onEdit(index, { fileName: value })} />
           </div>
           <div className="teacher-database-library-dataset-actions">
             <button className={`button teacher-database-library-preview-toggle${previewIndex === index ? " is-active" : ""}`} type="button" aria-expanded={previewIndex === index} onClick={() => togglePreview(index)}>

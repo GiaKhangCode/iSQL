@@ -1546,3 +1546,22 @@ body:has(.assignment-work-page), body:has(.scope-detail-page) { background: var(
 .exam-session-list-pagination { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .exam-session-list-pagination > span { color: var(--muted); font-size: 11px; }
 .exam-session-list-pagination .button { min-height: 30px; padding: 5px 9px; font-size: 11px; }
+
+/* Thẻ "Tổng quan học tập" (thay biểu đồ Hoạt động SQL): cùng khuôn với thẻ Hạn nộp, hàng bài nộp dùng lại .dashboard-deadline-row. */
+.dashboard-reordered .dashboard-layout .dashboard-activity-card.dashboard-overview-card { display:flex; flex-direction:column; height:400px; padding:0; overflow:hidden; }
+.dashboard-overview-heading { height:53px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 20px; border-bottom:1px solid var(--border); }
+.dashboard-overview-heading h2 { margin:0; font-size:16px; }
+.dashboard-overview-heading a { color:var(--accent); font-size:11px; }
+.dashboard-overview-stats { flex:none; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); border-bottom:1px solid var(--border); }
+.dashboard-overview-stat { display:flex; flex-direction:column; gap:2px; min-width:0; padding:14px 20px; }
+.dashboard-overview-stat + .dashboard-overview-stat { border-left:1px solid var(--border); }
+.dashboard-overview-stat b { font-size:22px; line-height:28px; }
+.dashboard-overview-stat span { color:var(--muted); font-size:11px; }
+.dashboard-overview-stat small { margin-top:2px; color:var(--muted); font-size:10px; line-height:14px; }
+.dashboard-overview-label { flex:none; margin:0; padding:12px 20px 8px; font-size:11px; }
+.dashboard-recent-scroll > p { margin:0; padding:8px 20px; }
+.dashboard-deadline-row time b { line-height:12px; white-space:nowrap; }
+.dashboard-deadlines .deadline-scroll > p { margin:0; padding:14px 20px; }
+.dashboard-recent-scroll .dashboard-deadline-row:last-child { border-bottom:0; }
+@media (max-width:760px) { .dashboard-reordered .dashboard-layout .dashboard-activity-card.dashboard-overview-card { height:auto; min-height:0; } .dashboard-recent-scroll { max-height:340px; } }
+@media (max-width:560px) { .dashboard-overview-stats { grid-template-columns:minmax(0, 1fr); } .dashboard-overview-stat + .dashboard-overview-stat { border-left:0; border-top:1px solid var(--border); } }

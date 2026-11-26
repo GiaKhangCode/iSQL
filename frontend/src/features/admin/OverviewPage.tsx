@@ -2,12 +2,15 @@ import {Select} from "@/shared/ui/Select";
 import { Table, TableRow } from "@/shared/ui/Table";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { useLanguage } from "@/shared/context/LanguageContext";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/app/providers/AuthContext";
 import { Loading } from "@/shared/ui/ui";
-import { type AdminClass, type AdminLecturerRequest } from "@/data/adminPolicy";
-import { adminService, userRoleNames, type AdminUser } from "@/features/admin/adminService";
+import { type AdminClass } from "@/data/adminPolicy";
+import { adminService, userRoleNames, type AdminUser, type NamedCount, type OverviewAttention, type SandboxSummary, type ServiceHealth, type UpcomingExam } from "@/features/admin/adminService";
+import { SandboxCleanupPanel } from "@/features/admin/SandboxCleanupPanel";
 import { localTime, parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
-import { formatActivityAction, formatGradingError } from "@/features/admin/activityText";
+import { formatActivityAction } from "@/features/admin/activityText";
 
 import { PageIntro, Split, Field, Notice, AddUserDialog, BulkImportDialog, BulkImportMembersDialog, AdminListPagination } from "@/features/admin/AdminShared";
 
@@ -22,85 +25,6 @@ function OverviewPagination({ total, page, onPageChange, label }: { total: numbe
       <span><TranslatedText>{tr("Page")}</TranslatedText> {currentPage} <TranslatedText>{tr("of")}</TranslatedText> {pageCount}</span>
       <button type="button" className="button admin-button" disabled={currentPage === pageCount} onClick={() => onPageChange(currentPage + 1)}><TranslatedText>{tr("Next →")}</TranslatedText></button>
     </nav>;
-}
-
-function OverviewLecturerApprovalsPanel({ onClose, onResolved }: { onClose: () => void; onResolved: (pendingCount: number) => void }) {
-  const { t: tr } = useLanguage("admin");
-  const [requests, setRequests] = useState<(AdminLecturerRequest & { id: string })[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [confirmReject, setConfirmReject] = useState(false);
-  const selected = requests.find(request => request.id === selectedId) || requests[0];
-
-  async function loadRequests() {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await adminService.getLecturerRequests();
-      setRequests(data);
-      setSelectedId(data[0]?.id || "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load lecturer requests.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadRequests();
-  }, []);
-
-  async function resolveRequest(approved: boolean) {
-    if (!selected || busy) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      if (approved) await adminService.approveLecturerRequest(selected.id);
-      else await adminService.rejectLecturerRequest(selected.id);
-      const remaining = requests.filter(request => request.id !== selected.id);
-      setRequests(remaining);
-      setSelectedId(remaining[0]?.id || "");
-      setConfirmReject(false);
-      setNotice(approved ? selected.name + " was approved as a lecturer." : selected.name + "'s request was rejected.");
-      onResolved(remaining.length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update this request.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return <div className="admin-overview-approvals">
-    <div className="admin-overview-panel-header"><h2><TranslatedText>{tr("Lecturer approvals")}</TranslatedText></h2><button type="button" className="text-button" disabled={busy} onClick={onClose}><TranslatedText>{tr("Close")}</TranslatedText></button></div>
-    {loading ? <Loading variant="table" columns={4} label={tr("Loading lecturer requests…")} /> : <>
-      {notice && <Notice><TranslatedText>{tr(notice)}</TranslatedText></Notice>}
-      {error && <p className="admin-warning" role="alert"><TranslatedText>{tr(error)}</TranslatedText></p>}
-      {selected ? <>
-        <Field label={"PENDING REQUESTS (" + requests.length + ")"}><Select value={selected.id} disabled={busy} onChange={event => { setSelectedId(event.target.value); setConfirmReject(false); setError(""); setNotice(""); }}>{requests.map(request => <option key={request.id} value={request.id}>{request.name} · {request.email}</option>)}</Select></Field>
-        <div className="admin-detail-divider" />
-        <h3 className="admin-detail-title">{selected.name}</h3>
-        <dl className="teacher-list-detail-facts">
-          <div><dt><TranslatedText>{tr("Email")}</TranslatedText></dt><dd>{selected.email}</dd></div>
-          <div><dt><TranslatedText>{tr("Department")}</TranslatedText></dt><dd>{selected.department || "—"}</dd></div>
-          <div><dt><TranslatedText>{tr("Submitted")}</TranslatedText></dt><dd>{selected.submitted || "—"}</dd></div>
-        </dl>
-        {confirmReject ? <div className="admin-overview-reject-confirm">
-          <p><TranslatedText>{tr("Reject the registration for")}</TranslatedText> <strong>{selected.name}</strong>?</p>
-          <div className="admin-overview-request-actions"><button type="button" className="button admin-button" disabled={busy} onClick={() => setConfirmReject(false)}><TranslatedText>{tr("Cancel")}</TranslatedText></button><button type="button" className="button admin-button admin-reject-button" disabled={busy} onClick={() => void resolveRequest(false)}><TranslatedText>{busy ? tr("Rejecting…") : tr("Confirm rejection")}</TranslatedText></button></div>
-        </div> : <div className="admin-overview-request-actions">
-          <button type="button" className="button primary admin-button" disabled={busy} onClick={() => void resolveRequest(true)}><TranslatedText>{busy ? tr("Approving…") : tr("Approve lecturer")}</TranslatedText></button>
-          <button type="button" className="button admin-button admin-reject-button" disabled={busy} onClick={() => setConfirmReject(true)}><TranslatedText>{tr("Reject request")}</TranslatedText></button>
-        </div>}
-      </> : error ? <button type="button" className="button admin-button" onClick={() => void loadRequests()}><TranslatedText>{tr("Retry")}</TranslatedText></button> : <>
-        <p className="admin-muted"><TranslatedText>{tr("No pending requests.")}</TranslatedText></p>
-        <button type="button" className="text-button" onClick={() => void loadRequests()}><TranslatedText>{tr("Refresh")}</TranslatedText></button>
-      </>}
-    </>}
-  </div>;
 }
 
 function OverviewActivityPanel({ activity, onClose }: { activity: any; onClose: () => void }) {
@@ -197,75 +121,124 @@ function OverviewUnassignedClassesPanel({ onClose }: { onClose: () => void }) {
   </div>;
 }
 
+const SERVICE_NAMES: Record<ServiceHealth["key"], string> = {
+  mysql: "MySQL database",
+  sqlserver: "SQL Server (grading)",
+  redis: "Redis (cache and queue)",
+};
+
+function OverviewNamesPanel({ title, hint, data, usersLink, onClose }: { title: string; hint: string; data: NamedCount; usersLink: boolean; onClose: () => void }) {
+  const { t: tr } = useLanguage("admin");
+  return <div className="admin-overview-details">
+    <div className="admin-overview-panel-header"><h2><TranslatedText>{tr(title)}</TranslatedText></h2><button type="button" className="text-button" onClick={onClose}><TranslatedText>{tr("Close")}</TranslatedText></button></div>
+    <p className="admin-muted">{tr(hint)}</p>
+    {data.names.length ? <ul className="admin-overview-list">{data.names.map((name, index) => <li key={index}>{name}</li>)}</ul> : <p className="admin-muted"><TranslatedText>{tr("Nothing here.")}</TranslatedText></p>}
+    {data.count > data.names.length && <p className="admin-muted">{tr("and {count} more", { count: data.count - data.names.length })}</p>}
+    {usersLink && <Link className="button admin-button" to="/admin/users"><TranslatedText>{tr("Open users")}</TranslatedText></Link>}
+  </div>;
+}
+
 export function AdminOverviewPage() {
   const { t: tr, locale: uiLocale } = useLanguage("admin");
+  const { permissions } = useAuth();
+  const canCleanSandbox = Boolean(permissions?.includes("sandbox.cleanup"));
+  const canManageUsers = Boolean(permissions?.includes("user.manage"));
   const [notice, setNotice] = useState("");
-  const [stats, setStats] = useState({ users: 0, classes: 0, pendingRequests: 0, unassignedClasses: 0, submissionsToday: 0, gradingErrors: 0 });
+  const [attention, setAttention] = useState<OverviewAttention | null>(null);
   const [activities, setActivities] = useState<any[]>([]);
-  const [errors, setErrors] = useState<any[]>([]);
-  const [attentionPage, setAttentionPage] = useState(1);
+  // Kiểm tra dịch vụ và đọc SQL Server có thể chậm nên tải riêng, không chặn cả trang.
+  const [health, setHealth] = useState<ServiceHealth[] | null>(null);
+  const [healthError, setHealthError] = useState("");
+  const [exams, setExams] = useState<UpcomingExam[] | null>(null);
+  const [sandbox, setSandbox] = useState<SandboxSummary | null>(null);
+  const [sandboxError, setSandboxError] = useState("");
   const [selection, setSelection] = useState<{ type: "attention" | "activity"; id: string } | null>(null);
   const selectedActivity = selection?.type === "activity" ? activities.find(item => item.id === selection.id) : undefined;
   const [activityPage, setActivityPage] = useState(1);
   const pageSize = 10;
-  const attentionItems = [
-    { id: "registrations", title: "Lecturer registrations", count: stats.pendingRequests, unit: "pending" },
-    { id: "unassigned", title: "Classes without a lecturer", count: stats.unassignedClasses, unit: "class(es)" },
-  ];
-  const currentAttentionPage = Math.min(attentionPage, Math.max(1, Math.ceil(attentionItems.length / pageSize)));
   const currentActivityPage = Math.min(activityPage, Math.max(1, Math.ceil(activities.length / pageSize)));
-  const visibleAttention = attentionItems.slice((currentAttentionPage - 1) * pageSize, currentAttentionPage * pageSize);
   const visibleActivities = activities.slice((currentActivityPage - 1) * pageSize, currentActivityPage * pageSize);
   const [loading, setLoading] = useState(true);
 
+  const loadHealth = useCallback(async () => {
+    setHealth(null); setHealthError("");
+    try { setHealth(await adminService.getHealth()); }
+    catch (err) { setHealth([]); setHealthError(err instanceof Error ? err.message : "Could not check the services."); }
+  }, []);
+
+  const loadSandbox = useCallback(async () => {
+    setSandbox(null); setSandboxError("");
+    try { setSandbox(await adminService.getSandbox()); }
+    catch (err) { setSandboxError(err instanceof Error ? err.message : "Could not read schemas."); }
+  }, []);
+
   useEffect(() => {
-    Promise.all([
-      adminService.getOverviewStats(),
-      adminService.getActivities(),
-      adminService.getErrors()
-    ]).then(([statsData, activitiesData, errorsData]) => {
-      setStats({
-        users: statsData.users,
-        classes: statsData.classes,
-        pendingRequests: statsData.pendingRequests,
-        unassignedClasses: statsData.unassignedClasses,
-        submissionsToday: statsData.submissionsToday,
-        gradingErrors: statsData.gradingErrors
-      });
+    Promise.all([adminService.getAttention(), adminService.getActivities()]).then(([attentionData, activitiesData]) => {
+      setAttention(attentionData);
       setActivities(activitiesData);
-      setErrors(errorsData);
       setLoading(false);
     }).catch(err => {
       console.error(err);
       setNotice("Failed to load overview data.");
       setLoading(false);
     });
-  }, []);
+    void loadHealth();
+    adminService.getUpcomingExams().then(setExams).catch(() => setExams([]));
+  }, [loadHealth]);
 
+  useEffect(() => { if (canCleanSandbox) void loadSandbox(); }, [canCleanSandbox, loadSandbox]);
+
+  const pageClass = "admin-page compact-tables-page admin-overview-page" + (selection ? " has-overview-selection" : "");
   if (loading) {
-    return <div className={"admin-page compact-tables-page admin-overview-page" + (selection ? " has-overview-selection" : "")}><h1 className="sr-only"><TranslatedText>{tr("System overview")}</TranslatedText></h1><Loading variant="dashboard" metrics={4} label={tr("Loading overview…")} /></div>;
+    return <div className={pageClass}><h1 className="sr-only"><TranslatedText>{tr("System overview")}</TranslatedText></h1><Loading variant="dashboard" metrics={4} label={tr("Loading overview…")} /></div>;
   }
-  if (notice) return <div className={"admin-page compact-tables-page admin-overview-page" + (selection ? " has-overview-selection" : "")}><h1 className="sr-only"><TranslatedText>{tr("System overview")}</TranslatedText></h1><p className="admin-notice" role="alert"><TranslatedText>{tr(notice)}</TranslatedText></p></div>;
+  if (notice || !attention) return <div className={pageClass}><h1 className="sr-only"><TranslatedText>{tr("System overview")}</TranslatedText></h1><p className="admin-notice" role="alert"><TranslatedText>{tr(notice)}</TranslatedText></p></div>;
 
-  return <div className={"admin-page compact-tables-page admin-overview-page" + (selection ? " has-overview-selection" : "")}>
+  const attentionItems: { id: string; title: string; count: number | null; unit: string; warn: boolean }[] = [
+    { id: "no-role", title: "Accounts without a role", count: attention.usersWithoutRole.count, unit: "account(s)", warn: attention.usersWithoutRole.count > 0 },
+    { id: "access-managers", title: "People who can manage roles", count: attention.accessManagers.count, unit: "person(s)", warn: attention.accessManagers.count <= 1 },
+    ...(attention.unassignedClasses == null ? [] : [{ id: "unassigned", title: "Classes without a lecturer", count: attention.unassignedClasses, unit: "class(es)", warn: attention.unassignedClasses > 0 }]),
+    ...(canCleanSandbox ? [{ id: "sandbox", title: "Student schemas on SQL Server", count: sandbox ? sandbox.totals.student + sandbox.totals.temporary : null, unit: "schema(s)", warn: false }] : []),
+  ];
+  const closeSelection = () => setSelection(null);
+  const selectedAttention = selection?.type === "attention" ? selection.id : "";
+  const examTime = (value: string | null) => value ? parseServerDateTime(value).toLocaleString(uiLocale) : "—";
+
+  const side = selectedAttention === "unassigned" ? <OverviewUnassignedClassesPanel onClose={closeSelection} />
+    : selectedAttention === "no-role" ? <OverviewNamesPanel title="Accounts without a role" hint="These active accounts cannot open any page. Give them a role." data={attention.usersWithoutRole} usersLink={canManageUsers} onClose={closeSelection} />
+    : selectedAttention === "access-managers" ? <OverviewNamesPanel title="People who can manage roles" hint="Keep at least two people with this permission, so access can still be managed if one account is unavailable." data={attention.accessManagers} usersLink={canManageUsers} onClose={closeSelection} />
+    : selectedAttention === "sandbox" ? <SandboxCleanupPanel summary={sandbox} error={sandboxError} onReload={loadSandbox} onClose={closeSelection} />
+    : selectedActivity ? <OverviewActivityPanel key={selectedActivity.id} activity={selectedActivity} onClose={closeSelection} />
+    : <>
+      <div className="admin-overview-panel-header"><h2><TranslatedText>{tr("System status")}</TranslatedText></h2><button type="button" className="text-button" disabled={health === null} onClick={() => void loadHealth()}><TranslatedText>{tr("Check again")}</TranslatedText></button></div>
+      {health === null ? <p className="admin-muted"><TranslatedText>{tr("Checking services…")}</TranslatedText></p> : healthError ? <p className="admin-warning" role="alert">{healthError}</p>
+        : <ul className="admin-overview-list">{health.map(item => <li key={item.key}>
+          <div><strong>{tr(SERVICE_NAMES[item.key] || item.key)}</strong><span>{item.ok ? tr("Responded in {ms} ms", { ms: item.ms }) : item.detail}</span></div>
+          <span className={"status " + (item.ok ? "success" : "danger")}><TranslatedText>{tr(item.ok ? "Working" : "Unreachable")}</TranslatedText></span>
+        </li>)}</ul>}
+      <div className="admin-detail-divider" />
+      <h3 className="admin-subheading"><TranslatedText>{tr("Exams in the next 24 hours")}</TranslatedText></h3>
+      {exams === null ? <p className="admin-muted"><TranslatedText>{tr("Loading…")}</TranslatedText></p> : exams.length ? <ul className="admin-overview-list">{exams.map(exam => <li key={exam.id}>
+        <div><strong>{exam.title}</strong><span>{examTime(exam.opens)} – {examTime(exam.closes)}</span><span>{tr("{count} candidates", { count: exam.students })}</span></div>
+        <span className={"status " + (exam.status === "Live" ? "warning" : "neutral")}><TranslatedText>{tr(exam.status === "Live" ? "In progress now" : "Upcoming")}</TranslatedText></span>
+      </li>)}</ul> : <p className="admin-muted"><TranslatedText>{tr("No exam in the next 24 hours.")}</TranslatedText></p>}
+    </>;
+
+  return <div className={pageClass}>
     <h1 className="sr-only"><TranslatedText>{tr("System overview")}</TranslatedText></h1>
     <Split className="admin-overview-split" main={<>
       <section className="admin-attention">
         <div className="admin-overview-table-heading">
           <h2 className="admin-section-heading"><TranslatedText>{tr("Needs attention")}</TranslatedText></h2>
-          <div className="admin-overview-table-controls">
-            <span className="admin-muted" role="status"><TranslatedText>{tr("Showing")}</TranslatedText> {attentionItems.length === 0 ? 0 : (currentAttentionPage - 1) * pageSize + 1}–{Math.min(currentAttentionPage * pageSize, attentionItems.length)} <TranslatedText>{tr("of")}</TranslatedText> {attentionItems.length.toLocaleString(uiLocale)} <TranslatedText>{tr("items")}</TranslatedText></span>
-            <OverviewPagination total={attentionItems.length} page={currentAttentionPage} onPageChange={setAttentionPage} label={tr("Needs attention pages")} />
-          </div>
         </div>
         <div className="compact-table-scroll" role="region" aria-label={tr("Needs attention table")} tabIndex={0}>
         <Table className="admin-table admin-attention-table"><thead><tr><th><TranslatedText>{tr("ITEM")}</TranslatedText></th><th><TranslatedText>{tr("COUNT")}</TranslatedText></th></tr></thead><tbody>
-          {visibleAttention.map(item => {
-            const isSelected = selection?.type === "attention" && selection.id === item.id;
+          {attentionItems.map(item => {
+            const isSelected = selectedAttention === item.id;
             const selectRow = () => setSelection({ type: "attention", id: item.id });
             return <TableRow selected={isSelected} key={item.id} className={isSelected ? "is-selected" : ""} onClick={selectRow}>
               <td data-label={tr("ITEM")}><button type="button" className="admin-overview-row-button" aria-pressed={isSelected} onClick={selectRow}><TranslatedText>{tr(item.title)}</TranslatedText></button></td>
-              <td data-label={tr("COUNT")} className={item.count > 0 ? "admin-warning" : ""}>{item.count} <TranslatedText>{tr(item.unit)}</TranslatedText></td>
+              <td data-label={tr("COUNT")} className={item.warn ? "admin-warning" : ""}>{item.count ?? "…"} <TranslatedText>{tr(item.unit)}</TranslatedText></td>
             </TableRow>;
           })}
         </tbody></Table>
@@ -291,12 +264,6 @@ export function AdminOverviewPage() {
         </tbody></Table>
         </div>
       </section>
-    </>} side={selection?.type === "attention" && selection.id === "registrations" ? <OverviewLecturerApprovalsPanel onClose={() => setSelection(null)} onResolved={pendingCount => {
-      setStats(current => ({ ...current, pendingRequests: pendingCount }));
-      adminService.getActivities().then(setActivities).catch(console.error);
-    }} /> : selection?.type === "attention" && selection.id === "unassigned" ? <OverviewUnassignedClassesPanel onClose={() => setSelection(null)} /> : selectedActivity ? <OverviewActivityPanel key={selectedActivity.id} activity={selectedActivity} onClose={() => setSelection(null)} /> : <>
-      <h2><TranslatedText>{tr("Grading health")}</TranslatedText></h2><p className={stats.gradingErrors === 0 ? "admin-health" : "admin-health admin-warning"}><TranslatedText>{stats.gradingErrors === 0 ? tr("Operational") : tr("Needs Attention")}</TranslatedText></p><p className="admin-muted">{stats.submissionsToday} <TranslatedText>{tr("submitted today /")}</TranslatedText> {stats.gradingErrors} <TranslatedText>{tr("need attention")}</TranslatedText></p><div className="admin-detail-divider" /><h3 className="admin-subheading"><TranslatedText>{tr("Recent errors")}</TranslatedText></h3>
-      {errors.length > 0 ? errors.map(err => <p key={err.id} className="admin-warning admin-error"><strong>{formatGradingError(err.errorType)}</strong><br />{err.problemTitle}{err.studentName ? " · " + err.studentName : ""}{err.submittedAt ? <><br /><span className="admin-muted">{parseServerDateTime(err.submittedAt).toLocaleString(uiLocale)}</span></> : null}</p>) : <p className="admin-muted"><TranslatedText>{tr("No errors recently")}</TranslatedText></p>}
-    </>} />
+    </>} side={side} />
   </div>;
 }

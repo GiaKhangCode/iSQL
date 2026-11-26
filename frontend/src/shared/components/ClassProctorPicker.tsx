@@ -3,7 +3,7 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import type { ProctorOption } from "@/shared/api/examSessions";
 
-type ClassInfo = { id: string; course?: string; practice_class?: string; practiceClass?: string };
+type ClassInfo = { id: string; course?: string; practice_class?: string; practiceClass?: string; lecturerId?: string | null; lecturer?: string | null };
 
 /** One row per class of the session: the lecturers who proctor that class. Every class needs at least one. */
 export function ClassProctorPicker({ classIds, classes, options, value, loading, error, onChange }: {
@@ -17,6 +17,12 @@ export function ClassProctorPicker({ classIds, classes, options, value, loading,
 }) {
   const { t } = useLanguage("teacher");
   const people = new Map(options.map(option => [option.id, option]));
+  // Giảng viên của lớp là giám thị mặc định, kể cả khi không nằm trong danh sách chọn thêm.
+  classes.forEach(info => {
+    if (info.lecturerId && !people.has(String(info.lecturerId))) {
+      people.set(String(info.lecturerId), { id: String(info.lecturerId), name: info.lecturer || String(info.lecturerId), email: "" });
+    }
+  });
   const label = (classId: string) => {
     const info = classes.find(item => item.id === classId);
     return info?.practice_class || info?.practiceClass || info?.course || classId;
@@ -52,6 +58,8 @@ export function ClassProctorPicker({ classIds, classes, options, value, loading,
                       type="button"
                       className="icon-button"
                       aria-label={t("Remove {value0}", { value0: name })}
+                      disabled={chosen.length <= 1}
+                      title={chosen.length <= 1 ? t("Each class needs at least one proctor.") : undefined}
                       onClick={() => setClass(classId, chosen.filter(value => value !== id))}
                     >
                       <X size={12} aria-hidden="true" />

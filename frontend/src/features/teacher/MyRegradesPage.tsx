@@ -49,7 +49,6 @@ export function MyRegradesPage() {
             <td data-label={t("Exam submission")}>
               <strong>{row.problemTitle}</strong>
               <small className="muted">{row.sessionTitle} · {date(row.assignedAt)}</small>
-              {row.appealReason && <small className="muted regrade-reason-text">{t("Appeal reason")}: {row.appealReason}</small>}
               {(row.assignmentNote || row.note) && <small className="muted">{t("Note")}: {row.assignmentNote || row.note}</small>}
             </td>
             <td data-label={t("Score")}>{row.score != null ? `${formatPoints(row.score)}${row.maxScore != null ? ` / ${formatPoints(row.maxScore)}` : ""}` : "—"}</td>

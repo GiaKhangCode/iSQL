@@ -1,4 +1,4 @@
-// Chuyển chuỗi nhật ký / loại lỗi chấm từ backend sang câu tiếng Việt cho trang Tổng quan của admin.
+// Chuyển chuỗi nhật ký từ backend sang câu tiếng Việt cho trang Tổng quan của admin.
 // Không hàm nào được để lộ mã bản ghi (UUID) ra giao diện.
 
 const RECORD_ID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
@@ -39,6 +39,12 @@ function describeActivity(action: string): string {
     const roleName = action.slice("access:save_role:".length);
     return `Lưu vai trò: ${roleName}`;
   }
+
+  // sandbox:clean_class:<class_id>:count=<n> | sandbox:clean_orphans:count=<n>
+  const cleanedClass = /^sandbox:clean_class:(.+):count=(\d+)$/.exec(action);
+  if (cleanedClass) return `Dọn ${cleanedClass[2]} schema của lớp ${cleanedClass[1]}`;
+  const cleanedOrphans = /^sandbox:clean_orphans:count=(\d+)$/.exec(action);
+  if (cleanedOrphans) return `Dọn ${cleanedOrphans[1]} schema mồ côi / tạm`;
 
   // access:assign_roles:<user_id>
   if (action.startsWith("access:assign_roles:")) {
@@ -210,15 +216,4 @@ function describeActivity(action: string): string {
   }
 
   return action;
-}
-
-export function formatGradingError(errorType: string): string {
-  if (!errorType) return "Lỗi không xác định";
-  const lower = errorType.toLowerCase();
-  if (lower.includes("runtime")) return "Lỗi thực thi (Runtime Error)";
-  if (lower.includes("syntax")) return "Lỗi cú pháp (Syntax Error)";
-  if (lower.includes("timeout") || lower.includes("time limit")) return "Quá thời gian thực thi (Time Limit)";
-  if (lower.includes("memory")) return "Quá giới hạn bộ nhớ (Memory Limit)";
-  if (lower.includes("wrong answer")) return "Sai kết quả (Wrong Answer)";
-  return errorType;
 }

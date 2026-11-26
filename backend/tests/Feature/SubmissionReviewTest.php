@@ -6,8 +6,7 @@ use App\Models\Assignment;
 use App\Models\Notification;
 use App\Models\Problem;
 use App\Models\Submission;
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\ExamRegrade;
 use App\Models\User;
 use App\Models\WorkspaceSubmissionResult;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -277,18 +276,13 @@ class SubmissionReviewTest extends TestCase
         return $this->makeAccount('instructor', ['results.grade']);
     }
 
-    private function appeal(array $overrides = []): SubmissionAppeal
+    /** Phân công phúc khảo cho cả bài thi (ca thi + sinh viên của bài nộp). */
+    private function regrade(User $reviewer, array $overrides = [], ?Submission $sub = null): ExamRegrade
     {
-        return SubmissionAppeal::create(array_merge([
-            'submission_id' => $this->sub->id, 'student_id' => $this->student->id, 'reason' => 'Xin xem lại',
-            'status' => 'pending', 'created_at' => now()->subHour(), 'resolved_at' => null,
-        ], $overrides));
-    }
+        $sub = $sub ?? $this->sub;
 
-    private function regrade(User $reviewer, array $overrides = []): SubmissionRegradeAssignment
-    {
-        return SubmissionRegradeAssignment::create(array_merge([
-            'submission_id' => $this->sub->id, 'assigned_instructor_id' => $reviewer->id,
+        return ExamRegrade::create(array_merge([
+            'activity_id' => $sub->context, 'student_id' => $sub->user_id, 'assigned_instructor_id' => $reviewer->id,
             'assigned_by_id' => null, 'assigned_at' => now(),
         ], $overrides));
     }
@@ -307,35 +301,18 @@ class SubmissionReviewTest extends TestCase
         $this->assertNull($this->sub->fresh()->evaluated_score);
     }
 
-    public function test_an_unresolved_appeal_needs_a_regrade_assignment_first(): void
-    {
-        $this->appeal();
-
-        $this->review(['finalScore' => 1])->assertStatus(403)
-            ->assertJsonPath('detail', 'Đơn phúc khảo chưa được Giáo vụ khoa phân công giảng viên chấm lại.');
-
-        // Đơn đã xử lý xong thì chấm bình thường.
-        SubmissionAppeal::where('submission_id', $this->sub->id)->update(['status' => 'resolved', 'resolved_at' => now()]);
-        $this->review(['finalScore' => 1])->assertOk();
-    }
-
-    public function test_the_assigned_reviewer_completes_the_regrade_and_the_appeal(): void
+    public function test_the_assigned_reviewer_completes_the_regrade(): void
     {
         $this->sub->update(['evaluated_score' => 4, 'feedback' => 'Cũ']);
         $reviewer = $this->reviewer();
         $manager = $this->makeAccount('faculty_office', ['examination.manage']);
         $regrade = $this->regrade($reviewer, ['assigned_by_id' => $manager->id]);
-        $appeal = $this->appeal();
         Sanctum::actingAs($reviewer);
 
         $this->review(['finalScore' => 6, 'feedback' => 'Đã xem lại'])->assertOk()
             ->assertJsonPath('status', 'Regraded')
             ->assertJsonPath('canEditReview', true);
 
-        $appeal->refresh();
-        $this->assertSame('resolved', $appeal->status);
-        $this->assertNotNull($appeal->resolved_at);
-        $this->assertEquals(4, $appeal->previous_evaluated_score);
         $regrade->refresh();
         $this->assertNotNull($regrade->completed_at);
         $this->assertEquals(4, $regrade->previous_evaluated_score);
@@ -348,12 +325,10 @@ class SubmissionReviewTest extends TestCase
         $this->sub->update(['evaluated_score' => 4, 'feedback' => 'Hiện tại']);
         $reviewer = $this->reviewer();
         $regrade = $this->regrade($reviewer, ['previous_evaluated_score' => 2, 'previous_feedback' => 'Gốc']);
-        $this->appeal(['previous_evaluated_score' => 3]);
         Sanctum::actingAs($reviewer);
 
         $this->review(['finalScore' => 6])->assertOk();
 
-        $this->assertEquals(3, SubmissionAppeal::find($this->sub->id)->previous_evaluated_score);
         $regrade->refresh();
         $this->assertEquals(2, $regrade->previous_evaluated_score);
         $this->assertSame('Gốc', $regrade->previous_feedback);
@@ -369,22 +344,24 @@ class SubmissionReviewTest extends TestCase
         $this->review(['finalScore' => 5])->assertOk();
         $this->review(['finalScore' => 7])->assertOk();
 
-        $regrade = SubmissionRegradeAssignment::find($this->sub->id);
+        $regrade = ExamRegrade::forSubmission($this->sub);
         $this->assertEquals(4, $regrade->previous_evaluated_score);
         $this->assertEquals(7, $this->sub->fresh()->evaluated_score);
     }
 
-    public function test_a_resolved_appeal_is_left_alone(): void
+    public function test_the_regrade_covers_every_submission_of_the_student_in_the_exam(): void
     {
-        $resolvedAt = now()->subDay()->startOfSecond();
-        $this->appeal(['status' => 'resolved', 'resolved_at' => $resolvedAt, 'previous_evaluated_score' => null]);
-        $this->sub->update(['evaluated_score' => 4]);
+        $reviewer = $this->reviewer();
+        $this->regrade($reviewer);
+        $sibling = $this->makeSubmission($this->student, $this->problem, $this->activity);
 
-        $this->review(['finalScore' => 6])->assertOk();
+        // Người được phân công chấm được mọi bài nộp của sinh viên đó trong ca thi; người khác thì không.
+        Sanctum::actingAs($reviewer);
+        $this->review(['finalScore' => 5], $sibling)->assertOk();
 
-        $appeal = SubmissionAppeal::find($this->sub->id);
-        $this->assertNull($appeal->previous_evaluated_score);
-        $this->assertSame($resolvedAt->toISOString(), $appeal->resolved_at->toISOString());
+        $stranger = $this->reviewer();
+        Sanctum::actingAs($stranger);
+        $this->review(['finalScore' => 1], $sibling)->assertStatus(403);
     }
 
     // ══ thông báo ═══════════════════════════════════════════════════════════
@@ -410,8 +387,10 @@ class SubmissionReviewTest extends TestCase
 
     public function test_the_notification_hides_the_score_while_scores_are_hidden(): void
     {
-        $this->activity->update(['show_scores_after_submit' => false]);
+        $this->activity->update(['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
 
+        // Ca thi: người chấm cần xem được mọi kết quả (hoặc dạy lớp của ca).
+        Sanctum::actingAs($this->makeAccount('instructor', ['results.view_all', 'results.grade']));
         $this->review(['finalScore' => 7, 'feedback' => 'Bí mật'])->assertOk();
 
         $this->assertSame('Bài nộp đã được chấm. Giáo viên đang ẩn điểm của hoạt động này.', $this->notificationsOf($this->student)->sole()->message);
@@ -419,17 +398,14 @@ class SubmissionReviewTest extends TestCase
 
     public function test_regrade_results_use_a_different_title(): void
     {
-        $this->appeal(['status' => 'resolved', 'resolved_at' => now()]);
         $this->review(['finalScore' => 5])->assertOk();
-        $this->assertSame('Kết quả phúc khảo: Bài chấm', $this->notificationsOf($this->student)->last()->title);
+        $this->assertSame('Bài nộp đã được chấm: Bài chấm', $this->notificationsOf($this->student)->last()->title);
 
         $reviewer = $this->reviewer();
-        $other = $this->makeSubmission($this->student, $this->problem, $this->activity);
-        SubmissionRegradeAssignment::create(['submission_id' => $other->id, 'assigned_instructor_id' => $reviewer->id, 'assigned_at' => now()]);
+        $this->regrade($reviewer);
         Sanctum::actingAs($reviewer);
-        $this->review(['finalScore' => 5], $other)->assertOk();
-        $note = Notification::where('user_id', $this->student->id)->where('link', "/submissions?submission={$other->id}")->sole();
-        $this->assertSame('Kết quả phúc khảo: Bài chấm', $note->title);
+        $this->review(['finalScore' => 6])->assertOk();
+        $this->assertContains('Kết quả phúc khảo: Bài chấm', $this->notificationsOf($this->student)->pluck('title')->all());
     }
 
     public function test_the_person_who_assigned_the_regrade_is_notified_with_a_link_to_their_area(): void
@@ -449,20 +425,21 @@ class SubmissionReviewTest extends TestCase
         $this->assertStringStartsWith('/', $note->link);
     }
 
-    public function test_the_assigner_link_prefix_follows_the_assigners_area(): void
+    public function test_the_assigner_link_prefix_follows_the_assigners_permissions(): void
     {
         $reviewer = $this->reviewer();
-        $admin = $this->makeAccount('admin');
+        $admin = $this->makeAccount('faculty_office', ['exam.results']); // không có results.grade: xem kết quả ở khu vực giáo vụ
         $teacherAssigner = $this->makeAccount('instructor', ['results.grade']);
-        $second = $this->makeSubmission($this->student, $this->problem, $this->activity);
+        $secondStudent = $this->makeStudent();
+        $second = $this->makeSubmission($secondStudent, $this->problem, $this->activity);
         $this->regrade($reviewer, ['assigned_by_id' => $admin->id]);
-        SubmissionRegradeAssignment::create(['submission_id' => $second->id, 'assigned_instructor_id' => $reviewer->id, 'assigned_by_id' => $teacherAssigner->id, 'assigned_at' => now()]);
+        $this->regrade($reviewer, ['assigned_by_id' => $teacherAssigner->id], $second);
         Sanctum::actingAs($reviewer);
 
         $this->review(['finalScore' => 6])->assertOk();
         $this->review(['finalScore' => 6], $second)->assertOk();
 
-        $this->assertSame("/admin/results/review/{$this->sub->id}", $this->notificationsOf($admin)->sole()->link);
+        $this->assertSame("/office/results/review/{$this->sub->id}", $this->notificationsOf($admin)->sole()->link);
         $this->assertSame("/teacher/results/review/{$second->id}", $this->notificationsOf($teacherAssigner)->sole()->link);
     }
 
@@ -492,7 +469,6 @@ class SubmissionReviewTest extends TestCase
     public function test_a_failed_grading_changes_nothing_at_all(): void
     {
         $this->sectionsFixture();
-        $this->appeal(['status' => 'resolved', 'resolved_at' => now()]);
 
         $this->review(['finalScore' => 99, 'feedback' => 'Không lưu'])->assertStatus(422);
 

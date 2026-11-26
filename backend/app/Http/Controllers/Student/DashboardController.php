@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Student\DashboardRequest;
 use App\Services\StudentDashboardService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
@@ -13,10 +13,10 @@ class DashboardController extends Controller
     {
     }
 
-    public function index(DashboardRequest $request): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         return response()->json(
-            $this->dashboardService->getDashboard($request->user(), $request->tzOffset())
+            $this->dashboardService->getDashboard($request->user())
         );
     }
 }

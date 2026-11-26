@@ -6,10 +6,10 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\AcademicTermController;
-use App\Http\Controllers\Admin\LecturerRequestController;
 use App\Http\Controllers\Admin\OverviewController;
 use App\Http\Controllers\ClassRosterController;
 use App\Http\Controllers\Admin\ExerciseTagController;
+use App\Http\Controllers\Admin\SandboxController;
 
 // Khu vực quản trị: quyền theo từng nhóm chức năng (capability), không so sánh loại tài khoản hay tên vai trò.
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
@@ -19,28 +19,30 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/users', [UserController::class, 'store']);
     Route::post('/users/import', [UserController::class, 'importCsv']);
     Route::get('/users/role-options', [UserController::class, 'roleOptions']);
-    // Duyệt giảng viên đăng ký (phải đứng trước /users/{id}).
-    Route::get('/users/lecturer-requests', [LecturerRequestController::class, 'index']);
-    Route::post('/users/lecturer-requests/{id}/approve', [LecturerRequestController::class, 'approve']);
-    Route::post('/users/lecturer-requests/{id}/reject', [LecturerRequestController::class, 'reject']);
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::patch('/users/{id}', [UserController::class, 'update']);
     Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
     Route::patch('/users/{id}/status', [UserController::class, 'updateStatus']);
-    Route::post('/users/{id}/approve', [UserController::class, 'approve']);
     Route::post('/users/{id}/reset-password', [UserController::class, 'resetStudentPassword']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
     });
 
-    // Trang Tổng quan: số liệu, nhật ký gần đây, lỗi chấm bài gần đây.
-    Route::prefix('overview')->middleware('capability:user.manage,class.manage,access.manage')->group(function () {
-        Route::get('/stats', [OverviewController::class, 'stats']);
+    // Trang Tổng quan: tình trạng dịch vụ, việc cần xử lý, ca thi sắp tới, nhật ký gần đây.
+    Route::prefix('overview')->middleware('capability:system.overview')->group(function () {
+        Route::get('/health', [OverviewController::class, 'health']);
+        Route::get('/attention', [OverviewController::class, 'attention']);
+        Route::get('/exams', [OverviewController::class, 'exams']);
         Route::get('/activities', [OverviewController::class, 'activities']);
-        Route::get('/errors', [OverviewController::class, 'errors']);
     });
 
-    // Lớp, danh mục môn học, học kỳ và thẻ bài tập: quyền class.manage.
+    // Dọn schema bài làm trên SQL Server (kết thúc học phần): quyền riêng sandbox.cleanup.
+    Route::prefix('sandbox')->middleware('capability:sandbox.cleanup')->group(function () {
+        Route::get('/', [SandboxController::class, 'index']);
+        Route::post('/cleanup', [SandboxController::class, 'cleanup']);
+    });
+
+    // Lớp, danh mục môn học và học kỳ: quyền class.manage.
     Route::middleware('capability:class.manage')->group(function () {
     Route::get('/classes', [ClassController::class, 'index']);
     Route::post('/classes', [ClassController::class, 'store']);
@@ -67,12 +69,14 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     Route::apiResource('courses', CourseController::class);
     Route::apiResource('terms', AcademicTermController::class);
+    });
 
-    // Exercise Tags Management (Admin - Gán thẻ Bài tập)
-    Route::get('/exercise-tags', [ExerciseTagController::class, 'index']);
-    Route::post('/exercise-tags', [ExerciseTagController::class, 'store']);
-    Route::put('/exercise-tags/{id}', [ExerciseTagController::class, 'update']);
-    Route::delete('/exercise-tags/{id}', [ExerciseTagController::class, 'destroy']);
+    // Thẻ câu hỏi: quyền riêng tag.manage (siêu quản trị không tự có; mặc định giao cho Trưởng bộ môn).
+    Route::middleware('capability:tag.manage')->group(function () {
+        Route::get('/exercise-tags', [ExerciseTagController::class, 'index']);
+        Route::post('/exercise-tags', [ExerciseTagController::class, 'store']);
+        Route::put('/exercise-tags/{id}', [ExerciseTagController::class, 'update']);
+        Route::delete('/exercise-tags/{id}', [ExerciseTagController::class, 'destroy']);
     });
 });
 

@@ -18,6 +18,7 @@ import { TeacherListPagination } from "@/shared/components/TeacherListPagination
 import { TeacherListLoading } from "@/shared/components/TeacherListLoading";
 import { parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
 import { examSessions, type SessionPlan } from "@/shared/api/examSessions";
+import { notify } from "@/shared/ui/notify";
 
 type ExamSession = {
   id: string; title: string; classes: string; problems: number; opens?: string;
@@ -84,8 +85,8 @@ export function ExamSessionsListPage({onBackToExaminations}:{onBackToExamination
   const [plan,setPlan]=useState<SessionPlan|null>(null);
   const [confirmBusy,setConfirmBusy]=useState(false);const [planError,setPlanError]=useState("");
   useEffect(()=>{let active=true;setPlan(null);setPlanError("");if(selected?.id)examSessions.plan(selected.id).then(value=>{if(active)setPlan(value);}).catch(error=>{if(active)setPlanError(error.message);});return()=>{active=false;};},[selected?.id]);
-  const confirmSelected=async()=>{if(!selected||!plan||!window.confirm(`Xác nhận ${selected.title}: ${plan.students.length} sinh viên, ${plan.classes.length} lớp? Đề, lịch và phân công giám thị sẽ bị khóa.`))return;setConfirmBusy(true);setPlanError("");try{setPlan(await examSessions.confirm(selected.id));}catch(error){setPlanError(error instanceof Error?error.message:"Không thể xác nhận.");}finally{setConfirmBusy(false);}};
-  const reopenSelected=async()=>{if(!selected)return;const reason=window.prompt("Lý do mở lại ca thi (ít nhất 5 ký tự):")?.trim();if(!reason)return;setConfirmBusy(true);setPlanError("");try{setPlan(await examSessions.reopen(selected.id,reason));}catch(error){setPlanError(error instanceof Error?error.message:"Không thể mở lại ca thi.");}finally{setConfirmBusy(false);}};
+  const confirmSelected=async()=>{if(!selected||!plan||!window.confirm(`Xác nhận ${selected.title}: ${plan.students.length} sinh viên, ${plan.classes.length} lớp? Đề, lịch và phân công giám thị sẽ bị khóa.`))return;setConfirmBusy(true);setPlanError("");try{setPlan(await examSessions.confirm(selected.id));notify.success("Đã xác nhận ca thi",selected.title);}catch(error){notify.fail("Không thể xác nhận ca thi.",error);}finally{setConfirmBusy(false);}};
+  const reopenSelected=async()=>{if(!selected)return;const reason=window.prompt("Lý do mở lại ca thi (ít nhất 5 ký tự):")?.trim();if(!reason)return;setConfirmBusy(true);setPlanError("");try{setPlan(await examSessions.reopen(selected.id,reason));notify.success("Đã mở lại ca thi",selected.title);}catch(error){notify.fail("Không thể mở lại ca thi.",error);}finally{setConfirmBusy(false);}};
   const editPath=(item:ExamSession)=>`${root}/sessions/${item.id}/edit`;
   const chooseExamSession=(item:ExamSession)=>{if(selected?.id===item.id)navigate(editPath(item));else setSelectedId(item.id);};
   return <section className="teacher-page teacher-list-page teacher-exam-session-page compact-teacher-exam-sessions">

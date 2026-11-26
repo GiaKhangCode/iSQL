@@ -109,19 +109,14 @@ class AccessApiTest extends TestCase
         foreach (['Sinh viên', 'Giảng viên', 'Giáo vụ khoa', 'Admin', 'Trưởng bộ môn'] as $name) {
             $this->assertTrue($roles->has($name), $name);
         }
-        $this->assertSame(['student'], $roles['Sinh viên']['areas']);
-        $this->assertSame(['teacher'], $roles['Giảng viên']['areas']);
-        $this->assertSame(['office'], $roles['Giáo vụ khoa']['areas']);
-        $this->assertSame(['office', 'teacher'], $roles['Trưởng bộ môn']['areas']);
-        $this->assertSame(['admin', 'office', 'teacher'], $roles['Admin']['areas']);
-        $this->assertArrayNotHasKey('area', $roles['Sinh viên']);
-        $this->assertTrue($roles['Admin']['isSuper']);
-        $sorted = PermissionCatalog::superCodes();
-        sort($sorted);
-        $this->assertSame($sorted, $roles['Admin']['permissions']);
+        foreach ($roles as $role) {
+            $this->assertArrayNotHasKey('area', $role);
+            $this->assertArrayNotHasKey('areas', $role, 'khu vực không do server tính: mỗi vai trò là một khu vực');
+            $this->assertArrayNotHasKey('isSuper', $role, 'không còn vai trò nào tự có mọi quyền');
+        }
+        $this->assertSame(['access.manage', 'class.manage', 'system.overview', 'user.manage'], $roles['Admin']['permissions']);
         $this->assertContains('results.grade', $roles['Giảng viên']['permissions']);
         $this->assertNotContains('results.grade', $roles['Trưởng bộ môn']['permissions']);
-        $this->assertFalse($roles['Giảng viên']['isSuper']);
     }
 
     public function test_catalog_reports_user_counts(): void
@@ -142,8 +137,7 @@ class AccessApiTest extends TestCase
             'name' => "  {$name}  ", 'permissions' => ['practice.solve', 'results.grade', 'practice.solve'],
         ])->assertCreated();
 
-        $res->assertJsonPath('name', $name)->assertJsonPath('areas', ['teacher'])->assertJsonPath('isSuper', false)
-            ->assertJsonPath('userCount', 0);
+        $res->assertJsonPath('name', $name)->assertJsonPath('userCount', 0);
         $this->assertSame(['practice.solve', 'results.grade'], $res->json('permissions'));
         $this->assertSame(['practice.solve', 'results.grade'], AccessRole::findOrFail($res->json('id'))->permissionCodes());
         $this->assertTrue(ActivityLog::where('user_id', $this->admin->id)->where('action', 'access:save_role:' . $name)->exists());
@@ -170,25 +164,16 @@ class AccessApiTest extends TestCase
             ->assertStatus(422)->assertJsonPath('detail', 'Tên vai trò đã tồn tại.');
     }
 
-    public function test_a_created_role_can_never_be_super(): void
-    {
-        $res = $this->postJson('/api/admin/access/roles', [
-            'name' => 'Cố tình ' . uniqid(), 'permissions' => [], 'isSuper' => true, 'is_super' => true,
-        ])->assertCreated();
-
-        $this->assertFalse(AccessRole::findOrFail($res->json('id'))->is_super);
-    }
-
     // ───────────────────────── sửa vai trò ─────────────────────────
 
-    public function test_update_role_changes_name_and_permissions_and_derives_areas(): void
+    public function test_update_role_changes_name_and_permissions(): void
     {
         $id = $this->newRole(['practice.solve']);
         $name = 'Đã đổi ' . uniqid();
 
         $this->putJson("/api/admin/access/roles/{$id}", [
             'name' => $name, 'permissions' => ['examination.manage'],
-        ])->assertOk()->assertJsonPath('name', $name)->assertJsonPath('areas', ['office'])
+        ])->assertOk()->assertJsonPath('name', $name)
             ->assertJsonPath('permissions', ['examination.manage']);
 
         $role = AccessRole::findOrFail($id);
@@ -196,20 +181,30 @@ class AccessApiTest extends TestCase
         $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('access_roles', 'area'));
     }
 
-    public function test_an_area_sent_by_a_client_is_ignored_and_areas_follow_permissions(): void
+    public function test_a_new_role_shows_up_as_an_area_of_the_people_holding_it(): void
     {
         $res = $this->postJson('/api/admin/access/roles', [
-            'name' => 'Cố đặt khu vực ' . uniqid(), 'area' => 'admin', 'permissions' => ['practice.solve'],
+            'name' => 'Khu vực mới ' . uniqid(), 'area' => 'admin', 'permissions' => ['results.grade', 'exam.proctor'],
         ])->assertCreated();
+        $this->assertArrayNotHasKey('area', AccessRole::findOrFail($res->json('id'))->getAttributes(), 'khu vực do client gửi bị bỏ qua');
 
-        $res->assertJsonPath('areas', ['student']);
+        $user = $this->makeUser('visitor');
+        $this->putJson('/api/admin/access/users/' . $user->id, ['role_ids' => [$res->json('id')]])->assertOk();
+        $this->actAs($user);
+        $this->getJson('/api/auth/permissions')->assertOk()
+            ->assertJsonPath('roles', [['id' => $res->json('id'), 'name' => $res->json('name'), 'permissions' => ['exam.proctor', 'results.grade']]]);
 
+        // Gán thêm quyền cho vai trò thì khu vực của vai trò có thêm quyền đó.
+        $this->actAs($this->admin);
         $this->putJson('/api/admin/access/roles/' . $res->json('id'), [
-            'name' => $res->json('name'), 'area' => 'student', 'permissions' => ['user.manage', 'problem.create'],
-        ])->assertOk()->assertJsonPath('areas', ['admin', 'teacher']);
+            'name' => $res->json('name'), 'permissions' => ['results.grade', 'exam.proctor', 'statistics.view'],
+        ])->assertOk();
+        $this->actAs($user);
+        $this->getJson('/api/auth/permissions')->assertOk()
+            ->assertJsonPath('roles.0.permissions', ['exam.proctor', 'results.grade', 'statistics.view']);
     }
 
-    public function test_seeded_roles_are_editable_except_admin(): void
+    public function test_seeded_roles_are_editable(): void
     {
         $id = $this->roleId('faculty_office');
         $this->putJson("/api/admin/access/roles/{$id}", [
@@ -219,16 +214,53 @@ class AccessApiTest extends TestCase
         $this->assertSame(['examination.manage'], AccessRole::findOrFail($id)->permissionCodes());
     }
 
-    public function test_the_admin_role_cannot_be_edited(): void
+    /** Chỉ $this->admin còn là tài khoản Active giữ access.manage (thay đổi nằm trong giao dịch của test, được rollback). */
+    private function makeAdminTheOnlyAccessManager(): void
+    {
+        DB::table('user_permissions')->where('permission', 'access.manage')->where('user_id', '!=', $this->admin->id)->delete();
+        $others = DB::table('user_access_roles as uar')
+            ->join('access_role_permissions as arp', 'arp.access_role_id', '=', 'uar.access_role_id')
+            ->where('arp.permission', 'access.manage')->where('uar.user_id', '!=', $this->admin->id)
+            ->pluck('uar.user_id');
+        DB::table('users')->whereIn('id', $others)->update(['status' => 'Inactive']);
+        app(AccessControlService::class)->forget();
+    }
+
+    public function test_the_admin_role_is_edited_like_any_other_role(): void
     {
         $id = $this->roleId('admin');
         $this->putJson("/api/admin/access/roles/{$id}", [
-            'name' => 'Admin', 'permissions' => [],
-        ])->assertStatus(422);
+            'name' => 'Admin', 'permissions' => ['access.manage', 'user.manage'],
+        ])->assertOk();
 
-        $role = AccessRole::findOrFail($id);
-        $this->assertTrue($role->is_super);
-        $this->assertSame('Admin', $role->name);
+        $this->assertSame(['access.manage', 'user.manage'], AccessRole::findOrFail($id)->permissionCodes());
+    }
+
+    public function test_access_manage_cannot_be_removed_from_the_last_role_holding_it(): void
+    {
+        $this->makeAdminTheOnlyAccessManager();
+        $id = $this->roleId('admin');
+
+        $this->putJson("/api/admin/access/roles/{$id}", ['name' => 'Admin', 'permissions' => ['user.manage']])->assertStatus(422);
+        $this->assertContains('access.manage', AccessRole::findOrFail($id)->permissionCodes(), 'bị từ chối thì không đổi gì');
+
+        // Có người khác giữ quyền (qua vai trò khác) thì được bỏ.
+        $other = $this->newRole(['access.manage']);
+        $helper = $this->makeUser('visitor');
+        $this->putJson('/api/admin/access/users/' . $helper->id, ['role_ids' => [$other]])->assertOk();
+        $this->putJson("/api/admin/access/roles/{$id}", ['name' => 'Admin', 'permissions' => ['user.manage']])->assertOk();
+    }
+
+    public function test_the_last_access_manager_cannot_lose_the_role_or_be_downgraded(): void
+    {
+        $this->makeAdminTheOnlyAccessManager();
+
+        $this->putJson('/api/admin/access/users/' . $this->admin->id, ['role_ids' => []])->assertStatus(422);
+        $this->assertSame(1, DB::table('user_access_roles')->where('user_id', $this->admin->id)->count());
+
+        // Đổi sang vai trò khác vẫn giữ access.manage thì được.
+        $other = $this->newRole(['access.manage', 'user.manage']);
+        $this->putJson('/api/admin/access/users/' . $this->admin->id, ['role_ids' => [$other]])->assertOk();
     }
 
     public function test_update_role_validation_and_not_found(): void
@@ -277,8 +309,7 @@ class AccessApiTest extends TestCase
             ->assertJsonPath('studentCode', null)
             ->assertJsonPath('role_ids', [$this->roleId('student')])
             ->assertJsonPath('direct_permissions', ['problem.create'])
-            ->assertJsonPath('permissions', ['practice.solve', 'problem.create'])
-            ->assertJsonPath('areas', ['teacher']); // quyền gán riêng problem.create đưa vào khu vực giảng viên
+            ->assertJsonPath('permissions', ['assignment.do', 'practice.solve', 'problem.create', 'submission.view']);
 
         $this->getJson('/api/admin/access/users/nobody')->assertStatus(404);
     }
@@ -289,7 +320,7 @@ class AccessApiTest extends TestCase
 
         $this->putJson('/api/admin/access/users/' . $user->id, [
             'role_ids' => [$this->roleId('instructor'), $this->roleId('faculty_office')],
-        ])->assertOk()->assertJsonPath('areas', ['office', 'teacher']);
+        ])->assertOk();
 
         $res = $this->getJson('/api/admin/access/users/' . $user->id)->assertOk();
         $this->assertEqualsCanonicalizing([$this->roleId('instructor'), $this->roleId('faculty_office')], $res->json('role_ids'));
@@ -333,14 +364,14 @@ class AccessApiTest extends TestCase
         $this->assertSame($before, DB::table('user_access_roles')->where('user_id', $user->id)->count(), 'lỗi validate không được đổi dữ liệu');
     }
 
-    public function test_the_last_active_super_admin_keeps_the_admin_role(): void
+    public function test_the_last_active_access_manager_keeps_the_role(): void
     {
         $adminRoleId = $this->roleId('admin');
         // Chỉ còn đúng một quản trị viên Active: người đang đăng nhập.
         DB::table('user_access_roles')->where('access_role_id', $adminRoleId)->where('user_id', '!=', $this->admin->id)->delete();
 
         $this->putJson('/api/admin/access/users/' . $this->admin->id, ['role_ids' => [$this->roleId('student')]])
-            ->assertStatus(422)->assertJsonPath('detail', 'Không thể bỏ vai trò Admin của quản trị viên đang hoạt động cuối cùng.');
+            ->assertStatus(422)->assertJsonPath('detail', 'Không thể bỏ quyền quản lý vai trò của quản trị viên đang hoạt động cuối cùng.');
         $this->putJson('/api/admin/access/users/' . $this->admin->id, ['role_ids' => []])->assertStatus(422);
         $this->assertTrue(DB::table('user_access_roles')->where('user_id', $this->admin->id)->where('access_role_id', $adminRoleId)->exists());
 
@@ -412,35 +443,41 @@ class AccessApiTest extends TestCase
 
     public function test_my_permissions_for_each_seeded_role(): void
     {
-        $expect = [
-            'student'         => ['practice.solve'],
-            'faculty_office'  => ['assignment.create', 'exam.credentials', 'examination.manage'],
-            'department_head' => null,
-        ];
+        $student = ['assignment.do', 'practice.solve', 'submission.view'];
+        $faculty = ['assignment.create', 'exam.credentials', 'exam.results', 'examination.manage', 'statistics.faculty'];
 
         $this->actAs($this->makeUser('student'));
-        $this->getJson('/api/auth/permissions')->assertOk()
-            ->assertExactJson(['permissions' => $expect['student'], 'areas' => ['student'], 'isSuperAdmin' => false]);
+        $this->getJson('/api/auth/permissions')->assertOk()->assertExactJson([
+            'permissions' => $student,
+            'roles' => [['id' => $this->roleId('student'), 'name' => 'Sinh viên', 'permissions' => $student]],
+            'directPermissions' => [],
+        ]);
 
         $this->actAs($this->makeUser('faculty_office'));
-        $this->getJson('/api/auth/permissions')->assertOk()
-            ->assertExactJson(['permissions' => $expect['faculty_office'], 'areas' => ['office'], 'isSuperAdmin' => false]);
+        $this->getJson('/api/auth/permissions')->assertOk()->assertExactJson([
+            'permissions' => $faculty,
+            'roles' => [['id' => $this->roleId('faculty_office'), 'name' => 'Giáo vụ khoa', 'permissions' => $faculty]],
+            'directPermissions' => [],
+        ]);
 
         $this->actAs($this->makeUser('department_head'));
         $res = $this->getJson('/api/auth/permissions')->assertOk();
         $this->assertContains('results.view_all', $res->json('permissions'));
         $this->assertContains('examination.manage', $res->json('permissions'));
         $this->assertNotContains('results.grade', $res->json('permissions'));
-        $this->assertSame(['office', 'teacher'], $res->json('areas')); // examination.manage mở thêm khu vực giáo vụ
+        $this->assertCount(1, $res->json('roles'));
     }
 
-    public function test_my_permissions_for_a_super_admin_excludes_grading(): void
+    public function test_my_permissions_for_the_admin_role_has_only_its_four_permissions(): void
     {
-        $sorted = PermissionCatalog::superCodes();
-        sort($sorted);
+        $four = ['access.manage', 'class.manage', 'system.overview', 'user.manage'];
 
-        $this->getJson('/api/auth/permissions')->assertOk()
-            ->assertExactJson(['permissions' => $sorted, 'areas' => ['admin', 'office', 'teacher'], 'isSuperAdmin' => true]);
+        $this->getJson('/api/auth/permissions')->assertOk()->assertExactJson([
+            'permissions' => $four,
+            'roles' => [['id' => $this->roleId('admin'), 'name' => 'Admin', 'permissions' => $four]],
+            'directPermissions' => [],
+        ]);
+        $this->getJson('/api/examinations')->assertStatus(403);
     }
 
     public function test_my_permissions_ignore_the_legacy_role_column_and_old_matrix(): void
@@ -451,7 +488,7 @@ class AccessApiTest extends TestCase
         $this->actAs($user);
 
         $this->getJson('/api/auth/permissions')->assertOk()
-            ->assertExactJson(['permissions' => [], 'areas' => [], 'isSuperAdmin' => false]);
+            ->assertExactJson(['permissions' => [], 'roles' => [], 'directPermissions' => []]);
     }
 
     public function test_my_permissions_include_direct_grants_and_multiple_roles(): void
@@ -466,7 +503,40 @@ class AccessApiTest extends TestCase
         $this->assertContains('library.manage', $res->json('permissions'));
         $this->assertContains('examination.manage', $res->json('permissions'));
         $this->assertContains('practice.solve', $res->json('permissions'));
-        $this->assertSame(['office', 'teacher'], $res->json('areas'));
+        // library.manage gán riêng không thuộc vai trò nào: client gom vào khu vực Quyền bổ sung.
+        $this->assertCount(2, $res->json('roles'));
+        foreach ($res->json('roles') as $role) {
+            $this->assertNotContains('library.manage', $role['permissions']);
+        }
+        $this->assertSame(['library.manage'], $res->json('directPermissions'));
+    }
+
+    public function test_a_direct_grant_is_not_part_of_the_role_area(): void
+    {
+        $user = $this->makeUser('instructor');
+        $this->putJson('/api/admin/access/users/' . $user->id, [
+            'role_ids' => [$this->roleId('instructor')], 'direct_permissions' => ['examination.manage', 'tag.manage'],
+        ])->assertOk();
+
+        $this->actAs($user);
+        $res = $this->getJson('/api/auth/permissions')->assertOk();
+        $this->assertContains('examination.manage', $res->json('permissions'), 'quyền gán riêng vẫn có hiệu lực ở API');
+        $this->assertNotContains('examination.manage', $res->json('roles.0.permissions'), 'không lẫn vào khu vực của vai trò');
+        $this->assertSame(['examination.manage', 'tag.manage'], $res->json('directPermissions'));
+
+        // API của trang vẫn kiểm theo quyền hiệu lực.
+        $this->getJson('/api/examinations')->assertOk();
+    }
+
+    public function test_an_account_with_only_direct_grants_has_no_role_area(): void
+    {
+        $user = $this->makeUser('instructor');
+        $this->putJson('/api/admin/access/users/' . $user->id, ['role_ids' => [], 'direct_permissions' => ['user.manage']])
+            ->assertOk();
+
+        $this->actAs($user);
+        $this->getJson('/api/auth/permissions')->assertOk()
+            ->assertExactJson(['permissions' => ['user.manage'], 'roles' => [], 'directPermissions' => ['user.manage']]);
     }
 
     // ───────────────────────── tài khoản mới ─────────────────────────
@@ -485,9 +555,9 @@ class AccessApiTest extends TestCase
         $this->assertSame(0, DB::table('user_access_roles')->where('user_id', $this->makeUser('visitor')->id)->count());
     }
 
-    public function test_a_pending_lecturer_has_the_role_but_no_permission_until_active(): void
+    public function test_an_inactive_lecturer_has_the_role_but_no_permission_until_active(): void
     {
-        $pending = $this->makeUser('instructor_practical', 'Pending');
+        $pending = $this->makeUser('instructor_practical', 'Inactive');
         $this->assertSame(1, DB::table('user_access_roles')->where('user_id', $pending->id)->count());
 
         $access = app(AccessControlService::class);

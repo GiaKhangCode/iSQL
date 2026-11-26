@@ -15,6 +15,7 @@ import { TeacherListPagination } from "@/shared/components/TeacherListPagination
 import { TeacherListLoading } from "@/shared/components/TeacherListLoading";
 
 import { PageIntro, Field, Notice, AddUserDialog, BulkImportDialog } from "@/features/admin/AdminShared";
+import { notify } from "@/shared/ui/notify";
 
 export function AdminUsersPage() {
   const { t: tr } = useLanguage("admin");
@@ -34,10 +35,8 @@ export function AdminUsersPage() {
   const pageSize = 15;
   const [dialog, setDialog] = useState(false);
   const [bulkImportDialog, setBulkImportDialog] = useState(false);
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [pendingRole, setPendingRole] = useState<string | null>(null);
-  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
@@ -55,10 +54,6 @@ export function AdminUsersPage() {
       setLoadError(err instanceof Error ? err.message : "Failed to load users.");
       setLoading(false);
     });
-
-    adminService.getLecturerRequests().then(requests => {
-      setPendingRequestCount(requests.length);
-    }).catch(console.error);
 
     adminService.getRoleOptions().then(setRoleOptions).catch(() => setRoleOptions([]));
   }, []);
@@ -83,7 +78,6 @@ export function AdminUsersPage() {
       const userIndex = filtered.findIndex(user => user.email === state.selectedEmail);
       if (userIndex >= 0) setPage(Math.floor(userIndex / pageSize) + 1);
     }
-    if (state?.notice) setNotice(state.notice);
     if (state) window.history.replaceState({}, document.title);
   }, [location.state, loading]);
 
@@ -104,8 +98,9 @@ export function AdminUsersPage() {
     try {
       const updated = await adminService.updateUser(userToUpdate.email, { account_type: newType });
       setUsers(all => all.map(u => u.email === updated.email ? updated : u));
+      notify.success(tr("Account type updated"), updated.name);
     } catch (err: any) {
-      setNotice(err.message || "Failed to update account type");
+      notify.fail(tr("Failed to update account type"), err, tr);
     }
   }
 
@@ -157,20 +152,6 @@ export function AdminUsersPage() {
   return (
     <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-users-page">
       <h1 className="sr-only"><TranslatedText>{tr("Users")}</TranslatedText></h1>
-      {pendingRequestCount > 0 && (
-        <div className="admin-pending-banner">
-          <span>
-            {pendingRequestCount}{" "}
-            <TranslatedText>
-              {tr("lecturer registrations are awaiting approval. Lecturer access stays locked until approved.")}
-            </TranslatedText>
-          </span>
-          <Link className="text-button" to="/admin/users/approvals">
-            <TranslatedText>{tr("Review requests →")}</TranslatedText>
-          </Link>
-        </div>
-      )}
-      {notice && <p className="teacher-form-message" role="status"><TranslatedText>{tr(notice)}</TranslatedText></p>}
       <div className="teacher-list-detail-layout teacher-filter-layout">
         <div className="teacher-list-detail-main">
           <TeacherListFilters
@@ -233,7 +214,6 @@ export function AdminUsersPage() {
                   { value: "All statuses", label: tr("All statuses") },
                   { value: "Active", label: tr("Active") },
                   { value: "Inactive", label: tr("Inactive") },
-                  { value: "Pending", label: tr("Pending") },
                 ],
               },
             ]}
@@ -398,16 +378,15 @@ export function AdminUsersPage() {
             setSelectedEmail(user.email);
             setPage(1);
             setDialog(false);
-            setNotice(`${user.name} was added successfully.`);
+            notify.success(tr(`${user.name} was added successfully.`));
           }}
         />
       )}
       {bulkImportDialog && (
         <BulkImportDialog
           onClose={() => setBulkImportDialog(false)}
-          onSuccess={(msg) => {
+          onSuccess={() => {
             setBulkImportDialog(false);
-            setNotice(msg);
             adminService.getUsers().then(setUsers);
           }}
         />
@@ -427,7 +406,6 @@ export function AdminEditAccountPage() {
   const [accountEmail, setAccountEmail] = useState("");
   const [accountType, setAccountType] = useState<AdminUser["account_type"]>("student");
   const [status, setStatus] = useState<AdminUser["status"]>("Active");
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -454,7 +432,7 @@ export function AdminEditAccountPage() {
     if (!currentUser) return;
     const nextName = name.trim();
     const nextEmail = accountEmail.trim().toLowerCase();
-    if (!nextName || !nextEmail) { setNotice("Name and email are required."); return; }
+    if (!nextName || !nextEmail) { notify.error(tr("Name and email are required.")); return; }
 
     setConfirmDeactivationSave(false);
     setSaving(true);
@@ -465,9 +443,10 @@ export function AdminEditAccountPage() {
         account_type: accountType,
         status
       });
-      navigate("/admin/users", { state: { selectedEmail: nextEmail, notice: `Account updated for ${nextName}.` } });
+      notify.success(tr(`Account updated for ${nextName}.`));
+      navigate("/admin/users", { state: { selectedEmail: nextEmail } });
     } catch (err: any) {
-      setNotice(err.message || "Failed to update account.");
+      notify.fail(tr("Failed to update account."), err, tr);
       setSaving(false);
     }
   }
@@ -493,9 +472,8 @@ export function AdminEditAccountPage() {
           <Field label={tr("EMAIL ADDRESS")}><input type="email" value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} required /></Field>
           <Field label={tr("ACCOUNT TYPE")}><Select value={accountType} onChange={(event) => setAccountType(event.target.value as AdminUser["account_type"])}><option value="student">{tr("Student")}</option><option value="staff">{tr("Staff")}</option></Select></Field>
           <Field label={tr("ROLES")}><p className="admin-muted" style={{ margin: 0 }}>{currentUser ? userRoleNames(currentUser) : "—"} · <Link to="/admin/roles"><TranslatedText>{tr("Manage roles")}</TranslatedText></Link></p></Field>
-          <Field label={tr("ACCOUNT STATUS")}><Select value={status} onChange={(event) => setStatus(event.target.value as AdminUser["status"])}><option value="Active">{tr("Active")}</option><option value="Inactive">{tr("Inactive")}</option><option value="Pending">{tr("Pending")}</option></Select></Field>
+          <Field label={tr("ACCOUNT STATUS")}><Select value={status} onChange={(event) => setStatus(event.target.value as AdminUser["status"])}><option value="Active">{tr("Active")}</option><option value="Inactive">{tr("Inactive")}</option></Select></Field>
         </div>
-        {notice && <Notice><TranslatedText>{tr(notice)}</TranslatedText></Notice>}
         <div className="admin-edit-actions"><Link className="button admin-button" to="/admin/users"><TranslatedText>{tr("Cancel")}</TranslatedText></Link><button className="button primary admin-button" disabled={saving}><TranslatedText>{saving ? tr("Saving...") : tr("Save changes")}</TranslatedText></button></div>
       </form>
     </div>

@@ -31,6 +31,15 @@ class SandboxService
     /**
      * Ensure the given schema exists in SQL Server.
      */
+    /** Schema đã tồn tại chưa (chỉ đọc, không tạo). */
+    public function schemaExists(\PDO $pdo, string $schemaName): bool
+    {
+        $stmt = $pdo->prepare('SELECT 1 FROM sys.schemas WHERE name = ?');
+        $stmt->execute([$this->sanitizeSchemaName($schemaName)]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
     public function ensureSchema(\PDO $pdo, string $schemaName): void
     {
         $safe = $this->sanitizeSchemaName($schemaName);
@@ -151,6 +160,43 @@ class SandboxService
             $safe = $this->sanitizeSchemaName($schemaName);
             $this->cleanSchema($pdo, $safe);
             $pdo->exec("DROP SCHEMA IF EXISTS [{$safe}]");
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Mọi schema của sandbox (`sv_*`, `exp_*`, `stu_*`) và số đối tượng bên trong. Lỗi kết nối ném ra cho nơi gọi.
+     *
+     * @return array<string, int> tên schema => số đối tượng
+     */
+    public function listSandboxSchemas(): array
+    {
+        $rows = DB::connection($this->connection)->select(
+            "SELECT s.name AS name, COUNT(o.object_id) AS objects
+             FROM sys.schemas s LEFT JOIN sys.objects o ON o.schema_id = s.schema_id
+             WHERE s.name LIKE 'sv[_]%' OR s.name LIKE 'exp[_]%' OR s.name LIKE 'stu[_]%'
+             GROUP BY s.name"
+        );
+
+        $schemas = [];
+        foreach ($rows as $row) {
+            $schemas[(string) $row->name] = (int) $row->objects;
+        }
+
+        return $schemas;
+    }
+
+    /** Xóa một schema sandbox; schema rỗng thì xóa thẳng, không cần dọn đối tượng trước. */
+    public function removeSandboxSchema(string $schemaName, bool $hasObjects): bool
+    {
+        if ($hasObjects) {
+            return $this->dropSchema($schemaName);
+        }
+        try {
+            $safe = $this->sanitizeSchemaName($schemaName);
+            DB::connection($this->connection)->getPdo()->exec("DROP SCHEMA IF EXISTS [{$safe}]");
             return true;
         } catch (Exception $e) {
             return false;

@@ -5,10 +5,12 @@ import { formatDisplayDate, sessionWeekday, type ExaminationPlan } from "@/data/
 import { AlertTriangle, AlertCircle, CheckCircle2, Download, Archive } from "lucide-react";
 import type { WorkspacePart } from "@/data/models";
 import { WORKSPACE_PARTS, WORKSPACE_PART_LABELS } from "@/shared/lib/workspace/workspaceParts";
+import { questionFullText } from "@/shared/lib/workspace/questionLabel";
 import { catalogOf, type QuestionOption } from "@/features/teacher/builder/BuilderProblemSettings";
 import { selectedQuestions } from "@/features/teacher/builder/BuilderSelectedQuestions";
 import { apiFetch } from "@/shared/api/apiClient";
 import { storage } from "@/shared/api/storage";
+import { notify } from "@/shared/ui/notify";
 
 interface ExaminationPublishModalProps {
   examinationId?: string;
@@ -194,6 +196,7 @@ export function ExaminationPublishModal({
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    notify.success("Đã tải file tài khoản thi.");
   }
 
   async function handleExportZip() {
@@ -220,8 +223,9 @@ export function ExaminationPublishModal({
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      notify.success("Đã tải tệp ZIP tài khoản thi.");
     } catch (e: any) {
-      alert(e?.message || "Không thể tải tệp ZIP.");
+      notify.fail("Không thể tải tệp ZIP.", e);
     } finally {
       setExportingZip(false);
     }
@@ -406,17 +410,31 @@ export function ExaminationPublishModal({
                   <div className="examination-account-summary">
                     <span>Tổng số sinh viên: <strong>{sessionAccounts?.students?.length ?? 0}</strong></span>
                   </div>
-                  {sessionAccounts?.students?.length ? (
-                    <button
-                      type="button"
-                      className="button subtle teacher-small-button examination-export-csv-btn"
-                      onClick={handleExportSessionCsv}
-                      title="Tải về file CSV danh sách tài khoản cho ca thi này"
-                    >
-                      <Download size={13} aria-hidden="true" />
-                      <span>Xuất CSV (Ca {currentSession?.sessionNumber || currentSession?.index || 1})</span>
-                    </button>
-                  ) : null}
+                  <div className="examination-account-export-actions">
+                    {sessionAccounts?.students?.length ? (
+                      <button
+                        type="button"
+                        className="button subtle teacher-small-button examination-export-csv-btn"
+                        onClick={handleExportSessionCsv}
+                        title="Tải về file CSV danh sách tài khoản cho ca thi này"
+                      >
+                        <Download size={13} aria-hidden="true" />
+                        <span>Xuất CSV (Ca {currentSession?.sessionNumber || currentSession?.index || 1})</span>
+                      </button>
+                    ) : null}
+                    {examinationId ? (
+                      <button
+                        type="button"
+                        className="button subtle teacher-small-button examination-export-zip-btn"
+                        onClick={handleExportZip}
+                        disabled={exportingZip}
+                        title="Tải về file ZIP chứa danh sách tài khoản CSV của tất cả các ca thi"
+                      >
+                        <Archive size={13} aria-hidden="true" />
+                        <span>{exportingZip ? "Đang xuất ZIP…" : "Xuất ZIP (toàn bộ ca)"}</span>
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
 
                 {loadingAccounts ? (
@@ -502,29 +520,6 @@ export function ExaminationPublishModal({
             ) : null}
           </div>
           <div className="builder-publish-footer-actions">
-            {mainTab === "accounts" && sessionAccounts?.students?.length ? (
-              <button
-                type="button"
-                className="button subtle teacher-small-button examination-export-csv-btn"
-                onClick={handleExportSessionCsv}
-                title="Tải về file CSV danh sách tài khoản ca thi đang chọn"
-              >
-                <Download size={13} aria-hidden="true" />
-                <span>Xuất CSV (Ca {currentSession?.sessionNumber || currentSession?.index || 1})</span>
-              </button>
-            ) : null}
-            {examinationId ? (
-              <button
-                type="button"
-                className="button subtle teacher-small-button examination-export-zip-btn"
-                onClick={handleExportZip}
-                disabled={exportingZip}
-                title="Tải về file ZIP chứa danh sách tài khoản CSV của tất cả các ca thi"
-              >
-                <Archive size={13} aria-hidden="true" />
-                <span>{exportingZip ? "Đang xuất ZIP…" : "Xuất ZIP (toàn bộ ca)"}</span>
-              </button>
-            ) : null}
             {isAlreadyPublished ? (
               <>
                 <button
@@ -551,24 +546,14 @@ export function ExaminationPublishModal({
                 </button>
               </>
             ) : (
-              <>
-                <button
-                  type="button"
-                  className="button subtle teacher-small-button"
-                  onClick={onClose}
-                  disabled={isPublishing}
-                >
-                  <TranslatedText>Hủy</TranslatedText>
-                </button>
-                <button
-                  type="button"
-                  className={`button teacher-small-button ${hasEmptySessions ? "subtle" : "primary"}`}
-                  onClick={handleConfirmClick}
-                  disabled={isPublishing || totalSessions === 0}
-                >
-                  <TranslatedText>{isPublishing ? "Đang công bố..." : "Xác nhận công bố"}</TranslatedText>
-                </button>
-              </>
+              <button
+                type="button"
+                className={`button teacher-small-button ${hasEmptySessions ? "subtle" : "primary"}`}
+                onClick={handleConfirmClick}
+                disabled={isPublishing || totalSessions === 0}
+              >
+                <TranslatedText>{isPublishing ? "Đang công bố..." : "Xác nhận công bố"}</TranslatedText>
+              </button>
             )}
           </div>
         </div>
@@ -750,7 +735,7 @@ function PublishProblemCard({
             <div key={q.id || qIdx} className="builder-publish-q-row">
               <div className="builder-publish-q-header">
                 <span className="builder-publish-q-index">{String(qIdx + 1).padStart(2, "0")}.</span>
-                <span className="builder-publish-q-name">{q.name}</span>
+                <span className="builder-publish-q-name">{questionFullText(q.description) || `Câu ${qIdx + 1}`}</span>
                 {q.difficulty && (
                   <span className="builder-q-tag difficulty">{q.difficulty}</span>
                 )}
@@ -761,11 +746,6 @@ function PublishProblemCard({
                   <span className="builder-q-tag shared">Câu chung</span>
                 )}
               </div>
-              {q.description && (
-                <p className="builder-publish-q-desc">
-                  {q.description.replace(/[\r\n]+/g, " ")}
-                </p>
-              )}
             </div>
           );
         })}

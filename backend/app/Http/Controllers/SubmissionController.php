@@ -3,15 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Services\StudentProfileService;
-use App\Services\SubmissionAppealService;
 use App\Services\SubmissionGradingService;
 use App\Services\SubmissionQueryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Bài nộp: danh sách / chi tiết, chấm bài, phúc khảo, công bố điểm và hồ sơ sinh viên. Logic nằm ở
- * SubmissionQueryService, SubmissionGradingService, SubmissionAppealService và StudentProfileService.
+ * Bài nộp: danh sách / chi tiết, chấm bài, công bố điểm và hồ sơ sinh viên. Logic nằm ở
+ * SubmissionQueryService, SubmissionGradingService và StudentProfileService. Phúc khảo xem RegradeAssignmentController.
  *
  * Các khóa đầu vào có nhiều cách viết (finalScore / final_score / evaluatedScore / evaluated_score,
  * questionScores / question_scores, questionId / question_id) vì frontend cũ và mới đều đang gọi; lỗi nghiệp vụ
@@ -22,7 +21,6 @@ class SubmissionController extends Controller
     public function __construct(
         protected readonly SubmissionQueryService $queries,
         protected readonly SubmissionGradingService $grading,
-        protected readonly SubmissionAppealService $appeals,
         protected readonly StudentProfileService $profiles,
     ) {
     }
@@ -59,7 +57,8 @@ class SubmissionController extends Controller
             $id,
             $score,
             $request->input('feedback'),
-            $request->input('questionScores', $request->input('question_scores'))
+            $request->input('questionScores', $request->input('question_scores')),
+            $request->input('questionFeedback', $request->input('question_feedback'))
         ));
     }
 
@@ -71,26 +70,6 @@ class SubmissionController extends Controller
             $request->input('part'),
             (string) ($request->input('questionId') ?? $request->input('question_id') ?? '')
         ));
-    }
-
-    public function appeal(Request $request, string $id): JsonResponse
-    {
-        return response()->json($this->appeals->submit(
-            $request->user(),
-            $id,
-            (string) ($request->input('reason') ?? '')
-        ));
-    }
-
-    public function publishResults(Request $request, string $activityId): JsonResponse
-    {
-        $published = $request->has('published')
-            ? filter_var($request->input('published'), FILTER_VALIDATE_BOOLEAN)
-            : true;
-
-        return response()->json([
-            'published' => $this->grading->publishResults($request->user(), $activityId, $published),
-        ]);
     }
 
     public function studentProfile(Request $request): JsonResponse

@@ -8,7 +8,7 @@ use App\Models\ClassModel;
 use App\Models\ExamClassProctor;
 use App\Models\Problem;
 use App\Models\Submission;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\ExamRegrade;
 use App\Models\User;
 use App\Services\Access\StaffAccess;
 
@@ -32,7 +32,7 @@ class SubmissionAccessService
         if (!$this->staff->isStaff($user)) {
             abort_unless($sub->user_id === $user->id, 403, 'Bạn không có quyền xem bài nộp này.');
         } else {
-            abort_unless($this->canGradeSubmission($user, $sub, null, true), 403, 'Bạn không có quyền xem bài nộp này.');
+            abort_unless($this->canGradeSubmission($user, $sub), 403, 'Bạn không có quyền xem bài nộp này.');
         }
     }
 
@@ -124,7 +124,7 @@ class SubmissionAccessService
         return false;
     }
 
-    public function canGradeSubmission(User $viewer, Submission $sub, ?Assignment $activity = null, bool $allowSiblingAttemptRead = false): bool
+    public function canGradeSubmission(User $viewer, Submission $sub, ?Assignment $activity = null): bool
     {
         if ($this->staff->seesEverything($viewer)) {
             return true;
@@ -141,22 +141,12 @@ class SubmissionAccessService
             if (!$activity) {
                 return false;
             }
-            if (SubmissionRegradeAssignment::where('submission_id', $sub->id)
+            // Phúc khảo gắn với cả bài thi: người được phân công chấm mọi bài nộp của sinh viên đó trong ca thi này.
+            if (ExamRegrade::where('activity_id', $sub->context)
+                ->where('student_id', $sub->user_id)
                 ->where('assigned_instructor_id', $viewer->id)
                 ->exists()) {
                 return true;
-            }
-            if ($allowSiblingAttemptRead) {
-                $siblingIds = Submission::where('user_id', $sub->user_id)
-                    ->where('problem_id', $sub->problem_id)
-                    ->where('context', $sub->context)
-                    ->pluck('id')
-                    ->all();
-                if (!empty($siblingIds) && SubmissionRegradeAssignment::whereIn('submission_id', $siblingIds)
-                    ->where('assigned_instructor_id', $viewer->id)
-                    ->exists()) {
-                    return true;
-                }
             }
             if ($this->isExamActivity($activity, $sub)) {
                 return $this->isPracticalClassInstructorForStudent($viewer, (string) $sub->user_id, $activity);

@@ -19,7 +19,7 @@ class StatisticsController extends Controller
     public function teacher(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($this->staff->isStaff($user), 403, 'Bạn không có quyền xem thống kê giảng viên.');
+        abort_unless($this->staff->canViewStatistics($user), 403, 'Bạn không có quyền xem thống kê giảng viên.');
 
         $filters = [
             'kind'        => $request->query('kind', 'assignments'),
@@ -36,7 +36,7 @@ class StatisticsController extends Controller
     public function office(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($this->staff->seesEverything($user), 403, 'Bạn không có quyền xem Dashboard tổng quát.');
+        abort_unless($this->staff->canViewFacultyStatistics($user), 403, 'Bạn không có quyền xem Dashboard tổng quát.');
 
         $filters = [
             'kind'          => $request->query('kind', 'all'),

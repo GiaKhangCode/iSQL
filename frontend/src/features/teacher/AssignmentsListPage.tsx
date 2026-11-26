@@ -13,6 +13,7 @@ import { TeacherListPagination } from "@/shared/components/TeacherListPagination
 import "@/styles/problem-library-filters.css";
 import { TeacherEmptyState } from "@/features/teacher/components/TeacherEmptyState";
 import { parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
+import { notify } from "@/shared/ui/notify";
 
 type AssignmentRow = { id: string; title: string; classes: string; createdAt?: string; problems: number; closes?: string | null; submitted: string; eligibleStudents: number; status: "Open" | "Scheduled" | "Closed" | "Draft" };
 
@@ -48,8 +49,6 @@ export function AssignmentsListPage() {
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const [confirmAssignment, setConfirmAssignment] = useState<AssignmentRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
-  const [notice, setNotice] = useState("");
   const filteredRows = useMemo(() => assignments.filter((item) =>
     dates.matches(item) && matchesAssignmentSearch(item, search) &&
     (classFilter === "All classes" || assignmentClassNames(item.classes).includes(classFilter)) &&
@@ -79,15 +78,14 @@ export function AssignmentsListPage() {
     if (!confirmAssignment || deleteBusy) return;
     const assignment = confirmAssignment;
     setDeleteBusy(true);
-    setDeleteError("");
     try {
       await teacherService.deleteAssignment(assignment.id);
       setAssignments((current) => current.filter((item) => item.id !== assignment.id));
       if (selectedAssignmentId === assignment.id) setSelectedAssignmentId("");
-      setNotice(`${assignment.title} was deleted.`);
+      notify.success(tr(`${assignment.title} was deleted.`));
       setConfirmAssignment(null);
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "Could not delete assignment.");
+      notify.fail(tr("Could not delete assignment."), e, tr);
     } finally {
       setDeleteBusy(false);
     }
@@ -96,7 +94,6 @@ export function AssignmentsListPage() {
   return (
     <section className="teacher-page teacher-list-page teacher-assignment-page compact-teacher-assignments">
       <h1 className="sr-only"><TranslatedText>{tr("Assignments")}</TranslatedText></h1>
-      {notice && <p className="teacher-form-message" role="status"><TranslatedText>{tr(notice)}</TranslatedText></p>}
       {loading ? <TeacherListLoading label={tr("Loading assignments…")} createLabel={tr("New assignment")} createTo="/teacher/assignments/new" /> : loadError ? <div className="empty-state" role="alert"><TranslatedText>{tr(loadError)}</TranslatedText></div> : assignments.length === 0 ? <TeacherEmptyState title={tr("No assignments yet")} description={tr("Group problems from your library into an assignment, choose the classes, and set a due date.")} primaryLabel={tr("New assignment")} primaryTo="/teacher/assignments/new" secondaryLabel={tr("Open problem library")} secondaryTo="/teacher/problems" /> : <>
         <div className="teacher-list-detail-layout teacher-assignment-layout">
           <div className="teacher-list-detail-main">
@@ -147,7 +144,7 @@ export function AssignmentsListPage() {
               <div className="teacher-list-detail-actions">
                 <Link className="button primary" to={`/teacher/assignments/${selectedAssignment.id}/edit`}><TranslatedText>{tr("Edit")}</TranslatedText></Link>
                 <Link className="button" to={`/teacher/results?search=${encodeURIComponent(selectedAssignment.title)}`}><TranslatedText>{tr("Results")}</TranslatedText></Link>
-                <button className="button teacher-danger-button" onClick={() => { setDeleteError(""); setConfirmAssignment(selectedAssignment); }}><TranslatedText>{tr("Delete")}</TranslatedText></button>
+                <button className="button teacher-danger-button" onClick={() => setConfirmAssignment(selectedAssignment)}><TranslatedText>{tr("Delete")}</TranslatedText></button>
               </div>
             </> : <p className="muted"><TranslatedText>{tr("Select an assignment to view its details.")}</TranslatedText></p>}
           </aside>
@@ -158,7 +155,6 @@ export function AssignmentsListPage() {
         <div className="teacher-preview-dialog">
           <p><TranslatedText>{tr("Delete")}</TranslatedText> <strong>{confirmAssignment.title}</strong> <TranslatedText>{tr("from its assigned classes?")}</TranslatedText></p>
           <p className="muted"><TranslatedText>{tr("Students will no longer see this assignment. Existing problem submissions remain in their history.")}</TranslatedText></p>
-          {deleteError && <p className="teacher-state-failed" role="alert"><TranslatedText>{tr(deleteError)}</TranslatedText></p>}
           <div className="teacher-dialog-actions"><button className="button" type="button" onClick={() => setConfirmAssignment(null)}><TranslatedText>{tr("Cancel")}</TranslatedText></button><button className="button teacher-danger-button" type="button" disabled={deleteBusy} onClick={() => void removeAssignment()}><TranslatedText>{deleteBusy ? tr("Deleting…") : tr("Delete assignment")}</TranslatedText></button></div>
         </div>
       </Dialog>}

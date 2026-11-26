@@ -38,7 +38,7 @@ trait ProctorFixtures
 
         if ($permissions !== null) {
             DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-            $role = AccessRole::create(['name' => 'PX role ' . uniqid(), 'is_super' => false]);
+            $role = AccessRole::create(['name' => 'PX role ' . uniqid()]);
             $role->syncPermissions($permissions);
             $user->accessRoles()->attach($role->id);
         }

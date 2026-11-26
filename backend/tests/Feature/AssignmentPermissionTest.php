@@ -35,7 +35,7 @@ class AssignmentPermissionTest extends TestCase
 
         if ($permissions !== null) {
             DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-            $role = AccessRole::create(['name' => 'Role ' . uniqid(), 'is_super' => false]);
+            $role = AccessRole::create(['name' => 'Role ' . uniqid()]);
             $role->syncPermissions($permissions);
             $user->accessRoles()->attach($role->id);
             app(AccessControlService::class)->forget();
@@ -99,7 +99,7 @@ class AssignmentPermissionTest extends TestCase
 
     // ───────────── xem mọi bài tập ─────────────
 
-    public function test_view_all_permissions_see_every_assignment_and_super_admin_too(): void
+    public function test_view_all_permissions_see_every_assignment(): void
     {
         $owner = $this->makeUser('instructor');
         $assignment = $this->makeAssignment($owner);
@@ -107,12 +107,20 @@ class AssignmentPermissionTest extends TestCase
         foreach ([
             $this->makeUser('student', ['results.view_all']),
             $this->makeUser('student', ['examination.manage']),
-            $this->makeUser('admin'),
         ] as $viewer) {
             Sanctum::actingAs($viewer);
             $this->assertContains($assignment->id, $this->listedIds());
             $this->getJson("/api/assignments/{$assignment->id}")->assertOk();
         }
+    }
+
+    public function test_the_admin_role_has_no_implicit_view_of_assignments(): void
+    {
+        $assignment = $this->makeAssignment($this->makeUser('instructor'));
+
+        Sanctum::actingAs($this->makeUser('admin'));
+        $this->assertNotContains($assignment->id, $this->listedIds());
+        $this->getJson("/api/assignments/{$assignment->id}")->assertStatus(403);
     }
 
     public function test_view_all_does_not_allow_authoring_without_assignment_create(): void
@@ -136,16 +144,26 @@ class AssignmentPermissionTest extends TestCase
 
     // ───────────── khu vực sinh viên: practice.solve ─────────────
 
-    public function test_student_area_endpoints_need_practice_solve_not_users_role(): void
+    public function test_student_area_endpoints_need_their_tab_permission_not_users_role(): void
     {
-        $allowed = $this->makeUser('instructor', ['practice.solve']);
+        $allowed = $this->makeUser('instructor', ['practice.solve', 'assignment.do', 'submission.view']);
+        $practiceOnly = $this->makeUser('instructor', ['practice.solve']);
         $blocked = $this->makeUser('student', ['problem.create']);
 
         Sanctum::actingAs($allowed);
         $this->getJson('/api/student/assignments')->assertOk();
         $this->getJson('/api/student/dashboard')->assertOk();
         $this->getJson('/api/student/preferences')->assertOk();
+        $this->getJson('/api/submissions')->assertOk();
 
+        // Tắt tab Bài tập / Bài nộp: chỉ còn luyện tập.
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($practiceOnly);
+        $this->getJson('/api/student/dashboard')->assertOk();
+        $this->getJson('/api/student/assignments')->assertStatus(403);
+        $this->getJson('/api/submissions')->assertStatus(403);
+
+        $this->app['auth']->forgetGuards();
         Sanctum::actingAs($blocked);
         $this->getJson('/api/student/assignments')->assertStatus(403);
         $this->getJson('/api/student/dashboard')->assertStatus(403);

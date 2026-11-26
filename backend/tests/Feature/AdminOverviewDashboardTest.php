@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\AccessRole;
 use App\Models\ActivityLog;
+use App\Models\Assignment;
 use App\Models\ClassModel;
-use App\Models\Problem;
-use App\Models\Submission;
+use App\Models\Examination;
 use App\Models\User;
 use App\Services\Access\AccessControlService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -20,7 +20,7 @@ use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 /**
- * Test đặc tả cho trang Tổng quan của admin: GET /api/admin/overview/{stats,activities,errors}
+ * Test đặc tả cho trang Tổng quan của admin: GET /api/admin/overview/{health,attention,exams,activities}
  * (Admin\OverviewController). Khóa JSON là camelCase vì frontend đọc thẳng (statsData.pendingRequests...).
  *
  * DB dev đã có dữ liệu sẵn nên test đo ĐỘ CHÊNH, hoặc dùng mốc thời gian nằm trong tương lai gần để
@@ -31,7 +31,7 @@ class AdminOverviewDashboardTest extends TestCase
     use DatabaseTransactions;
     use UsesDefaultRolePermissions;
 
-    private const STATS_KEYS = ['users', 'classes', 'pendingRequests', 'unassignedClasses', 'submissionsToday', 'gradingErrors'];
+    private const PARTS = ['health', 'attention', 'exams', 'activities'];
 
     protected User $admin;
 
@@ -56,7 +56,7 @@ class AdminOverviewDashboardTest extends TestCase
 
         if ($permissions !== null) {
             DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-            $role = AccessRole::create(['name' => 'Role ' . uniqid(), 'is_super' => false]);
+            $role = AccessRole::create(['name' => 'Role ' . uniqid()]);
             $role->syncPermissions($permissions);
             $user->accessRoles()->attach($role->id);
             app(AccessControlService::class)->forget();
@@ -65,39 +65,12 @@ class AdminOverviewDashboardTest extends TestCase
         return $user;
     }
 
-    /** @return array<string, int> */
-    private function stats(): array
+    private function attention(?User $as = null): array
     {
-        Sanctum::actingAs($this->admin);
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs($as ?? $this->admin);
 
-        return $this->getJson('/api/admin/overview/stats')->assertOk()->json();
-    }
-
-    private function makeProblem(User $creator, string $title = 'Bài thử tổng quan'): Problem
-    {
-        return Problem::create([
-            'number'          => 'SQL-OV-' . strtoupper(uniqid()),
-            'title'           => $title,
-            'difficulty'      => 'Easy',
-            'description'     => 'Mô tả',
-            'requirements'    => 'SELECT 1',
-            'practice_listed' => true,
-            'creator_id'      => $creator->id,
-        ]);
-    }
-
-    private function makeSubmission(User $student, Problem $problem, string $result, Carbon $at): Submission
-    {
-        return Submission::create([
-            'id'           => (string) Str::uuid(),
-            'user_id'      => $student->id,
-            'problem_id'   => $problem->id,
-            'source'       => 'SELECT 1',
-            'context'      => 'Practice',
-            'result'       => $result,
-            'score'        => 0,
-            'submitted_at' => $at,
-        ]);
+        return $this->getJson('/api/admin/overview/attention')->assertOk()->json();
     }
 
     private function makeLog(?User $user, string $action, Carbon $at): ActivityLog
@@ -125,26 +98,30 @@ class AdminOverviewDashboardTest extends TestCase
 
     public function test_endpoints_require_authentication_and_a_management_capability(): void
     {
-        foreach (['stats', 'activities', 'errors'] as $part) {
+        foreach (self::PARTS as $part) {
             $this->getJson("/api/admin/overview/{$part}")->assertStatus(401);
         }
 
         $forbidden = [$this->makeUser('instructor'), $this->makeUser('student'), $this->makeUser('faculty_office')];
         foreach ($forbidden as $user) {
             Sanctum::actingAs($user);
-            foreach (['stats', 'activities', 'errors'] as $part) {
+            foreach (self::PARTS as $part) {
                 $this->getJson("/api/admin/overview/{$part}")->assertStatus(403);
             }
         }
     }
 
-    public function test_any_of_user_class_or_access_management_is_enough(): void
+    public function test_the_overview_tab_needs_system_overview(): void
     {
+        Sanctum::actingAs($this->makeUser('visitor', 'Active', ['system.overview']));
+        foreach (self::PARTS as $part) {
+            $this->getJson("/api/admin/overview/{$part}")->assertOk();
+        }
+
+        // Quản lý người dùng/lớp/vai trò không còn tự mở tab Tổng quan.
         foreach (['user.manage', 'class.manage', 'access.manage'] as $code) {
             Sanctum::actingAs($this->makeUser('visitor', 'Active', [$code]));
-            foreach (['stats', 'activities', 'errors'] as $part) {
-                $this->getJson("/api/admin/overview/{$part}")->assertOk();
-            }
+            $this->getJson('/api/admin/overview/attention')->assertStatus(403);
         }
     }
 
@@ -155,116 +132,89 @@ class AdminOverviewDashboardTest extends TestCase
         $this->getJson('/api/admin/overview')->assertStatus(404);
     }
 
-    // ------------------------------------------------------------------ stats
-
-    public function test_stats_returns_exactly_the_integer_keys_the_frontend_reads(): void
+    public function test_the_grading_result_routes_are_gone(): void
     {
-        $data = $this->stats();
+        Sanctum::actingAs($this->admin);
 
-        $this->assertEqualsCanonicalizing(self::STATS_KEYS, array_keys($data));
-        foreach (self::STATS_KEYS as $key) {
-            $this->assertIsInt($data[$key], "{$key} phải là số nguyên");
-            $this->assertGreaterThanOrEqual(0, $data[$key]);
-        }
-        $this->assertGreaterThanOrEqual(1, $data['users']);
+        $this->getJson('/api/admin/overview/stats')->assertStatus(404);
+        $this->getJson('/api/admin/overview/errors')->assertStatus(404);
     }
 
-    public function test_stats_users_counts_every_account_in_any_status(): void
+    // -------------------------------------------------------------- attention
+
+    public function test_attention_counts_only_active_accounts_without_any_role_or_permission(): void
     {
-        $before = $this->stats();
+        $before = $this->attention()['usersWithoutRole']['count'];
 
-        $this->makeUser('student');
-        $this->makeUser('student', 'Pending');
-        $this->makeUser('instructor', 'Inactive');
+        $this->makeUser('visitor');                       // +1
+        $this->makeUser('visitor', 'Inactive');           // đã khóa: không tính
+        $this->makeUser('student');                       // có vai trò mặc định
+        $direct = $this->makeUser('visitor');             // có quyền gán riêng: không tính
+        DB::table('user_permissions')->insert(['user_id' => $direct->id, 'permission' => 'system.overview']);
 
-        $this->assertSame(3, $this->stats()['users'] - $before['users']);
+        $after = $this->attention()['usersWithoutRole'];
+        $this->assertSame(1, $after['count'] - $before);
+        $this->assertLessThanOrEqual(20, count($after['names']));
     }
 
-    public function test_stats_classes_counts_only_active_classes(): void
+    public function test_attention_lists_the_active_access_managers(): void
     {
-        $before = $this->stats();
+        $before = $this->attention()['accessManagers']['count'];
 
-        $this->makeClass('Active');
-        $this->makeClass('Active');
-        $this->makeClass('Archived');
+        $this->makeUser('visitor', 'Active', ['access.manage']);
+        $this->makeUser('visitor', 'Inactive', ['access.manage']);
 
-        $this->assertSame(2, $this->stats()['classes'] - $before['classes']);
+        $this->assertSame(1, $this->attention()['accessManagers']['count'] - $before);
     }
 
-    public function test_stats_pending_requests_counts_only_pending_staff_accounts(): void
-    {
-        $before = $this->stats();
-
-        $this->makeUser('instructor', 'Pending');
-        $this->makeUser('instructor', 'Pending');
-        $this->makeUser('student', 'Pending');      // sinh viên chờ: không phải đơn giảng viên
-        $this->makeUser('instructor', 'Active');
-        $this->makeUser('instructor', 'Inactive');
-
-        $this->assertSame(2, $this->stats()['pendingRequests'] - $before['pendingRequests']);
-    }
-
-    public function test_stats_unassigned_classes_skips_archived_and_classes_with_a_lecturer(): void
+    public function test_unassigned_classes_are_only_reported_to_class_managers(): void
     {
         $lecturer = $this->makeUser('instructor');
-        $before = $this->stats();
+        $before = $this->attention()['unassignedClasses'];
 
-        $this->makeClass('Active');                      // +1
-        $this->makeClass('Inactive');                    // +1 (chưa lưu trữ)
-        $this->makeClass('Archived');                    // đã lưu trữ: không tính
-        $this->makeClass('Active', $lecturer->id);       // đã có giảng viên: không tính
-
-        $this->assertSame(2, $this->stats()['unassignedClasses'] - $before['unassignedClasses']);
-    }
-
-    public function test_stats_submissions_today_uses_the_utc_day_boundary(): void
-    {
-        $student = $this->makeUser('student');
-        $problem = $this->makeProblem($student);
-        $before = $this->stats();
-
-        $startOfDay = now()->utc()->startOfDay();
-        $this->makeSubmission($student, $problem, 'Accepted', $startOfDay);                     // đúng 0h: tính
-        $this->makeSubmission($student, $problem, 'Accepted', $startOfDay->copy()->subSecond()); // 23:59:59 hôm qua: không
-        $this->makeSubmission($student, $problem, 'Accepted', now());                            // tính
-
-        $this->assertSame(2, $this->stats()['submissionsToday'] - $before['submissionsToday']);
-    }
-
-    public function test_stats_grading_errors_match_error_and_timeout_results_in_any_case(): void
-    {
-        $student = $this->makeUser('student');
-        $problem = $this->makeProblem($student);
-        $before = $this->stats();
-
-        foreach (['Runtime Error', 'syntax ERROR', 'TIMEOUT'] as $result) {
-            $this->makeSubmission($student, $problem, $result, now()->subDays(3));
-        }
-        foreach (['Accepted', 'Wrong Answer', 'Pending'] as $result) {
-            $this->makeSubmission($student, $problem, $result, now()->subDays(3));
-        }
-
-        $this->assertSame(3, $this->stats()['gradingErrors'] - $before['gradingErrors']);
-    }
-
-    public function test_stats_match_direct_table_counts(): void
-    {
-        $this->makeUser('instructor', 'Pending');
         $this->makeClass('Active');
+        $this->makeClass('Archived');
+        $this->makeClass('Active', $lecturer->id);
 
-        $data = $this->stats();
+        $this->assertSame(1, $this->attention()['unassignedClasses'] - $before);
+        $this->assertNull($this->attention($this->makeUser('visitor', 'Active', ['system.overview']))['unassignedClasses']);
+    }
 
-        $this->assertSame(DB::table('users')->count(), $data['users']);
-        $this->assertSame(DB::table('classes')->where('status', 'Active')->count(), $data['classes']);
-        $this->assertSame(DB::table('users')->where('status', 'Pending')->where('account_type', 'staff')->count(), $data['pendingRequests']);
-        $this->assertSame(
-            DB::table('classes')->whereNull('instructor_id')->where('status', '!=', 'Archived')->count(),
-            $data['unassignedClasses'],
-        );
-        $this->assertSame(
-            DB::table('submissions')->where(fn ($q) => $q->where('result', 'like', '%error%')->orWhere('result', 'like', '%timeout%'))->count(),
-            $data['gradingErrors'],
-        );
+    // ------------------------------------------------------- health and exams
+
+    public function test_health_reports_each_service(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $rows = $this->getJson('/api/admin/overview/health')->assertOk()->json();
+
+        $this->assertSame(['mysql', 'sqlserver', 'redis'], array_column($rows, 'key'));
+        $this->assertTrue($rows[0]['ok']);
+        $this->assertSame(['key', 'ok', 'ms', 'detail'], array_keys($rows[0]));
+    }
+
+    public function test_exams_lists_published_sessions_running_or_opening_within_a_day(): void
+    {
+        $examination = Examination::create([
+            'title' => 'OV exam ' . uniqid(), 'exam_date' => now()->toDateString(), 'owner_id' => $this->admin->id,
+        ]);
+        $make = fn (string $title, Carbon $opens, Carbon $closes, bool $published = true) => Assignment::create([
+            'title' => $title, 'instructor_id' => $this->admin->id, 'examination_id' => $examination->id,
+            'published' => $published, 'opens' => $opens, 'closes' => $closes,
+        ]);
+        $live = $make('OV live', now()->subHour(), now()->addHour());
+        $soon = $make('OV soon', now()->addHours(23), now()->addHours(25));
+        $make('OV later', now()->addHours(30), now()->addHours(31));
+        $make('OV over', now()->subHours(3), now()->subHour());
+        $make('OV draft', now()->subHour(), now()->addHour(), false);
+
+        Sanctum::actingAs($this->admin);
+        $rows = collect($this->getJson('/api/admin/overview/exams')->assertOk()->json())
+            ->filter(fn ($row) => str_starts_with($row['title'], 'OV '))->values();
+
+        $this->assertSame([$live->id, $soon->id], $rows->pluck('id')->all());
+        $this->assertSame(['Live', 'Upcoming'], $rows->pluck('status')->all());
+        $this->assertSame(0, $rows[0]['students']);
     }
 
     // ------------------------------------------------------------- activities
@@ -314,46 +264,5 @@ class AdminOverviewDashboardTest extends TestCase
 
         $this->assertSame(array_column($first, 'id'), array_column($second, 'id'));
         $this->assertCount(3, array_filter($first, fn ($row) => str_starts_with($row['action'], 'Updated class TIE')));
-    }
-
-    // ----------------------------------------------------------------- errors
-
-    public function test_errors_are_the_five_newest_error_submissions_with_readable_fields(): void
-    {
-        Sanctum::actingAs($this->admin);
-        $student = $this->makeUser('student');
-        $problem = $this->makeProblem($student, 'Truy vấn khách hàng');
-        $base = now()->addDays(2);
-
-        $errors = [];
-        for ($i = 0; $i < 7; $i++) {
-            $errors[$i] = $this->makeSubmission($student, $problem, $i % 2 ? 'Timeout' : 'Runtime Error', $base->copy()->addMinutes($i));
-        }
-        // Bài nộp đúng, mới hơn tất cả lỗi: không được lọt vào danh sách.
-        $this->makeSubmission($student, $problem, 'Accepted', $base->copy()->addHour());
-
-        $rows = $this->getJson('/api/admin/overview/errors')->assertOk()->json();
-
-        $this->assertCount(5, $rows);
-        $this->assertSame(array_map(fn ($i) => $errors[$i]->id, range(6, 2)), array_column($rows, 'id'));
-        $this->assertSame(['id', 'problemTitle', 'errorType', 'studentName', 'submittedAt'], array_keys($rows[0]));
-        $this->assertSame('Truy vấn khách hàng', $rows[0]['problemTitle']);
-        $this->assertSame('Runtime Error', $rows[0]['errorType']);
-        $this->assertSame('Timeout', $rows[1]['errorType']);
-        $this->assertSame($student->name, $rows[0]['studentName']);
-        $this->assertStringEndsWith('Z', $rows[0]['submittedAt']);
-        $this->assertTrue(Carbon::parse($rows[0]['submittedAt'])->equalTo($base->copy()->addMinutes(6)->startOfSecond()));
-    }
-
-    public function test_errors_list_is_empty_safe_when_no_error_is_newer_than_existing_data(): void
-    {
-        Sanctum::actingAs($this->admin);
-
-        $rows = $this->getJson('/api/admin/overview/errors')->assertOk()->json();
-
-        $this->assertLessThanOrEqual(5, count($rows));
-        foreach ($rows as $row) {
-            $this->assertMatchesRegularExpression('/error|timeout/i', $row['errorType']);
-        }
     }
 }

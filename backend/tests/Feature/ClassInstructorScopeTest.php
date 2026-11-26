@@ -30,8 +30,8 @@ class ClassInstructorScopeTest extends TestCase
 
     public function test_teacher_statistics_list_only_the_classes_the_user_teaches(): void
     {
-        $teacher = $this->makeAccount('instructor', ['results.grade']);
-        $other = $this->makeAccount('instructor', ['results.grade']);
+        $teacher = $this->makeAccount('instructor', ['results.grade', 'statistics.view']);
+        $other = $this->makeAccount('instructor', ['results.grade', 'statistics.view']);
         $mine = $this->makeClass(['instructor_id' => $teacher->id]);
         $theirs = $this->makeClass(['instructor_id' => $other->id]);
         $nobodys = $this->makeClass();

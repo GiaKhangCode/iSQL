@@ -54,7 +54,7 @@ class NotificationService
      * @param string      $userId  người nhận
      * @param string      $title   tiêu đề ngắn
      * @param string      $message nội dung
-     * @param string      $type    nhãn nghiệp vụ (vd: Assignment, Review, Info, content_share)
+     * @param string      $type    nhãn nghiệp vụ (vd: Assignment, Review, Info)
      * @param string|null $link    đường dẫn trên frontend khi bấm vào thông báo
      */
     public function create(

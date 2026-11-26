@@ -240,9 +240,9 @@ body:has(.compact-tables-page) { overflow: hidden; }
 }
 
 
-/* Continue learning docks after the activity cards and scrolls its two panels. */
-.dashboard-reordered { padding-bottom: 0; }
-.dashboard-continue-region { position: sticky; top: var(--header-height); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; height: calc(100dvh - var(--header-height)); min-height: 0; margin-top: 8px; padding: 4px 0 0; background: transparent; }
+/* Continue learning: cao cố định bằng các thẻ phía trên (400px), hai cột cuộn bên trong. */
+.dashboard-reordered { padding-bottom: 32px; }
+.dashboard-continue-region { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; height: 400px; min-height: 0; margin-top: 24px; padding: 0; background: transparent; }
 .dashboard-continue-region .dashboard-learning-panel { height: 100%; min-height: 0; }
 .dashboard-continue-region .dashboard-learning-heading { flex: none; min-height: 53px; flex-wrap: wrap; padding: 12px 16px; }
 .dashboard-continue-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 16px; margin-left: auto; font-size: 11px; }
@@ -269,7 +269,8 @@ body:has(.compact-tables-page) { overflow: hidden; }
   .dashboard-continue-region { grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; }
 }
 @media (max-width: 760px) {
-  .dashboard-continue-region { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, .8fr); gap: 12px; }
+  .dashboard-continue-region { grid-template-columns: minmax(0, 1fr); grid-template-rows: 360px auto; height: auto; margin-top: 20px; gap: 12px; }
+  .dashboard-continue-details { max-height: 360px; }
   .dashboard-continue-region .continue-row { gap: 12px; }
   .dashboard-continue-details { padding: 14px; }
 }

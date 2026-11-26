@@ -31,7 +31,7 @@ class StoreUserRequest extends FormRequest
             // Loại danh tính (student|staff) và vai trò khởi tạo (id của vai trò động; bỏ trống thì theo loại tài khoản).
             'account_type' => ['required', Rule::in(User::ACCOUNT_TYPES)],
             'role_id'    => ['nullable', 'string', Rule::exists('access_roles', 'id')],
-            'status'     => 'sometimes|in:Active,Inactive,Pending',
+            'status'     => 'sometimes|in:Active,Inactive',
             'department' => 'nullable|string|max:255',
         ];
     }

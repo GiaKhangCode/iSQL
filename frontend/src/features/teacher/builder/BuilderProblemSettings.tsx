@@ -4,6 +4,7 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import type { DatabaseRelationDescription, DataTable, WorkspacePart } from "@/data/models";
 import { teacherService } from "@/shared/api/teacherService";
 import { WORKSPACE_PARTS, WORKSPACE_PART_LABELS } from "@/shared/lib/workspace/workspaceParts";
+import { questionLabel } from "@/shared/lib/workspace/questionLabel";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { Loading } from "@/shared/ui/ui";
 import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
@@ -12,21 +13,24 @@ import "@/styles/builder-problem-settings.css";
 
 export type BuilderProblemDetail = {
   questionCatalog?: Partial<Record<WorkspacePart, QuestionOption[]>>;
-  triggerExercise?: { questions: { id: string; name: string; description: string; answer: string; difficulty?: string; category?: string }[] };
-  ddlExercise?: { questions: { id: string; name: string; description: string; answer: string; difficulty?: string; category?: string }[] };
-  dmlExercise?: { questions: { id: string; name: string; description: string; answer: string; difficulty?: string; category?: string }[] };
+  triggerExercise?: { questions: { id: string; description: string; answer: string; difficulty?: string; category?: string }[] };
+  ddlExercise?: { questions: { id: string; description: string; answer: string; difficulty?: string; category?: string }[] };
+  dmlExercise?: { questions: { id: string; description: string; answer: string; difficulty?: string; category?: string }[] };
   description?: string; requirements?: string; schema?: string; seedData?: string;
   databaseDescription?: DatabaseRelationDescription[];
   testCases?: { seedData: string; isHidden: boolean }[];
-  sqlSolutions?: { id: string; name: string; description?: string; query: string; enabled: boolean; timeLimitMs: number; difficulty?: string; category?: string }[];
+  sqlSolutions?: { id: string; description?: string; query: string; enabled: boolean; timeLimitMs: number; difficulty?: string; category?: string }[];
   referenceSolution?: string; expectedOutputs?: DataTable[];
 };
 
-export type AutoQuestionGroupRule = { id: string; difficulty: string; category: string; count: number; };
-export type SharedQuestionRule = { id: string; difficulty: string; category: string; questionId: string; part?: WorkspacePart; };
+/** `points`: điểm mỗi câu của nhóm (chỉ dùng khi kỳ thi chọn "Tùy chỉnh điểm"); chuỗi vì đang gõ dở như "0,". */
+export type AutoQuestionGroupRule = { id: string; difficulty: string; category: string; count: number; points?: string | number; };
+export type SharedQuestionRule = { id: string; difficulty: string; category: string; questionId: string; part?: WorkspacePart; points?: string | number; };
 export type ExamVariant = {
   code: string;
   questions: Partial<Record<WorkspacePart, string[]>>;
+  /** Câu nào của mã đề thuộc nhóm câu hỏi nào (mã câu → mã nhóm `_autoRules`); backend tra điểm nhóm theo đây. Câu chung không có. */
+  groups?: Partial<Record<WorkspacePart, Record<string, string>>>;
 };
 export type QuestionSelection = Partial<Record<WorkspacePart, string[]>> & {
   _autoRules?: Partial<Record<WorkspacePart, AutoQuestionGroupRule[]>>;
@@ -37,7 +41,7 @@ export type QuestionSelection = Partial<Record<WorkspacePart, string[]>> & {
   _sharedRules?: Partial<Record<WorkspacePart, SharedQuestionRule[]>>;
   _sharedQuestions?: Partial<Record<WorkspacePart, string[]>>;
 };
-export type QuestionOption = { id: string; name: string; description?: string; kind?: "schema" | "seed"; timeLimitMs?: number; difficulty?: string; category?: string };
+export type QuestionOption = { id: string; description?: string; kind?: "schema" | "seed"; timeLimitMs?: number; difficulty?: string; category?: string };
 export function catalogOf(detail: BuilderProblemDetail | null): Record<WorkspacePart, QuestionOption[]> {
   const enrich = (list: QuestionOption[], part: WorkspacePart): QuestionOption[] => {
     return list.map(q => {
@@ -51,7 +55,7 @@ export function catalogOf(detail: BuilderProblemDetail | null): Record<Workspace
         cat = q.category?.trim() || "DML - Thêm dòng dữ liệu (INSERT)";
       } else if (!cat) {
         if (part === "DDL") {
-          const lower = (q.name + " " + (q.description || "")).toLowerCase();
+          const lower = (q.description || "").toLowerCase();
           if (lower.includes("drop") || lower.includes("truncate")) {
             cat = "DDL - Xóa đối tượng (DROP/TRUNCATE)";
           } else if (lower.includes("constraint") || lower.includes("khóa") || lower.includes("ràng buộc")) {
@@ -60,7 +64,7 @@ export function catalogOf(detail: BuilderProblemDetail | null): Record<Workspace
             cat = "DDL - Sửa cấu trúc (ALTER TABLE)";
           }
         } else if (part === "DML") {
-          const lower = (q.name + " " + (q.description || "")).toLowerCase();
+          const lower = (q.description || "").toLowerCase();
           if (lower.includes("update") || lower.includes("cập nhật")) {
             cat = "DML - Cập nhật dữ liệu (UPDATE)";
           } else if (lower.includes("delete") || lower.includes("xóa")) {
@@ -69,7 +73,7 @@ export function catalogOf(detail: BuilderProblemDetail | null): Record<Workspace
             cat = "DML - Thêm dòng dữ liệu (INSERT)";
           }
         } else if (part === "SQL") {
-          const lower = (q.name + " " + (q.description || "")).toLowerCase();
+          const lower = (q.description || "").toLowerCase();
           if (lower.includes("join") || lower.includes("kết nối")) {
             cat = "DQL - Kết nối nhiều bảng (JOIN)";
           } else if (lower.includes("group by") || lower.includes("gom nhóm") || lower.includes("having")) {
@@ -96,10 +100,10 @@ export function catalogOf(detail: BuilderProblemDetail | null): Record<Workspace
   const seed = detail?.testCases?.some(dataset => dataset.seedData.trim()) || detail?.seedData?.trim();
   const queries = (detail?.sqlSolutions || []).filter(solution => solution.query.trim());
   return {
-    DDL: enrich([...(schema ? [{ id: "__base_ddl__", name: "create_tables.sql", kind: "schema" as const, description: "Create all tables and declare their primary and foreign keys.", difficulty: "Dễ", category: "DDL - Tạo bảng (CREATE TABLE)" }] : []), ...(detail?.ddlExercise?.questions || []).filter(question => question.answer.trim())], "DDL"),
-    DML: enrich([...(schema && seed ? [{ id: "__base_dml__", name: "insert_data.sql", kind: "seed" as const, description: "Insert the original sample data into all tables.", difficulty: "Dễ", category: "DML - Thêm dòng dữ liệu (INSERT)" }] : []), ...(detail?.dmlExercise?.questions || []).filter(question => question.answer.trim())], "DML"),
+    DDL: enrich([...(schema ? [{ id: "__base_ddl__", kind: "schema" as const, description: "Create all tables and declare their primary and foreign keys.", difficulty: "Dễ", category: "DDL - Tạo bảng (CREATE TABLE)" }] : []), ...(detail?.ddlExercise?.questions || []).filter(question => question.answer.trim())], "DDL"),
+    DML: enrich([...(schema && seed ? [{ id: "__base_dml__", kind: "seed" as const, description: "Insert the original sample data into all tables.", difficulty: "Dễ", category: "DML - Thêm dòng dữ liệu (INSERT)" }] : []), ...(detail?.dmlExercise?.questions || []).filter(question => question.answer.trim())], "DML"),
     TRIGGER: enrich((detail?.triggerExercise?.questions || []).filter(question => question.answer.trim()), "TRIGGER"),
-    SQL: enrich(queries.length ? queries : (detail?.referenceSolution?.trim() ? [{ id: "__base_sql__", name: "query.sql" }] : []), "SQL"),
+    SQL: enrich(queries.length ? queries : (detail?.referenceSolution?.trim() ? [{ id: "__base_sql__" }] : []), "SQL"),
   };
 }
 
@@ -181,9 +185,9 @@ export function BuilderProblemSettings({ problemId, title, parts, closing, onClo
                     onPartsChange(WORKSPACE_PARTS.filter(value => value === part || parts.includes(value)));
                   }}><TranslatedText>{tr("Select all questions")}</TranslatedText></button>
                   {choices.map((question, index) => <label className="builder-settings-question" key={question.id}>
-                    <input type="checkbox" aria-label={tr("Select question {value0}", { value0: question.name })}
+                    <input type="checkbox" aria-label={tr("Select question {value0}", { value0: questionLabel(index, question.description, tr("Question")) })}
                       checked={parts.includes(part) && selectedIds(part).includes(question.id)} onChange={event => chooseQuestion(part, question.id, event.target.checked)} />
-                    <span><span className="builder-settings-question-title">{index + 1}. <TranslatedText>{question.kind === "schema" ? tr("Create tables and keys") : question.kind === "seed" ? tr("Import original data") : question.name}</TranslatedText>
+                    <span><span className="builder-settings-question-title">{question.kind ? `${index + 1}. ` : ""}<TranslatedText>{question.kind === "schema" ? tr("Create tables and keys") : question.kind === "seed" ? tr("Import original data") : tr("Question {value0}", { value0: index + 1 })}</TranslatedText>
                       {question.kind && <small><TranslatedText>{tr("From original database")}</TranslatedText></small>}</span>
                       {question.description && <ProblemMarkdown>{tr(question.description)}</ProblemMarkdown>}
                     </span>

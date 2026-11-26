@@ -1,74 +1,148 @@
 /**
- * Khu vực giao diện (student / teacher / office / admin).
+ * Khu vực giao diện = VAI TRÒ.
  *
- * Khu vực là THUỘC TÍNH CỦA VAI TRÒ (access_roles.area), backend trả danh sách khu vực mà người dùng
- * được vào ở GET /api/auth/permissions (`areas`). Không suy ra từ tên vai trò hay cột users.role.
- * Khu vực đang xem được xác định bằng đường dẫn (/admin, /office, /teacher, còn lại là sinh viên);
- * "khu vực ưu tiên" chỉ dùng để quyết định trang chủ khi vào "/" hoặc sau khi đăng nhập.
+ * Mỗi vai trò người dùng đang giữ (kể cả vai trò tạo thêm ở trang Vai trò) là một khu vực, tên khu vực là tên vai trò.
+ * Thanh điều hướng của khu vực gồm các tab mà quyền của chính vai trò đó mở ra: mỗi tab có đúng một mã quyền
+ * (NAV_TABS), tick thêm quyền thì tab xuất hiện, bỏ tick thì tab biến mất. Backend chỉ trả danh sách vai trò kèm
+ * quyền ở GET /api/auth/permissions (`roles`); không có khu vực cố định nào ở phía backend.
+ *
+ * Quyền gán riêng (`directPermissions`) không thuộc vai trò nào: những tab mà chỉ quyền gán riêng mở ra được gom vào
+ * khu vực "Quyền bổ sung" (id "extra", chỉ có ở client).
+ *
+ * Đường dẫn trang giữ nguyên (/teacher/..., /office/..., /admin/...). Đường dẫn chỉ là nhóm trang (TabGroup);
+ * việc vào trang do mã quyền quyết định, không phụ thuộc người dùng đang ở khu vực nào.
  */
-export type Area = "student" | "teacher" | "office" | "admin";
 
-/** Thứ tự chọn khu vực mặc định khi người dùng chưa chọn (khu vực quản lý trước, sinh viên sau cùng). */
-export const AREA_PRIORITY: readonly Area[] = ["admin", "office", "teacher", "student"];
+/** Nhóm trang theo tiền tố đường dẫn: /admin, /office, /teacher, còn lại là các trang của sinh viên. */
+export type TabGroup = "student" | "teacher" | "office" | "admin";
 
-export const AREA_LABELS: Record<Area, string> = {
-  student: "Student",
-  teacher: "Lecturer",
-  office: "Faculty office",
-  admin: "Admin",
-};
+/** id của khu vực Quyền bổ sung. */
+export const EXTRA_AREA = "extra";
+export const EXTRA_AREA_LABEL = "Additional permissions";
 
-const HOME: Record<Area, string> = {
-  student: "/dashboard",
-  teacher: "/teacher/problems",
-  office: "/office/examinations",
-  admin: "/admin/overview",
-};
+/** Vai trò như backend trả về ở GET /api/auth/permissions. */
+export type AccessRole = { id: string; name: string; permissions: string[] };
 
-export function isArea(value: unknown): value is Area {
-  return typeof value === "string" && (AREA_PRIORITY as readonly string[]).includes(value);
+/**
+ * Một tab trên thanh điều hướng. `prefixes` là các đường dẫn con thuộc tab (mặc định chính `path`).
+ * `label` là khóa tiếng Anh, bản tiếng Việt nằm ở i18n/locales/vi/common.ts.
+ */
+export type NavTab = { label: string; path: string; permission: string; group: TabGroup; prefixes?: string[] };
+
+/** Một khu vực: vai trò (id = id vai trò) hoặc Quyền bổ sung (id = "extra"), cùng các tab của nó. */
+export type Area = { id: string; label: string; tabs: NavTab[] };
+
+/**
+ * Bảng tab → quyền duy nhất (menu, route, trang chủ khu vực đều lấy từ đây). Thứ tự là thứ tự hiện trên menu:
+ * quản trị, giáo vụ, giảng viên, rồi sinh viên. Tên tab không trùng nhau để một vai trò gồm nhiều nhóm vẫn rõ nghĩa.
+ */
+export const NAV_TABS: readonly NavTab[] = [
+  { label: "Overview", path: "/admin/overview", permission: "system.overview", group: "admin" },
+  { label: "Users", path: "/admin/users", permission: "user.manage", group: "admin" },
+  { label: "Courses", path: "/admin/courses", permission: "class.manage", group: "admin" },
+  { label: "Roles", path: "/admin/roles", permission: "access.manage", group: "admin" },
+
+  { label: "Examinations", path: "/office/examinations", permission: "examination.manage", group: "office", prefixes: ["/office/examinations", "/office/sessions"] },
+  { label: "Exam results", path: "/office/results", permission: "exam.results", group: "office" },
+  { label: "Faculty statistics", path: "/office/statistics", permission: "statistics.faculty", group: "office" },
+
+  { label: "Problems", path: "/teacher/problems", permission: "problem.create", group: "teacher" },
+  { label: "Database library", path: "/teacher/database-library", permission: "library.manage", group: "teacher" },
+  { label: "Question tags", path: "/teacher/exercise-tags", permission: "tag.manage", group: "teacher" },
+  { label: "Manage assignments", path: "/teacher/assignments", permission: "assignment.create", group: "teacher" },
+  { label: "Classes", path: "/teacher/classes", permission: "class.teach", group: "teacher" },
+  { label: "Proctoring", path: "/teacher/exams", permission: "exam.proctor", group: "teacher" },
+  { label: "Grading", path: "/teacher/results", permission: "results.grade", group: "teacher" },
+  { label: "Class statistics", path: "/teacher/statistics", permission: "statistics.view", group: "teacher" },
+  { label: "Regrade", path: "/teacher/regrade", permission: "results.regrade", group: "teacher" },
+
+  { label: "Dashboard", path: "/dashboard", permission: "practice.solve", group: "student" },
+  { label: "My assignments", path: "/assignments", permission: "assignment.do", group: "student" },
+  { label: "Submissions", path: "/submissions", permission: "submission.view", group: "student" },
+];
+
+/** Các tab mà một tập quyền mở ra, theo thứ tự của NAV_TABS. */
+export function tabsFor(permissions: readonly string[]): NavTab[] {
+  return NAV_TABS.filter((tab) => permissions.includes(tab.permission));
 }
 
-/** Giữ lại các giá trị hợp lệ, theo thứ tự ưu tiên, không trùng. */
-export function normalizeAreas(values: unknown): Area[] {
-  const list = Array.isArray(values) ? values : [];
-  return AREA_PRIORITY.filter((area) => list.includes(area));
+/**
+ * Danh sách khu vực của người dùng: mỗi vai trò có ít nhất một tab là một khu vực (theo thứ tự backend trả về),
+ * cộng khu vực Quyền bổ sung khi có tab chỉ mở được nhờ quyền gán riêng.
+ */
+export function buildAreas(roles: readonly AccessRole[], directPermissions: readonly string[]): Area[] {
+  const areas: Area[] = [];
+  const held = new Set<string>();
+  for (const role of roles) {
+    role.permissions.forEach((code) => held.add(code));
+    const tabs = tabsFor(role.permissions);
+    if (tabs.length) areas.push({ id: role.id, label: role.name, tabs });
+  }
+  const extraTabs = NAV_TABS.filter((tab) => directPermissions.includes(tab.permission) && !held.has(tab.permission));
+  if (extraTabs.length) areas.push({ id: EXTRA_AREA, label: EXTRA_AREA_LABEL, tabs: extraTabs });
+  return areas;
 }
 
-export function homeForArea(area: Area | null | undefined): string {
-  return area ? HOME[area] : "/login";
-}
-
-/** Khu vực ưu tiên: lựa chọn đã lưu nếu còn được phép, ngược lại theo AREA_PRIORITY. */
-export function pickArea(areas: readonly Area[], preferred?: string | null): Area | null {
-  if (preferred && isArea(preferred) && areas.includes(preferred)) return preferred;
-  return AREA_PRIORITY.find((area) => areas.includes(area)) ?? null;
-}
-
-/** Khu vực mà một đường dẫn thuộc về. */
-export function areaOfPath(pathname: string): Area {
+/** Nhóm trang mà một đường dẫn thuộc về. */
+export function groupOfPath(pathname: string): TabGroup {
   if (/^\/admin(\/|$)/.test(pathname)) return "admin";
   if (/^\/office(\/|$)/.test(pathname)) return "office";
   if (/^\/teacher(\/|$)/.test(pathname)) return "teacher";
   return "student";
 }
 
+/** Đường dẫn có thuộc tab này (chính tab hoặc trang con) hay không. */
+export function tabMatchesPath(tab: NavTab, pathname: string): boolean {
+  return (tab.prefixes ?? [tab.path]).some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
+}
+
+/** Người dùng có tab nào của nhóm trang này không (điều kiện vào cụm route /admin, /office, /teacher). */
+export function canOpenGroup(permissions: readonly string[], group: TabGroup): boolean {
+  return NAV_TABS.some((tab) => tab.group === group && permissions.includes(tab.permission));
+}
+
+/** Tab đầu tiên của một nhóm trang mà quyền mở ra (trang chủ của /admin, /office, /teacher). */
+export function firstTabOfGroup(permissions: readonly string[], group: TabGroup): NavTab | null {
+  return NAV_TABS.find((tab) => tab.group === group && permissions.includes(tab.permission)) ?? null;
+}
+
+/** Trang chủ của khu vực: tab đầu tiên của nó. */
+export function homeOfArea(area: Area | null | undefined): string {
+  return area?.tabs[0]?.path ?? "/login";
+}
+
+/** Khu vực ưu tiên: lựa chọn đã lưu nếu còn tồn tại, ngược lại khu vực đầu tiên (Quyền bổ sung luôn ở cuối). */
+export function pickArea(areas: readonly Area[], preferredId?: string | null): Area | null {
+  return areas.find((area) => area.id === preferredId) ?? areas[0] ?? null;
+}
+
+/**
+ * Khu vực đang xem, suy từ đường dẫn: khu vực có tab khớp đường dẫn; nếu không có thì khu vực có tab cùng nhóm trang
+ * (ví dụ trang chấm bài nằm dưới /teacher/exams); nếu vẫn không có thì khu vực ưu tiên. Khi nhiều khu vực cùng khớp,
+ * ưu tiên khu vực người dùng đã chọn.
+ */
+export function resolveArea(areas: readonly Area[], pathname: string, preferredId?: string | null): Area | null {
+  const exact = areas.filter((area) => area.tabs.some((tab) => tabMatchesPath(tab, pathname)));
+  const group = groupOfPath(pathname);
+  const pool = exact.length ? exact : areas.filter((area) => area.tabs.some((tab) => tab.group === group));
+  return pool.find((area) => area.id === preferredId) ?? pool[0] ?? pickArea(areas, preferredId);
+}
+
 const storageKey = (userId: string) => `sql-practice:area:${userId}`;
 
-export function readPreferredArea(userId: string | undefined): Area | null {
+export function readPreferredArea(userId: string | undefined): string | null {
   if (!userId) return null;
   try {
-    const value = window.localStorage.getItem(storageKey(userId));
-    return isArea(value) ? value : null;
+    return window.localStorage.getItem(storageKey(userId)) || null;
   } catch {
     return null;
   }
 }
 
-export function writePreferredArea(userId: string | undefined, area: Area): void {
+export function writePreferredArea(userId: string | undefined, areaId: string): void {
   if (!userId) return;
   try {
-    window.localStorage.setItem(storageKey(userId), area);
+    window.localStorage.setItem(storageKey(userId), areaId);
   } catch {
     /* localStorage có thể bị chặn: bỏ qua, chỉ mất tiện ích nhớ lựa chọn */
   }

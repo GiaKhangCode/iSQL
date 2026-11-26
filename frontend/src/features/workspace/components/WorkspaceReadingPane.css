@@ -24,7 +24,25 @@
 .workspace-reading-pane .problem-expected-sample + .problem-expected-sample { margin-top:12px; }
 .workspace-reading-pane .workspace-database-content { gap:12px; }
 .workspace-reading-pane.problem-pane .workspace-database-content > p:first-child { margin:0; }
-.workspace-database-view-switch { display:flex; gap:6px; }
+/* Thanh trên của tab Cơ sở dữ liệu: tên câu bên trái, nút chuyển Tham chiếu | Hiện tại bên phải
+   (cùng kiểu với dải Danh sách | Sơ đồ của sơ đồ CSDL). */
+.workspace-database-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; }
+.workspace-database-toolbar .workspace-database-question-name { min-width:0; }
+.workspace-database-view-switch { display:inline-flex; flex:none; gap:2px; margin-left:auto; padding:3px; border:1px solid var(--border); border-radius:6px; background:var(--subtle); }
+.workspace-database-view-switch > button { display:inline-flex; align-items:center; justify-content:center; min-height:28px; padding:4px 12px; border:0; border-radius:4px; background:transparent; color:var(--muted); font:inherit; font-size:11px; white-space:nowrap; }
+.workspace-database-view-switch > button[aria-pressed="true"] { background:var(--surface); color:var(--accent); box-shadow:0 1px 3px #17183112; }
+.workspace-database-view-switch > button:hover { color:var(--accent); }
+.workspace-database-view-switch > button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* Dòng mô tả + nút Làm lại từ đầu (nút phụ, chỉ đỏ khi trỏ chuột vì là thao tác xóa). */
+.workspace-database-caption-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 12px; }
+.workspace-reading-pane.problem-pane .workspace-database-caption-row p { margin:0; }
+.workspace-database-reset-button { display:inline-flex; flex:none; align-items:center; gap:5px; padding:4px 8px; border:0; border-radius:var(--radius-sm); color:var(--muted); font-size:11px; white-space:nowrap; }
+.workspace-database-reset-button:hover { background:var(--danger-subtle); color:var(--danger); }
+.workspace-database-reset-button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.workspace-database-reset { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.workspace-database-reset-confirm { padding:10px 12px; border-radius:var(--radius-md); background:var(--danger-subtle); }
+.workspace-database-reset-confirm > span { flex:1 1 180px; color:var(--danger); font-size:11px; line-height:16px; }
+.workspace-database-reset-confirm .button { min-height:28px; padding:4px 10px; font-size:11px; }
 .workspace-reading-pane .workspace-database-table { margin-bottom:12px; }
 .workspace-reading-pane .workspace-database-table > header { padding:6px 0; }
 .workspace-reading-pane .stage-target-dataset { margin:14px 0; padding:10px; }

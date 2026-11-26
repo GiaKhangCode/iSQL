@@ -1,4 +1,3 @@
-import {ShareContentButton} from "@/features/teacher/ContentSharing";
 import { DatabaseLibraryList } from "./DatabaseLibraryList";
 import { newestFirst } from "@/shared/lib/sql/listOrder";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -18,6 +17,7 @@ import "@/styles/database-library.css";
 import { invalidateLibraryOutputs } from "@/features/teacher/library/LibraryBundleEditor";
 import { LibraryEditorTabs, LibraryEditorPanel } from "@/features/teacher/library/LibraryEditorTabs";
 import { blankEntry, scriptFileNames, datasetFileNameForTitle, fileNameFromEntry, datasetsFromEntry } from "@/features/teacher/DatabaseLibraryParts";
+import { notify } from "@/shared/ui/notify";
 
 export function DatabaseLibraryPage() {
   const { t: tr } = useLanguage("teacher");
@@ -35,11 +35,8 @@ export function DatabaseLibraryPage() {
   const [structureTab, setStructureTab] = useState<"schema" | "data">("schema");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [saveError, setSaveError] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
   const [schemaDiagram, setSchemaDiagram] = useState<SchemaDiagramState>(null);
-  const [importStatus, setImportStatus] = useState("");
-  const [importError, setImportError] = useState("");
   const [saving, setSaving] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -105,9 +102,6 @@ export function DatabaseLibraryPage() {
     setStructureTab("schema");
     setForm({ ...blankEntry, datasets: blankEntry.datasets.map((dataset) => ({ ...dataset })) });
     setSaveStatus("");
-    setSaveError("");
-    setImportStatus("");
-    setImportError("");
     setEditorKey(key => key + 1);
     setSchemaDiagram(null);
   }
@@ -127,9 +121,6 @@ export function DatabaseLibraryPage() {
     });
     setStructureTab("schema");
     setSaveStatus("");
-    setSaveError("");
-    setImportStatus("");
-    setImportError("");
     setEditorKey(key => key + 1);
     setSchemaDiagram(null);
   }
@@ -154,9 +145,6 @@ export function DatabaseLibraryPage() {
       };
     });
     setSaveStatus(tr("Unsaved changes"));
-    setSaveError("");
-    setImportStatus("");
-    setImportError("");
   }
 
   function updateDataset(index: number, patch: Partial<TeacherDatabaseLibraryDataset>) {
@@ -166,9 +154,6 @@ export function DatabaseLibraryPage() {
       ...(patch.sql !== undefined ? {bundle:invalidateLibraryOutputs(current.bundle)} : {}),
     }));
     setSaveStatus(tr("Unsaved changes"));
-    setSaveError("");
-    setImportStatus("");
-    setImportError("");
   }
 
   function runCreateTableDdl() {
@@ -184,18 +169,12 @@ export function DatabaseLibraryPage() {
     }
     setForm((current) => ({ ...current, datasets: [...current.datasets, { fileName, sql: "" }], bundle:invalidateLibraryOutputs(current.bundle) }));
     setSaveStatus(tr("Unsaved changes"));
-    setSaveError("");
-    setImportStatus("");
-    setImportError("");
   }
 
   function removeDataset(index: number) {
     if (index === 0) return;
     setForm((current) => ({ ...current, datasets: current.datasets.filter((_, datasetIndex) => datasetIndex !== index), bundle:invalidateLibraryOutputs(current.bundle) }));
     setSaveStatus(tr("Unsaved changes"));
-    setSaveError("");
-    setImportStatus("");
-    setImportError("");
   }
 
   async function importSqlFile(event: ChangeEvent<HTMLInputElement>) {
@@ -203,10 +182,8 @@ export function DatabaseLibraryPage() {
     event.currentTarget.value = "";
     if (!file) return;
 
-    setImportStatus("");
-    setImportError("");
     if (!/\.sql$/i.test(file.name)) {
-      setImportError(tr("Choose a .sql file to import."));
+      notify.error(tr("Choose a .sql file to import."));
       return;
     }
 
@@ -224,30 +201,28 @@ export function DatabaseLibraryPage() {
         bundle: invalidateLibraryOutputs(current.bundle),
       }));
       setSaveStatus(tr("Unsaved changes"));
-      setSaveError("");
-      setImportStatus(tr("Imported {value0} CREATE TABLE and {value1} INSERT INTO statements from {value2}.", {
+      notify.success(tr("SQL file imported"), tr("Imported {value0} CREATE TABLE and {value1} INSERT INTO statements from {value2}.", {
         value0: imported.createTableCount,
         value1: imported.insertIntoCount,
         value2: file.name,
       }));
     } catch (error) {
       if (error instanceof DatabaseLibrarySqlImportError) {
-        if (error.kind === "empty") setImportError(tr("The SQL file is empty."));
-        else if (error.kind === "no-supported-statements") setImportError(tr("No CREATE TABLE or INSERT INTO statements were found."));
-        else setImportError(tr("Only CREATE TABLE and INSERT INTO statements are allowed. Found: {value0}.", { value0: error.command }));
+        if (error.kind === "empty") notify.error(tr("The SQL file is empty."));
+        else if (error.kind === "no-supported-statements") notify.error(tr("No CREATE TABLE or INSERT INTO statements were found."));
+        else notify.error(tr("Only CREATE TABLE and INSERT INTO statements are allowed. Found: {value0}.", { value0: error.command }));
       } else {
-        setImportError(error instanceof Error ? error.message : tr("Could not read this SQL file."));
+        notify.fail(tr("Could not read this SQL file."), error);
       }
     }
   }
 
   async function saveEntry() {
     if (!form.title.trim()) {
-      setSaveError(tr("Give this database a name before saving."));
+      notify.error(tr("Give this database a name before saving."));
       return;
     }
     setSaving(true);
-    setSaveError("");
     try {
       const saved = selectedId
         ? await teacherService.updateDatabaseLibraryEntry(selectedId, form)
@@ -256,6 +231,7 @@ export function DatabaseLibraryPage() {
       setSelectedId(saved.id);
       setForm({ title: saved.title, ...fileNameFromEntry(saved), createTableSql: saved.createTableSql, datasets: datasetsFromEntry(saved), bundle: saved.bundle || undefined, expectedRevision: saved.revision || 1 });
       setSaveStatus(tr("All changes saved"));
+      notify.success(tr("Database library entry saved"), saved.title);
       try {
         localStorage.setItem(`teacher-db-library-entry:${saved.id}`, JSON.stringify({
           id: saved.id,
@@ -265,7 +241,7 @@ export function DatabaseLibraryPage() {
       } catch {}
       if (returnTo) navigate(`${returnTo}?database=${encodeURIComponent(saved.id)}`);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : tr("Could not save database library entry."));
+      notify.fail(tr("Could not save database library entry."), error, tr);
     } finally {
       setSaving(false);
     }
@@ -274,14 +250,14 @@ export function DatabaseLibraryPage() {
   async function deleteEntry() {
     if (!selectedId || !window.confirm(tr("Delete this database library entry?"))) return;
     setSaving(true);
-    setSaveError("");
     try {
       await teacherService.deleteDatabaseLibraryEntry(selectedId);
+      notify.success(tr("Database library entry deleted"), form.title);
       setEntries((current) => current.filter((entry) => entry.id !== selectedId));
       startNewEntry(true);
       setEditing(false);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : tr("Could not delete database library entry."));
+      notify.fail(tr("Could not delete database library entry."), error, tr);
     } finally {
       setSaving(false);
     }
@@ -312,7 +288,6 @@ export function DatabaseLibraryPage() {
           <section className="teacher-database-library-card">
             <div className="teacher-database-library-section-heading">
               <h3><TranslatedText>{tr("Database details")}</TranslatedText></h3>
-              {selectedId&&<ShareContentButton kind="library" id={selectedId}/>}
               {saveStatus && <span className={`teacher-database-library-save-status${saveStatus === tr("Unsaved changes") ? " is-unsaved" : ""}`}><TranslatedText>{saveStatus}</TranslatedText></span>}
             </div>
             <div id="library-details" className="teacher-database-library-identity-fields">
@@ -322,8 +297,6 @@ export function DatabaseLibraryPage() {
 
             </div>
 
-            {importError && <p className="teacher-database-library-error" role="alert"><TranslatedText>{importError}</TranslatedText></p>}
-            {importStatus && <p className="teacher-database-library-import-status" role="status"><TranslatedText>{importStatus}</TranslatedText></p>}
 
             <div className="library-database-heading">
               <h3><TranslatedText>{tr("Database")}</TranslatedText></h3>
@@ -358,7 +331,6 @@ export function DatabaseLibraryPage() {
             </LibraryEditorPanel>
             </div>
 
-            {saveError && <p className="teacher-database-library-error" role="alert"><TranslatedText>{saveError}</TranslatedText></p>}
             <div className="teacher-database-library-actions">
               {selectedId && <button className="button teacher-danger-button" type="button" disabled={saving} onClick={() => void deleteEntry()}><Trash2 size={14} aria-hidden="true" /><TranslatedText>{tr("Delete")}</TranslatedText></button>}
               <button className="button primary" type="button" disabled={saving || !form.title.trim()} onClick={() => void saveEntry()}><Save size={14} aria-hidden="true" /><TranslatedText>{saving ? tr("Saving…") : returnTo ? tr("Save and return to problem") : selectedId ? tr("Save changes") : tr("Save to library")}</TranslatedText></button>

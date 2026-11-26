@@ -1,0 +1,37 @@
+/* Panel kết quả kiểu SSMS ở đáy khung soạn SQL. Chiều cao khi mở = phần còn lại sau --editor-pane-height. */
+.workspace-output { flex: none; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--border); background: var(--surface); }
+.workspace-output.is-open { flex: 0 0 calc(100% - var(--editor-pane-height, 58%)); min-height: 120px; }
+.workspace-output-header { flex: none; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px 0 6px; }
+.workspace-output.is-open .workspace-output-header { border-bottom: 1px solid var(--border); }
+.workspace-output-toggle { display: inline-grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: var(--radius-sm); color: var(--muted); }
+.workspace-output-toggle:hover { background: var(--subtle); color: var(--text); }
+.workspace-output-chevron { transition: transform .2s ease; }
+.workspace-output.is-open .workspace-output-chevron { transform: rotate(180deg); }
+
+/* Tab Kết quả / Thông báo: gạch chân như tab của SSMS. */
+.workspace-output-tabs { display: flex; align-self: stretch; gap: 2px; }
+.workspace-output-tabs button { position: relative; padding: 0 10px; border: 0; color: var(--muted); font-size: 12px; }
+.workspace-output-tabs button:hover { color: var(--text); }
+.workspace-output-tabs button[aria-selected="true"] { color: var(--text); font-weight: 600; }
+.workspace-output-tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+
+.workspace-output-summary { display: flex; align-items: center; gap: 10px; min-width: 0; margin-left: auto; color: var(--muted); font-size: 11px; }
+.workspace-output-summary .workspace-question-submit-wrap .button { min-height: 26px; padding: 3px 10px; font-size: 11px; }
+.workspace-output-time { white-space: nowrap; }
+
+.workspace-output-body { flex: 1; min-height: 0; overflow: auto; }
+.workspace-output-grid { padding: 0; }
+.workspace-output-grid .table-scroll { border: 0; border-radius: 0; }
+.workspace-output-grid > small { display: block; padding: 6px 12px; }
+.workspace-output-messages { margin: 0; padding: 10px 14px; font-family: var(--font-mono); font-size: 12px; line-height: 20px; }
+.workspace-output-messages p { margin: 0; }
+.workspace-output-error { margin: 2px 0; color: var(--danger); }
+.workspace-output-error .workspace-sql-error { padding: 0; border: 0; background: transparent; color: var(--danger); }
+.workspace-output-error .workspace-sql-error strong { font-weight: 600; }
+.workspace-output-error .workspace-sql-error p { color: var(--danger); }
+.workspace-output-completion { margin-top: 12px !important; color: var(--muted); }
+.workspace-output-empty { margin: 0; padding: 12px 14px; font-size: 12px; }
+/* Thanh kéo giữa editor và panel kết quả. Trong khung flex của editor nó không có hàng lưới 12px như bố cục cũ,
+   nên phải tự đặt chiều cao, nếu không sẽ cao 0px và không nắm được. */
+.editor-pane > .workspace-splitter-horizontal { flex: none; height: 10px; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .workspace-output-chevron { transition: none; } }

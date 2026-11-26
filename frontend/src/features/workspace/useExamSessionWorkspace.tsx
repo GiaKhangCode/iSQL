@@ -10,6 +10,7 @@ import type { ExamSessionSchema } from "@/features/workspace/types";
 import { ExamSessionCardsView, ExamSessionDiagramCanvas } from "@/features/workspace/components/ExamSessionWorkspaceSchemaViews";
 import { parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
 import "@/styles/exam-session-workspace.css";
+import { notify } from "@/shared/ui/notify";
 
 export function useExamSessionWorkspace() {
   const { t: tr } = useLanguage("workspace");
@@ -218,7 +219,7 @@ export function useExamSessionWorkspace() {
       // Clear the draft after successful submission
       localStorage.removeItem(draftKey);
     } catch (err: any) {
-      alert(err.message || "Unable to submit the exam. Please try again.");
+      notify.fail(tr("Unable to submit the exam. Please try again."), err, tr);
     } finally {
       setSubmitting(false);
     }

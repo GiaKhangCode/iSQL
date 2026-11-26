@@ -24,6 +24,48 @@ final class QuestionScoring
             return 0.0;
         }
 
+        $weights = self::weights($questions, $selection, $maxPoints);
+        $total = array_sum($weights);
+        $earned = 0.0;
+        foreach ($questions as $i => $q) {
+            if (!empty($q['passed'])) {
+                $earned += $weights[$i];
+            }
+        }
+
+        return $total > 0 ? round($maxPoints * ($earned / $total), 2) : 0.0;
+    }
+
+    /**
+     * Điểm tối đa của từng câu (cùng thứ tự với $questions), làm tròn 2 chữ số; câu cuối cùng có trọng số nhận phần dư
+     * nên tổng luôn đúng bằng điểm tối đa của bài (10 điểm chia 3 câu = 3.33, 3.33, 3.34).
+     *
+     * @param array<int, array{part: string, id: string}> $questions
+     * @param array<string, mixed>|null                   $selection
+     * @return array<int, float>
+     */
+    public static function maxScores(array $questions, ?array $selection, float $maxPoints): array
+    {
+        $weights = self::weights($questions, $selection, $maxPoints);
+        $total = array_sum($weights);
+        $points = array_map(fn (float $w) => $total > 0 ? round($maxPoints * $w / $total, 2) : 0.0, $weights);
+
+        $weighted = array_keys(array_filter($weights, fn (float $w) => $w > 0));
+        if ($weighted !== []) {
+            $last = end($weighted);
+            $points[$last] = round($maxPoints - (array_sum($points) - $points[$last]), 2);
+        }
+
+        return $points;
+    }
+
+    /**
+     * @param array<int, array{part: string, id: string}> $questions
+     * @param array<string, mixed>|null                   $selection
+     * @return array<int, float>
+     */
+    private static function weights(array $questions, ?array $selection, float $maxPoints): array
+    {
         $weights = [];
         $listedTotal = 0.0;
         $unlisted = 0;
@@ -44,17 +86,7 @@ final class QuestionScoring
             $each = $unlisted > 0 && $left > 0 ? $left / $unlisted : 0.0;
         }
 
-        $total = 0.0;
-        $earned = 0.0;
-        foreach ($questions as $i => $q) {
-            $w = $weights[$i] ?? $each;
-            $total += $w;
-            if (!empty($q['passed'])) {
-                $earned += $w;
-            }
-        }
-
-        return $total > 0 ? round($maxPoints * ($earned / $total), 2) : 0.0;
+        return array_map(fn (?float $w) => (float) ($w ?? $each), $weights);
     }
 
     private static function listedPoints(?array $selection, string $part, string $id): ?float

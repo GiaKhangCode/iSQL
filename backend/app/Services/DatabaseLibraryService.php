@@ -38,7 +38,7 @@ class DatabaseLibraryService
             $query->where('instructor_id', $user->id);
         } elseif ($scope === 'system') {
             $query->whereNull('instructor_id');
-        } elseif (! $this->access->isSuperAdmin($user)) {
+        } else {
             $query->where(function ($q) use ($user) {
                 $q->where('instructor_id', $user->id)->orWhereNull('instructor_id');
             });
@@ -76,7 +76,7 @@ class DatabaseLibraryService
 
         $entry = DatabaseLibraryEntry::findOrFail($id);
 
-        if ($entry->instructor_id && $entry->instructor_id !== $user->id && ! $this->access->isSuperAdmin($user)) {
+        if ($entry->instructor_id && $entry->instructor_id !== $user->id) {
             abort(403, 'You do not have permission to view this database library entry.');
         }
 
@@ -204,7 +204,7 @@ class DatabaseLibraryService
 
     private function assertCanModify(User $user, DatabaseLibraryEntry $entry, string $verb): void
     {
-        if ((! $entry->instructor_id || $entry->instructor_id !== $user->id) && ! $this->access->isSuperAdmin($user)) {
+        if (! $entry->instructor_id || $entry->instructor_id !== $user->id) {
             abort(403, "You do not have permission to {$verb} this database library entry.");
         }
     }

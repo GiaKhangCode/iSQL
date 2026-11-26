@@ -7,7 +7,10 @@ use App\Services\Access\AccessControlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/** GET /api/auth/permissions: quyền hiệu lực và khu vực giao diện của người đang đăng nhập. */
+/**
+ * GET /api/auth/permissions: quyền hiệu lực, các vai trò đang giữ (mỗi vai trò là một khu vực giao diện, kèm quyền
+ * của nó) và quyền gán riêng của người đang đăng nhập.
+ */
 class MyPermissionsController extends Controller
 {
     public function __invoke(Request $request, AccessControlService $access): JsonResponse
@@ -16,8 +19,8 @@ class MyPermissionsController extends Controller
 
         return response()->json([
             'permissions'  => $access->permissionsOf($user),
-            'areas'        => $access->areasOf($user),
-            'isSuperAdmin' => $access->isSuperAdmin($user),
+            'roles'        => $access->rolesOf($user),
+            'directPermissions' => $access->directPermissionsOf($user),
         ]);
     }
 }

@@ -271,6 +271,14 @@ export const teacherService = {
     });
   },
 
+  /** Bài thi: chấm từng câu, điểm cuối do máy chủ cộng lại. */
+  async updateSubmissionQuestionReview(id: string, questionScores: Record<string, number>, questionFeedback: Record<string, string>): Promise<TeacherSubmissionDetail> {
+    return apiFetch(`/api/submissions/${encodeURIComponent(id)}/review`, {
+      method: "PUT",
+      body: JSON.stringify({ questionScores, questionFeedback }),
+    });
+  },
+
   async inspectSubmission(id: string, part: WorkspacePart, questionId: string): Promise<ReviewResult> {
     return apiFetch(`/api/submissions/${encodeURIComponent(id)}/inspect`, {
       method: "POST", body: JSON.stringify({ part, question_id: questionId }),
@@ -311,8 +319,7 @@ export type TeacherStatistics = {
     flaggedStudents: number;
     courseAverages: { course: string; students: number; participants: number; averageScore: number | null; passRate: number }[];
     regradeSummary: {
-      totalAppeals: number;
-      unassignedAppeals: number;
+      totalRegrades: number;
       awaitingRegrade: number;
       completedRegrade: number;
       scoreChanged: number;

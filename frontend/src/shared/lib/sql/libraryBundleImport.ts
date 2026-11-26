@@ -22,16 +22,13 @@ const exerciseKey = (section: "DDL" | "DML" | "TRIGGER") => section === "DDL" ? 
 const authoredStage = (question: TeacherStageQuestion) => Boolean(question.answer.trim() || question.description.trim());
 const authoredSql = (question: TeacherSqlSolution) => Boolean(question.query.trim() || question.description?.trim());
 
-function copyQuestions<T extends {id:string;name:string}>(incoming:T[], existing:T[], newId:()=>string) {
-  const names=new Set(existing.map(question=>question.name.toLowerCase()));
+function copyQuestions<T extends {id:string}>(incoming:T[], newId:()=>string) {
   return incoming.map(question=>{
-    const copy=structuredClone(question);
+    const copy=structuredClone(question) as T & {name?:string};
     copy.id=newId();
-    const base=copy.name.replace(/\.sql$/i,"") || "question";
-    let suffix=2;
-    while(names.has(copy.name.toLowerCase())) copy.name=`${base}_${suffix++}.sql`;
-    names.add(copy.name.toLowerCase());
-    return copy;
+    // Thư viện cũ còn lưu tên câu hỏi; câu hỏi không còn tên nên bỏ trường này khi sao chép.
+    delete copy.name;
+    return copy as T;
   });
 }
 
@@ -59,12 +56,12 @@ export function importLibraryBundle(problem:TeacherProblem, entry:TeacherDatabas
     if(!selected.has(section) || !entry.bundle) continue;
     const key=exerciseKey(section);
     const existing=options.mode==="append" ? (next[key]?.questions || []).filter(authoredStage) : [];
-    next[key]={questions:[...existing,...copyQuestions(entry.bundle[key].questions.filter(authoredStage),existing,newId)]};
+    next[key]={questions:[...existing,...copyQuestions(entry.bundle[key].questions.filter(authoredStage),newId)]};
     if(next[key]!.questions.length>50) throw new Error("Mỗi loại đề chỉ được có tối đa 50 câu hỏi. Hãy chọn thay thế hoặc giảm số câu trước khi nhập.");
   }
   if(selected.has("SQL") && entry.bundle) {
     const existing=options.mode==="append" ? (next.sqlSolutions || []).filter(authoredSql) : [];
-    const incoming=copyQuestions(entry.bundle.sqlSolutions.filter(authoredSql),existing,newId).map(question=>({...question,expectedOutputs:[]}));
+    const incoming=copyQuestions(entry.bundle.sqlSolutions.filter(authoredSql),newId).map(question=>({...question,expectedOutputs:[]}));
     next.sqlSolutions=[...existing,...incoming];
     if(next.sqlSolutions.length>50) throw new Error("Mỗi loại đề chỉ được có tối đa 50 câu hỏi. Hãy chọn thay thế hoặc giảm số câu trước khi nhập.");
     next.referenceSolution=next.sqlSolutions.find(question=>question.enabled)?.query || "";

@@ -119,8 +119,6 @@ export function StudentExaminationDetailPage() {
         onUnlocked={() => {
           void mutate();
         }}
-        getSubmissions={studentApi.getSubmissions}
-        getProblem={studentApi.getProblem}
       />
     </section>
   );

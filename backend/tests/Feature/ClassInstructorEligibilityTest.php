@@ -59,7 +59,7 @@ class ClassInstructorEligibilityTest extends TestCase
     private function giveOnly(User $user, array $codes): User
     {
         DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-        $role = AccessRole::create(['name' => 'CE vai trò ' . uniqid(), 'is_super' => false]);
+        $role = AccessRole::create(['name' => 'CE vai trò ' . uniqid()]);
         $role->syncPermissions($codes);
         $user->accessRoles()->attach($role->id);
         app(AccessControlService::class)->forget();
@@ -132,7 +132,7 @@ class ClassInstructorEligibilityTest extends TestCase
 
     public function test_holders_that_are_not_active_are_rejected_and_not_listed(): void
     {
-        foreach (['Pending', 'Inactive'] as $status) {
+        foreach (['Inactive'] as $status) {
             $u = $this->giveOnly($this->makeUser('instructor_practical', $status), ['class.teach']);
 
             $this->assign($u)->assertStatus(422);
@@ -166,7 +166,7 @@ class ClassInstructorEligibilityTest extends TestCase
         $this->assign($this->admin)->assertStatus(422);
         $this->assertFalse(app(AccessControlService::class)->can($this->admin, 'class.teach'));
 
-        $extra = AccessRole::create(['name' => 'CE dạy ' . uniqid(), 'is_super' => false]);
+        $extra = AccessRole::create(['name' => 'CE dạy ' . uniqid()]);
         $extra->syncPermissions(['class.teach']);
         $this->admin->accessRoles()->attach($extra->id);
         app(AccessControlService::class)->forget();

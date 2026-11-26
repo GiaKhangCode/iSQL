@@ -31,7 +31,7 @@ class AccessRoleService
         $counts = DB::table('user_access_roles')->select('access_role_id', DB::raw('COUNT(*) as total'))
             ->groupBy('access_role_id')->pluck('total', 'access_role_id');
 
-        $roles = AccessRole::orderByDesc('is_super')->orderBy('name')->get()
+        $roles = AccessRole::orderBy('name')->get()
             ->map(fn (AccessRole $role) => $this->roleData($role, (int) ($counts[$role->id] ?? 0)))
             ->all();
 
@@ -41,7 +41,7 @@ class AccessRoleService
     public function createRole(array $data, User $actor): array
     {
         $role = DB::transaction(function () use ($data) {
-            $role = AccessRole::create(['name' => trim($data['name']), 'is_super' => false]);
+            $role = AccessRole::create(['name' => trim($data['name'])]);
             $role->syncPermissions($data['permissions']);
 
             return $role;
@@ -57,13 +57,17 @@ class AccessRoleService
     {
         $role = AccessRole::find($id) ?? throw new HttpException(404, 'Không tìm thấy vai trò.');
 
-        if ($role->is_super) {
-            throw new HttpException(422, 'Vai trò Admin là siêu quản trị, luôn đủ quyền và không thể chỉnh sửa.');
-        }
+        $hadAccessManage = in_array('access.manage', $role->permissionCodes(), true);
 
-        DB::transaction(function () use ($role, $data) {
+        DB::transaction(function () use ($role, $data, $hadAccessManage) {
             $role->update(['name' => trim($data['name'])]);
             $role->syncPermissions($data['permissions']);
+
+            // Bỏ access.manage khỏi vai trò không được làm hệ thống không còn ai vào được trang Vai trò.
+            if ($hadAccessManage && ! in_array('access.manage', $data['permissions'], true) && ! $this->access->hasActiveHolder('access.manage')) {
+                $this->access->forget();
+                throw new HttpException(422, 'Không thể bỏ quyền quản lý vai trò: sẽ không còn quản trị viên đang hoạt động nào giữ quyền này.');
+            }
         });
 
         $this->activityLog->record($actor->id, 'access:save_role:' . $role->name);
@@ -74,14 +78,12 @@ class AccessRoleService
 
     private function roleData(AccessRole $role, int $userCount): array
     {
-        $permissions = $role->is_super ? PermissionCatalog::superCodes() : $role->permissionCodes();
+        $permissions = $role->permissionCodes();
         sort($permissions);
 
         return [
             'id'          => $role->id,
             'name'        => $role->name,
-            'areas'       => PermissionCatalog::areasFor($permissions),
-            'isSuper'     => (bool) $role->is_super,
             'permissions' => $permissions,
             'userCount'   => $userCount,
         ];
@@ -105,9 +107,9 @@ class AccessRoleService
         $target = User::find($userId) ?? throw new HttpException(404, 'Không tìm thấy người dùng.');
         $roleIds = array_values(array_unique($roleIds));
 
-        $this->guardLastSuperAdmin($target, $roleIds);
+        $wasAccessManager = $this->access->can($target, 'access.manage');
 
-        DB::transaction(function () use ($target, $roleIds, $directPermissions) {
+        DB::transaction(function () use ($target, $roleIds, $directPermissions, $wasAccessManager) {
             DB::table('user_access_roles')->where('user_id', $target->id)->delete();
             $now = now();
             $rows = array_map(fn (string $roleId) => [
@@ -126,38 +128,19 @@ class AccessRoleService
                     DB::table('user_permissions')->insert($direct);
                 }
             }
+
+            // Người giữ access.manage cuối cùng không được bị bỏ vai trò/quyền đó.
+            $this->access->forget($target->id);
+            if ($wasAccessManager && ! $this->access->can($target, 'access.manage') && ! $this->access->hasActiveHolder('access.manage', $target->id)) {
+                $this->access->forget($target->id); // giao dịch sắp bị hủy: không để lại quyền đã tính theo dữ liệu bị hủy
+                throw new HttpException(422, 'Không thể bỏ quyền quản lý vai trò của quản trị viên đang hoạt động cuối cùng.');
+            }
         });
 
         $this->activityLog->record($actor->id, 'access:assign_roles:' . $target->id);
         $this->access->forget($target->id);
 
         return $this->userData($target);
-    }
-
-    /** Không được để hệ thống không còn siêu quản trị Active nào. */
-    private function guardLastSuperAdmin(User $target, array $newRoleIds): void
-    {
-        $hadSuper = DB::table('user_access_roles as uar')
-            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
-            ->where('uar.user_id', $target->id)->where('ar.is_super', true)->exists();
-        if (!$hadSuper || $target->status !== 'Active') {
-            return;
-        }
-
-        $keepsSuper = $newRoleIds && AccessRole::whereIn('id', $newRoleIds)->where('is_super', true)->exists();
-        if ($keepsSuper) {
-            return;
-        }
-
-        $others = DB::table('user_access_roles as uar')
-            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
-            ->join('users as u', 'u.id', '=', 'uar.user_id')
-            ->where('ar.is_super', true)->where('u.status', 'Active')->where('u.id', '!=', $target->id)
-            ->exists();
-
-        if (!$others) {
-            throw new HttpException(422, 'Không thể bỏ vai trò Admin của quản trị viên đang hoạt động cuối cùng.');
-        }
     }
 
     private function userData(User $target): array
@@ -171,7 +154,6 @@ class AccessRoleService
             'role_ids'           => DB::table('user_access_roles')->where('user_id', $target->id)->pluck('access_role_id')->all(),
             'direct_permissions' => DB::table('user_permissions')->where('user_id', $target->id)->orderBy('permission')->pluck('permission')->all(),
             'permissions'        => $this->access->permissionsOf($target),
-            'areas'              => $this->access->areasOf($target),
         ];
     }
 
@@ -181,7 +163,7 @@ class AccessRoleService
     {
         $target = User::find($userId) ?? throw new HttpException(404, 'Không tìm thấy người dùng.');
 
-        if (!in_array('student', $this->access->areasOf($target), true)) {
+        if ($target->account_type !== User::ACCOUNT_STUDENT) {
             throw new HttpException(422, 'Hãy chọn tài khoản sinh viên.');
         }
 

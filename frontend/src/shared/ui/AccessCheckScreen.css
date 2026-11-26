@@ -1,0 +1,49 @@
+/* Hiện trễ một nhịp: phản hồi nhanh thì người dùng không thấy màn hình chớp qua. */
+.access-check { display:grid; place-items:center; min-height:100dvh; padding:var(--space-5) var(--space-4); box-sizing:border-box; background:radial-gradient(ellipse 60% 45% at 50% 40%, var(--accent-subtle), transparent 100%), var(--canvas); opacity:0; animation:access-check-appear .35s ease-out .18s forwards; }
+.access-check *, .access-check *::before { box-sizing:border-box; }
+.access-check::before { content:""; position:fixed; inset:0 0 auto; height:3px; background:linear-gradient(90deg, var(--brand-primary), var(--brand-mint)); }
+.access-check--compact { min-height:min(420px, 60dvh); background:none; }
+.access-check--compact::before { display:none; }
+.access-check__card { display:grid; justify-items:center; gap:var(--space-4); width:min(100%, 380px); }
+
+.access-check__brand { display:grid; justify-items:center; gap:var(--space-2); color:var(--text-primary); font-size:20px; }
+.access-check__logo { position:relative; display:grid; place-items:center; width:72px; height:72px; }
+.access-check__logo::before { content:""; position:absolute; inset:6px; border:2px solid var(--accent); border-radius:18px; animation:access-check-ripple 1.8s ease-out infinite; }
+.access-check__logo img { position:relative; animation:access-check-float 2.4s ease-in-out infinite; }
+
+.access-check__terminal { width:100%; overflow:hidden; border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--brand-night); box-shadow:0 14px 34px #1719422e; }
+.access-check__bar { display:flex; align-items:center; gap:6px; padding:9px 12px; border-bottom:1px solid #ffffff1f; }
+.access-check__bar i { width:8px; height:8px; border-radius:var(--radius-circle); background:#ffffff40; }
+.access-check__bar i:last-of-type { background:var(--brand-mint); }
+.access-check__bar span { margin-left:auto; color:#ffffff80; font-size:var(--text-caption-size); }
+.access-check__terminal code { display:grid; gap:4px; padding:14px 16px; color:#eef0ff; font-family:var(--font-mono); font-size:var(--text-label-size); line-height:var(--text-label-line); }
+/* Từng dòng được "gõ" ra lần lượt rồi lặp lại; bề rộng tính theo ch vì dùng font mono. */
+.access-check__line { display:block; justify-self:start; max-width:100%; overflow:hidden; white-space:nowrap; clip-path:inset(0 100% 0 0); animation:access-check-type-1 3.6s steps(28) infinite; }
+.access-check__line:nth-child(2) { animation-name:access-check-type-2; }
+.access-check__line:nth-child(3) { animation-name:access-check-type-3; }
+.access-check__line:nth-child(3)::after { content:""; display:inline-block; width:.6ch; height:1.1em; margin-left:3px; vertical-align:text-bottom; background:var(--brand-mint); animation:access-check-blink .9s steps(1) infinite; }
+.access-check__line b { color:var(--brand-mint); font-weight:700; }
+.access-check__line em { color:#c1baf4; font-style:normal; }
+
+.access-check__progress { width:100%; height:4px; overflow:hidden; border-radius:var(--radius-full); background:var(--border); }
+.access-check__progress span { display:block; width:38%; height:100%; border-radius:inherit; background:linear-gradient(90deg, var(--brand-primary), var(--accent)); animation:access-check-slide 1.4s ease-in-out infinite; }
+.access-check__title { margin:0; color:var(--text-secondary); font-size:var(--text-base-size); line-height:var(--text-base-line); text-align:center; }
+.access-check__slow { display:grid; justify-items:center; gap:var(--space-2); text-align:center; animation:access-check-appear .35s ease-out; }
+.access-check__slow p { margin:0; color:var(--warning); font-size:var(--text-label-size); line-height:var(--text-label-line); }
+
+@keyframes access-check-appear { to { opacity:1; } from { opacity:0; } }
+@keyframes access-check-ripple { 0% { opacity:.6; transform:scale(.9); } 100% { opacity:0; transform:scale(1.45); } }
+@keyframes access-check-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3px); } }
+@keyframes access-check-type-1 { 0% { clip-path:inset(0 100% 0 0); } 18%,92% { clip-path:inset(0 0 0 0); } 100% { clip-path:inset(0 100% 0 0); } }
+@keyframes access-check-type-2 { 0%,18% { clip-path:inset(0 100% 0 0); } 36%,92% { clip-path:inset(0 0 0 0); } 100% { clip-path:inset(0 100% 0 0); } }
+@keyframes access-check-type-3 { 0%,36% { clip-path:inset(0 100% 0 0); } 62%,92% { clip-path:inset(0 0 0 0); } 100% { clip-path:inset(0 100% 0 0); } }
+@keyframes access-check-blink { 50% { opacity:0; } }
+@keyframes access-check-slide { 0% { transform:translateX(-110%); } 100% { transform:translateX(275%); } }
+
+@media (prefers-reduced-motion:reduce) {
+  .access-check { animation-duration:.01s; }
+  .access-check__logo::before { display:none; }
+  .access-check__logo img, .access-check__line::after { animation:none; }
+  .access-check__line { clip-path:none; animation:none; }
+  .access-check__progress span { width:100%; opacity:.6; animation:none; }
+}

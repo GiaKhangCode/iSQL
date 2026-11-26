@@ -52,7 +52,7 @@ export function BuilderSelectedQuestions({detail, parts, selection, total, error
         {count ? <div role="tabpanel" className="builder-selected-list">
           {selected[part].map((question, index) => <article key={question.id}>
             <header aria-label={t("Question {value0}", {value0: index + 1})}><span>{String(index + 1).padStart(2, "0")}</span></header>
-            <ProblemMarkdown>{t(question.description || (question.kind === "schema" ? "Create tables and keys" : question.kind === "seed" ? "Import original data" : question.name))}</ProblemMarkdown>
+            <ProblemMarkdown>{t(question.description || (question.kind === "schema" ? "Create tables and keys" : question.kind === "seed" ? "Import original data" : "Question"))}</ProblemMarkdown>
           </article>)}
         </div> : <p className="muted"><TranslatedText>{t("No questions selected.")}</TranslatedText></p>}
       </>}

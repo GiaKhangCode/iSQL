@@ -13,7 +13,7 @@ await build({
 });
 
 try {
-  const { formatActivityAction, formatGradingError, hideRecordIds } = await import(`../${outfile}?${Date.now()}`);
+  const { formatActivityAction, hideRecordIds } = await import(`../${outfile}?${Date.now()}`);
   const U1 = "3f2b8c1e-9d4a-4b6f-8a21-0c5d7e9f1a23";
   const U2 = "A1B2C3D4-0000-4111-8222-333344445555";
   const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
@@ -70,14 +70,6 @@ try {
   assert.equal(hideRecordIds("Không có mã nào"), "Không có mã nào");
   assert.equal(hideRecordIds("NT101.O21"), "NT101.O21", "mã lớp không phải UUID thì giữ nguyên");
 
-  // Loại lỗi chấm bài.
-  assert.equal(formatGradingError("Runtime Error"), "Lỗi thực thi (Runtime Error)");
-  assert.equal(formatGradingError("Syntax Error"), "Lỗi cú pháp (Syntax Error)");
-  assert.equal(formatGradingError("Timeout"), "Quá thời gian thực thi (Time Limit)");
-  assert.equal(formatGradingError("Time limit exceeded"), "Quá thời gian thực thi (Time Limit)");
-  assert.equal(formatGradingError("Memory limit"), "Quá giới hạn bộ nhớ (Memory Limit)");
-  assert.equal(formatGradingError("Compilation error"), "Compilation error");
-  assert.equal(formatGradingError(""), "Lỗi không xác định");
 
   // Trang không được in mã bản ghi: `err.id`/`activity.id` chỉ dùng làm key và để chọn dòng, không để hiển thị.
   const { readFileSync } = await import("node:fs");

@@ -30,12 +30,12 @@ globalThis.__examApi = async (url, options={}) => {
 const output=await build({
   stdin:{contents:`
     import {WorkspaceExamProvider,useWorkspaceExam,WorkspaceExamFinishButton} from './src/features/workspace/components/WorkspaceExamContext';
-    import {WorkspaceEditorStatus} from './src/features/workspace/components/WorkspaceEditorStatus';
+    import {WorkspaceHeaderStatus} from './src/features/workspace/components/WorkspaceHeaderStatus';
     import {useParams} from 'react-router-dom';
     export {createMemoryRouter,RouterProvider} from 'react-router-dom';
     export {createRoot} from 'react-dom/client';
     export {act,createElement} from 'react';
-    function Content(){const exam=useWorkspaceExam();const {id}=useParams();return <div><WorkspaceExamFinishButton/><WorkspaceEditorStatus line={1} column={1}/><button id="edit" onClick={()=>exam.update(id,{ddl:'CREATE TABLE '+id+'(id INT)'})}>Edit</button><a href="/dashboard" id="leave">Leave</a><span id="id">{id}</span></div>}
+    function Content(){const exam=useWorkspaceExam();const {id}=useParams();return <div><WorkspaceExamFinishButton/><WorkspaceHeaderStatus/><button id="edit" onClick={()=>exam.update(id,{ddl:'CREATE TABLE '+id+'(id INT)'})}>Edit</button><a href="/dashboard" id="leave">Leave</a><span id="id">{id}</span></div>}
     export function Page(){return <WorkspaceExamProvider><Content/></WorkspaceExamProvider>}
   `,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},
   plugins:[{name:'exam-adapters',setup(b){

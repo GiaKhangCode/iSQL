@@ -38,7 +38,7 @@ export function DatabaseLibraryList({ entries, onNew, onEdit, initialSearch = ""
     return map;
   }, [entries]);
 
-  const filteredRows = entries.filter(entry => dates.matches(entry) && matchesListSearch(search,entry.title,entry.createTableFileName));
+  const filteredRows = entries.filter(entry => dates.matches(entry) && matchesListSearch(search,entry.title));
   const filtered = order.apply(filteredRows, item => naturalIdMap.get(item.id) ?? 0);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 15));
   const currentPage = Math.min(page, pageCount);
@@ -55,7 +55,7 @@ export function DatabaseLibraryList({ entries, onNew, onEdit, initialSearch = ""
     <h1 className="sr-only"><TranslatedText>{t("Database library")}</TranslatedText></h1>
     <div className="teacher-list-detail-layout teacher-filter-layout">
       <div className="teacher-list-detail-main">
-        <TeacherListFilters order={order} suggestions={filtered.map(item=>({id:item.id,title:item.title,description:item.createTableFileName||"SQL Server"}))} dates={dates} search={search} onSearchChange={value => {setSearch(value);setPage(1);setSelectedId("");}} searchLabel={t("Search databases…")} actionsTarget={actionsTarget} createLabel={t("New database")} onCreate={onNew} />
+        <TeacherListFilters order={order} suggestions={filtered.map(item=>({id:item.id,title:item.title,description:"SQL Server"}))} dates={dates} search={search} onSearchChange={value => {setSearch(value);setPage(1);setSelectedId("");}} searchLabel={t("Search databases…")} actionsTarget={actionsTarget} createLabel={t("New database")} onCreate={onNew} />
         <div ref={scroll} className="teacher-table-scroll teacher-list-table-scroll sticky-list-table-wrap">
           <Table className="teacher-table teacher-database-tracking-table sticky-list-table">
             <thead><tr><th>ID</th><th><TranslatedText>{t("Database")}</TranslatedText></th><th><TranslatedText>{t("DML datasets")}</TranslatedText></th><th><TranslatedText>{t("Updated date")}</TranslatedText></th></tr></thead>
@@ -75,7 +75,7 @@ export function DatabaseLibraryList({ entries, onNew, onEdit, initialSearch = ""
         <aside className="teacher-list-detail-panel teacher-problem-details-panel">
           <div className="teacher-problem-detail-body">
             <span className="teacher-detail-eyebrow"><TranslatedText>{t("Database details")}</TranslatedText></span>
-            {selected ? <><h2>{selected.title}</h2><p className="muted">{selected.createTableFileName || "SQL Server"}</p>
+            {selected ? <><h2>{selected.title}</h2><p className="muted">SQL Server</p>
               <dl className="teacher-list-detail-facts">
                 <div><dt><TranslatedText>{t("Database")}</TranslatedText></dt><dd>SQL Server</dd></div>
                 <div><dt><TranslatedText>{t("DML datasets")}</TranslatedText></dt><dd>{datasetsFromEntry(selected).filter(dataset => dataset.sql.trim()).length}</dd></div>

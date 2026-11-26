@@ -1,3 +1,4 @@
+import { Select } from "@/shared/ui/Select";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Play, Trash2 } from "lucide-react";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
@@ -8,7 +9,6 @@ import { teacherService } from "@/shared/api/teacherService";
 import { ProblemSqlEditor } from "@/features/teacher/problem-editor/ProblemSqlEditor";
 import { TeacherExerciseCollection } from "@/features/teacher/problem-editor/TeacherExerciseCollection";
 import { TeacherQuestionCard } from "@/features/teacher/problem-editor/TeacherQuestionCard";
-import { SqlFileNameInput } from "@/features/teacher/problem-editor/SqlFileNameInput";
 import { TeacherRunResult } from "@/features/teacher/problem-editor/TeacherRunResult";
 import { TeacherResultTable } from "@/features/teacher/problem-editor/TeacherResultTable";
 import { QuestionTagSelectors } from "@/features/teacher/problem-editor/QuestionTagSelectors";
@@ -22,7 +22,7 @@ type DatasetResult = {
 type Run = { running: boolean; source: string; results: DatasetResult[] };
 
 export function initialSqlSolutions(solutions?: TeacherSqlSolution[] | null, legacyQuery = "", legacyId: string = crypto.randomUUID()): TeacherSqlSolution[] {
-  return solutions?.length ? solutions.map(solution => ({ ...solution, enabled: solution.enabled !== false, description: solution.description || "", setupSql: solution.setupSql || "", expectedOutputs: solution.expectedOutputs || [], expectedOutputVisible: solution.expectedOutputVisible !== false })) : [{ id: legacyId, name: "DQL1.sql", description: "", expectedOutputs: [], expectedOutputVisible: true, query: legacyQuery, enabled: true, timeLimitMs: 5000 }];
+  return solutions?.length ? solutions.map(solution => ({ ...solution, enabled: solution.enabled !== false, description: solution.description || "", setupSql: solution.setupSql || "", expectedOutputs: solution.expectedOutputs || [], expectedOutputVisible: solution.expectedOutputVisible !== false })) : [{ id: legacyId, description: "", expectedOutputs: [], expectedOutputVisible: true, query: legacyQuery, enabled: true, timeLimitMs: 5000 }];
 }
 
 function TimeLimitInput({ value, onChange, id, disabled = false }: { value: number; onChange: (value: number) => void; id: string; disabled?: boolean }) {
@@ -114,10 +114,7 @@ export function TeacherSqlSolutions({ solutions, schema, datasets, onChange,
   return <TeacherExerciseCollection id="teacher-dql-exercise" title={tr("DQL questions")} addLabel="Add question" count={solutions.length} disabled={readOnly}
     onAdd={() => {
       if (readOnly) return;
-      const names = new Set(solutions.map(item => item.name));
-      let number = solutions.length + 1;
-      while (names.has(`DQL${number}.sql`)) number++;
-      onChange([...solutions, { id: crypto.randomUUID(), name: `DQL${number}.sql`, description: "", query: "", enabled: true, timeLimitMs: 5000, expectedOutputs: [], expectedOutputVisible: true }]);
+      onChange([...solutions, { id: crypto.randomUUID(), description: "", query: "", enabled: true, timeLimitMs: 5000, expectedOutputs: [], expectedOutputVisible: true }]);
     }}>
     {solutions.map((solution, index) => {
       const run = runs[solution.id];
@@ -130,8 +127,6 @@ export function TeacherSqlSolutions({ solutions, schema, datasets, onChange,
             disabled={readOnly} readOnly={readOnly}
             onChange={event => change(solution.id, { description: event.target.value })} />
         </label>}
-          fileName={<SqlFileNameInput label={tr("Question {value0} file name", { value0: index + 1 })}
-          value={solution.name} disabled={readOnly || run?.running} onChange={name => change(solution.id, { name })} />}
         tagControls={<QuestionTagSelectors
           part="DQL"
           difficulty={solution.difficulty}
@@ -145,7 +140,7 @@ export function TeacherSqlSolutions({ solutions, schema, datasets, onChange,
               onChange(solutions.filter(item => item.id !== solution.id));
             }}><Trash2 size={15} /></button>}>
 
-        <details className="teacher-stage-setup" open={expandedSetups[solution.id] ?? Boolean(solution.setupSql?.trim())}
+        <details className="teacher-stage-setup-field" open={expandedSetups[solution.id] ?? Boolean(solution.setupSql?.trim())}
           onToggle={event => {const open=event.currentTarget.open;setExpandedSetups(current=>current[solution.id]===open?current:{...current,[solution.id]:open});}}>
           <summary><ChevronDown size={14} aria-hidden="true"/><TranslatedText>{tr("SQL setup before this question (optional)")}</TranslatedText></summary>
           <ProblemSqlEditor label={tr("SQL setup before this question (optional)")} value={solution.setupSql || ""}
@@ -160,6 +155,23 @@ export function TeacherSqlSolutions({ solutions, schema, datasets, onChange,
             readOnly={readOnly}
             placeholder={tr("-- Example SQL Server query\nSELECT CustomerId, FullName\nFROM Customers\nORDER BY CustomerId;")}
             onChange={(query) => change(solution.id, { query })} />
+        </div>
+        <div className="teacher-grading-options" role="group" aria-label={tr("Grading options")}>
+          <label className="teacher-grading-option">
+            <span><TranslatedText>{tr("Row order")}</TranslatedText></span>
+            <Select aria-label={tr("Row order")} disabled={readOnly}
+              value={solution.checkRowOrder === true ? "on" : solution.checkRowOrder === false ? "off" : "auto"}
+              onChange={event => change(solution.id, { checkRowOrder: event.target.value === "on" ? true : event.target.value === "off" ? false : null })}>
+              <option value="auto">{tr("Automatic (checked when the answer has ORDER BY)")}</option>
+              <option value="on">{tr("Check row order")}</option>
+              <option value="off">{tr("Ignore row order")}</option>
+            </Select>
+          </label>
+          <label className="teacher-grading-option teacher-grading-check">
+            <input type="checkbox" checked={Boolean(solution.ignoreColumnNames)} disabled={readOnly}
+              onChange={event => change(solution.id, { ignoreColumnNames: event.target.checked })} />
+            <span><TranslatedText>{tr("Ignore column names (compare values by column position)")}</TranslatedText></span>
+          </label>
         </div>
         <div className="teacher-solution-run-row">
           <span className="teacher-solution-timing" aria-live="polite">

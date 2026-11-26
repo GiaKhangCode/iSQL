@@ -11,7 +11,7 @@ use App\Http\Controllers\ClassRosterController;
 // GHI (tạo/sửa/xóa lớp, phân giảng viên, thêm/bớt sinh viên): quyền class.manage.
 // Đặt lại mật khẩu sinh viên: quyền student.reset_password, trong lớp mình dạy.
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
-    Route::middleware('capability:class.manage,assignment.create,examination.manage,results.view_all')->group(function () {
+    Route::middleware('capability:class.manage,class.teach,assignment.create,examination.manage,results.view_all')->group(function () {
         Route::get('/courses', [CatalogController::class, 'courses']);
         Route::get('/terms', [CatalogController::class, 'terms']);
     });

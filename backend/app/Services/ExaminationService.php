@@ -21,6 +21,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ExaminationService
 {
@@ -242,9 +243,8 @@ class ExaminationService
             if (array_key_exists('show_scores_after_submit', $data)) {
                 $session->show_scores_after_submit = (bool) $data['show_scores_after_submit'];
             }
-            if (array_key_exists('max_submissions', $data)) {
-                $session->max_submissions = $data['max_submissions'] !== null ? (int) $data['max_submissions'] : 1;
-            }
+            // Bài thi chỉ có một lần nộp toàn bài (Nộp & Thoát), nên số lượt nộp luôn là 1.
+            $session->max_submissions = 1;
             if (array_key_exists('proctors', $data)) {
                 $session->proctors = $this->cleanTextList((array) $data['proctors']);
             }
@@ -648,6 +648,8 @@ class ExaminationService
 
         $raw = $ap->question_selection;
         $variants = $raw['_variants'] ?? null;
+        // Mã đề ghi câu nào thuộc nhóm câu hỏi nào: groups[PHẦN][mã câu] = mã nhóm (xem pointsForQuestions).
+        $chosenGroups = [];
         if (is_array($variants) && count($variants) > 0) {
             $chosen = null;
             // First check if student was assigned a specific variant in ExamAdmission
@@ -668,6 +670,7 @@ class ExaminationService
             }
 
             if (is_array($chosen)) {
+                $chosenGroups = is_array($chosen['groups'] ?? null) ? $chosen['groups'] : [];
                 $chosenQuestions = $chosen['questions'] ?? $chosen['selection'] ?? [];
                 if (is_array($chosenQuestions)) {
                     $raw = array_merge($raw, $chosenQuestions, [
@@ -737,17 +740,7 @@ class ExaminationService
                 $ids = array_values(array_filter($available, fn ($id) => isset($reqSet[$id])));
             }
 
-            $qPoints = [];
-            // Điểm từng câu: trong cấu hình của phần (`questionPoints`) hoặc ở cấp trên cùng (`_questionPoints[PHẦN]`),
-            // cách sau dùng được khi phần chỉ là mảng mã câu như giao diện soạn kỳ thi lưu.
-            $rawPoints = $rule['questionPoints'] ?? $rule['question_points'] ?? $raw['_questionPoints'][$part] ?? [];
-            if (is_array($rawPoints)) {
-                foreach ($ids as $qid) {
-                    if (isset($rawPoints[$qid]) && is_numeric($rawPoints[$qid]) && (float) $rawPoints[$qid] > 0) {
-                        $qPoints[$qid] = round((float) $rawPoints[$qid], 2);
-                    }
-                }
-            }
+            $qPoints = $this->pointsForQuestions($raw, $rule, $part, $ids, $chosenGroups[$part] ?? []);
 
             $resolved[$part] = [
                 'mode'           => $mode,
@@ -759,6 +752,54 @@ class ExaminationService
         }
 
         return $resolved;
+    }
+
+    /**
+     * Điểm từng câu của một phần, [mã câu => điểm], theo thứ tự ưu tiên:
+     *  1. câu chung: `_sharedRules[PHẦN][].points` của dòng có `questionId` là câu đó;
+     *  2. nhóm câu hỏi (kỳ thi): `_autoRules[PHẦN][].points` là điểm MỖI CÂU; nhóm của câu lấy từ
+     *     `groups[mã câu]` ghi trong mã đề lúc sinh;
+     *  3. điểm theo từng câu (bài tập): `questionPoints` trong cấu hình của phần hoặc `_questionPoints[PHẦN]`.
+     * Câu không có điểm nào thì không có mặt trong kết quả (QuestionScoring chia phần điểm còn lại).
+     *
+     * @param  array<string,string>  $groupOf  mã câu => mã nhóm, của mã đề sinh viên nhận
+     * @return array<string,float>
+     */
+    protected function pointsForQuestions(array $raw, mixed $rule, string $part, array $ids, array $groupOf): array
+    {
+        $positive = fn ($value) => is_numeric($value) && (float) $value > 0 ? round((float) $value, 2) : null;
+
+        $sharedPoints = [];
+        foreach ((array) ($raw['_sharedRules'][$part] ?? []) as $shared) {
+            $qid = is_array($shared) ? (string) ($shared['questionId'] ?? '') : '';
+            $points = is_array($shared) ? $positive($shared['points'] ?? null) : null;
+            if ($qid !== '' && $points !== null) {
+                $sharedPoints[$qid] = $points;
+            }
+        }
+        $groupPoints = [];
+        foreach ((array) ($raw['_autoRules'][$part] ?? []) as $group) {
+            $gid = is_array($group) ? (string) ($group['id'] ?? '') : '';
+            $points = is_array($group) ? $positive($group['points'] ?? null) : null;
+            if ($gid !== '' && $points !== null) {
+                $groupPoints[$gid] = $points;
+            }
+        }
+        $perQuestion = is_array($rule) ? ($rule['questionPoints'] ?? $rule['question_points'] ?? null) : null;
+        $perQuestion = is_array($perQuestion) ? $perQuestion : ($raw['_questionPoints'][$part] ?? []);
+
+        $result = [];
+        foreach ($ids as $qid) {
+            $qid = (string) $qid;
+            $points = $sharedPoints[$qid]
+                ?? (isset($groupOf[$qid]) ? ($groupPoints[(string) $groupOf[$qid]] ?? null) : null)
+                ?? (is_array($perQuestion) ? $positive($perQuestion[$qid] ?? null) : null);
+            if ($points !== null) {
+                $result[$qid] = $points;
+            }
+        }
+
+        return $result;
     }
 
     protected function deterministicSample(array $pool, int $count, string $seedStr): array
@@ -981,6 +1022,7 @@ class ExaminationService
 
         $fallbackExamDate = (string) ($payload['examDate'] ?? $payload['exam_date'] ?? date('Y-m-d'));
         $defaultProblems = $payload['problems'] ?? $payload['template']['problems'] ?? [];
+        $this->assertSingleProblem((array) $defaultProblems);
 
         $existingById = collect([]);
         if ($examinationId) {
@@ -1004,6 +1046,7 @@ class ExaminationService
             $studentEmails = array_values(array_unique(array_filter(array_map('strval', (array) ($item['studentEmails'] ?? $item['student_emails'] ?? [])))));
 
             $sessionProblems = !empty($item['problems']) ? $item['problems'] : $defaultProblems;
+            $this->assertSingleProblem((array) $sessionProblems);
             if ($existingSession && empty($sessionProblems)) {
                 $sessionProblems = $this->sessionProblemsPayload($existingSession);
             }
@@ -1031,9 +1074,22 @@ class ExaminationService
                 ? ($item['classProctors'] ?? $item['class_proctors'])
                 : [];
 
-            $published = array_key_exists('published', $item) && $item['published'] !== null
-                ? (bool) $item['published']
-                : (bool) ($payload['published'] ?? false);
+            // Công bố là của cả kỳ thi: giao diện gửi `published` trong `template` (hoặc cấp trên cùng) và nó thắng cờ cũ
+            // của từng ca (ca được tải về từ lần lưu nháp trước vẫn mang published = false). Không có thì giữ cờ của ca.
+            $explicitPublished = $payload['published'] ?? $payload['template']['published'] ?? null;
+            $published = $explicitPublished !== null
+                ? (bool) $explicitPublished
+                : (array_key_exists('published', $item) && $item['published'] !== null ? (bool) $item['published'] : false);
+
+            if ($published) {
+                foreach ($classIds as $classId) {
+                    $assigned = $classProctors[$classId] ?? [];
+                    $hasProctor = is_array($assigned) && count(array_filter(array_map(fn ($v) => trim((string) $v), $assigned))) > 0;
+                    if (! $hasProctor) {
+                        abort(422, "Ca {$sessionNumber}: mỗi lớp cần ít nhất một giám thị.");
+                    }
+                }
+            }
 
             $normalized[] = [
                 'id'               => $existingSession ? $existingSession->id : null,
@@ -1152,7 +1208,8 @@ class ExaminationService
         $session->exam_mode = true;
         $session->exam_violation_limit = isset($opts['examViolationLimit']) ? (int) $opts['examViolationLimit'] : 2;
         $session->show_scores_after_submit = (bool) ($opts['showScoresAfterSubmit'] ?? false);
-        $session->max_submissions = isset($opts['maxSubmissions']) && $opts['maxSubmissions'] !== null ? (int) $opts['maxSubmissions'] : 1;
+        // Bài thi chỉ có một lần nộp toàn bài (Nộp & Thoát), nên số lượt nộp luôn là 1.
+        $session->max_submissions = 1;
 
         $session->save();
 
@@ -1232,8 +1289,22 @@ class ExaminationService
         }
     }
 
+    /** Mỗi bài thi chỉ có một bài toán (nhiều câu hỏi nhưng thuộc cùng bài toán đó). */
+    protected function assertSingleProblem(array $problems): void
+    {
+        $count = count(array_filter(array_values($problems), function ($item) {
+            return (bool) (is_array($item) ? ($item['id'] ?? $item['problem_id'] ?? null) : $item);
+        }));
+        if ($count > 1) {
+            throw ValidationException::withMessages([
+                'problems' => ['Mỗi bài thi chỉ được có một bài toán (nhiều câu hỏi nhưng cùng thuộc bài toán đó).'],
+            ]);
+        }
+    }
+
     protected function syncSessionProblems(Assignment $session, array $problems): void
     {
+        $this->assertSingleProblem($problems);
         $session->assignmentProblems()->delete();
 
         foreach (array_values($problems) as $idx => $item) {

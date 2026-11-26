@@ -15,7 +15,7 @@ export function ProblemQuestionNavigation({
   variantCode,
 }: {
   part: WorkspacePart;
-  questions: { id: string; name: string }[];
+  questions: { id: string; description?: string }[];
   selectedId?: string;
   onChange: (id: string) => void;
   disabled?: boolean;

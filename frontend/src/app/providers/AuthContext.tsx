@@ -4,34 +4,32 @@ import {
   type StudentSession,
 } from "@/features/auth/authService";
 import {apiFetch} from "@/shared/api/apiClient";
-import {normalizeAreas, pickArea, readPreferredArea, writePreferredArea, type Area} from "@/shared/lib/access/areas";
+import {buildAreas, pickArea, readPreferredArea, writePreferredArea, type AccessRole, type Area} from "@/shared/lib/access/areas";
 type Auth = {
   session: StudentSession | null;
   permissions: string[] | null;
-  /** Khu vực giao diện được vào (thuộc tính của các vai trò); null = chưa tải xong. */
+  /** Khu vực giao diện = mỗi vai trò có tab (tên khu vực là tên vai trò), thêm "extra" khi có tab chỉ mở được nhờ quyền gán riêng; null = chưa tải xong. */
   areas: Area[] | null;
-  /** Khu vực dùng làm trang chủ: lựa chọn đã lưu nếu còn hợp lệ, ngược lại theo thứ tự ưu tiên. */
+  /** Khu vực dùng làm trang chủ: lựa chọn đã lưu nếu còn tồn tại, ngược lại khu vực đầu tiên. */
   preferredArea: Area | null;
-  isSuperAdmin: boolean;
   permissionsError: string;
   /** Ghi nhớ khu vực người dùng vừa chọn/vừa vào (chỉ ảnh hưởng trang chủ). */
-  chooseArea: (area: Area) => void;
+  chooseArea: (areaId: string) => void;
   login: (email: string, password: string) => Promise<StudentSession>;
   examLogin: (username:string,password:string) => Promise<StudentSession>;
-  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
 };
-type Access={key:string;permissions:string[];areas:Area[];isSuperAdmin:boolean;error:string};
+type Access={key:string;permissions:string[];roles:AccessRole[];direct:string[];error:string};
 const AuthContext = createContext<Auth | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState(authService.restoreSession);
   const [access,setAccess]=useState<Access|null>(null);
-  const [chosen,setChosen]=useState<{userId:string;area:Area}|null>(null);
+  const [chosen,setChosen]=useState<{userId:string;areaId:string}|null>(null);
   const accessKey=session?`${session.id}:${session.account_type}:${session.examSessionId||''}`:'';
   useEffect(()=>{
     if(!session||session.examSessionId){setAccess(null);return;}
     let active=true;let running=false;
-    const refresh=async()=>{if(running)return;running=true;try{const value=await apiFetch<{permissions:string[];areas?:string[];isSuperAdmin?:boolean}>('/api/auth/permissions');if(active)setAccess({key:accessKey,permissions:value.permissions,areas:normalizeAreas(value.areas),isSuperAdmin:Boolean(value.isSuperAdmin),error:''});}catch(e){if(active)setAccess({key:accessKey,permissions:[],areas:[],isSuperAdmin:false,error:e instanceof Error?e.message:'Không tải được quyền truy cập.'});}finally{running=false;}};
+    const refresh=async()=>{if(running)return;running=true;try{const value=await apiFetch<{permissions:string[];roles?:AccessRole[];directPermissions?:string[]}>('/api/auth/permissions');if(active)setAccess({key:accessKey,permissions:value.permissions,roles:Array.isArray(value.roles)?value.roles:[],direct:Array.isArray(value.directPermissions)?value.directPermissions:[],error:''});}catch(e){if(active)setAccess({key:accessKey,permissions:[],roles:[],direct:[],error:e instanceof Error?e.message:'Không tải được quyền truy cập.'});}finally{running=false;}};
     void refresh();const timer=setInterval(()=>void refresh(),30000);window.addEventListener('focus',refresh);
     return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',refresh);};
   },[accessKey]);
@@ -45,20 +43,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const current=access?.key===accessKey?access:null;
-  const areas=session?.examSessionId?[]:current?.areas??null;
-  const stored=session?.id&&chosen?.userId===session.id?chosen.area:readPreferredArea(session?.id);
+  // Tài khoản thi tạm không có vai trò nên không có khu vực.
+  const areas:Area[]|null=session?.examSessionId?[]:current?buildAreas(current.roles,current.direct):null;
+  const stored=session?.id&&chosen?.userId===session.id?chosen.areaId:readPreferredArea(session?.id);
 
   const auth: Auth = {
     session,
     permissions:session?.examSessionId?[]:current?.permissions??null,
     areas,
     preferredArea:areas?pickArea(areas,stored):null,
-    isSuperAdmin:current?.isSuperAdmin??false,
     permissionsError:current?.error??'',
-    chooseArea:(area)=>{
+    chooseArea:(areaId)=>{
       if(!session?.id)return;
-      writePreferredArea(session.id,area);
-      setChosen({userId:session.id,area});
+      writePreferredArea(session.id,areaId);
+      setChosen({userId:session.id,areaId});
     },
     examLogin: async (username,password)=>{
       const user=await authService.examLogin(username,password);
@@ -70,8 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(user);
       return user;
     },
-    register: async (n, e, p) =>
-      setSession(await authService.register(n, e, p)),
     logout: () => {
       authService.logout();
       setSession(null);

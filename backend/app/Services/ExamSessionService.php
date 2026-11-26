@@ -72,7 +72,6 @@ class ExamSessionService
             $plan->save();
 
             $session->published = true;
-            $session->show_scores_after_submit = false;
             $session->save();
 
             $this->examinationService->ensureSessionStudentAccounts($session, $session->examination_id);

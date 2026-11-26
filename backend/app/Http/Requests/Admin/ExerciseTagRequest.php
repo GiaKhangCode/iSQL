@@ -11,7 +11,7 @@ class ExerciseTagRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // Quyền class.manage được chặn ở route admin và kiểm tiếp trong ExerciseTagService.
+        // Quyền tag.manage được chặn ở route admin và kiểm tiếp trong ExerciseTagService.
         return $this->user() !== null;
     }
 

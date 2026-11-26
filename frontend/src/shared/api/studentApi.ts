@@ -1,13 +1,11 @@
 import { matchesListSearch } from "@/shared/lib/listSearch";
 import { apiFetch } from "@/shared/api/apiClient";
 import { storage } from "@/shared/api/storage";
-import type { Assignment, ExamSession, Deadline, WorkspacePart } from "@/data/models";
+import type { Assignment, ExamSession, Deadline, ExpectedOutputSample, WorkspacePart } from "@/data/models";
 import type { WorkspaceDatabaseState } from "@/shared/types/workspaceDatabase";
 import { localDate, localTime, parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
 import type { QueryResult } from "@/shared/types/queryResult";
-import type { DailySubmission } from "@/shared/types/dailySubmission";
 export type { QueryResult } from "@/shared/types/queryResult";
-export type { DailySubmission } from "@/shared/types/dailySubmission";
 
 export interface StudentAssignments {
   classes: { id: string; code: string; name: string; lecturer: string; createdAt?: string | null }[];
@@ -32,7 +30,6 @@ export interface DashboardStats {
   hard: number;
   continuing: any[];
   deadlines: any[];
-  submissionsPerDay: DailySubmission[];
   deadlinesError?: string;
 }
 
@@ -96,10 +93,18 @@ export const studentApi = {
     apiFetch(`/api/problems/${encodeURIComponent(id)}/workspace/questions/submit`,{method:"POST",body:JSON.stringify(input)}),
   getQuestionDatabase: (id: string, input: {part: "DDL" | "DML" | "SQL" | "TRIGGER"; solutionId: string; source: "Practice" | "Assignments" | "ExamSession"; context: string}): Promise<WorkspaceDatabaseState> =>
     apiFetch(`/api/problems/${encodeURIComponent(id)}/workspace/database`, {method:"POST",body:JSON.stringify(input)}),
+  /** Bảng "Kết quả mong đợi" của câu DQL, backend tính khi cần (chỉ các bộ dữ liệu không ẩn). */
+  getExpectedOutput: (id: string, input: {solutionId: string; source: "Practice" | "Assignments" | "ExamSession"; context: string}): Promise<{visible: boolean; samples: ExpectedOutputSample[]}> =>
+    apiFetch(`/api/problems/${encodeURIComponent(id)}/workspace/expected-output`, {method:"POST",body:JSON.stringify(input)}),
+  /** Cấu trúc và dữ liệu đang có trong schema riêng của sinh viên (đọc lại từ SQL Server, không chạy script). */
+  getCurrentDatabase: (id: string, input: {source: "Practice" | "Assignments" | "ExamSession"; context: string}): Promise<WorkspaceDatabaseState> =>
+    apiFetch(`/api/problems/${encodeURIComponent(id)}/workspace/current`, {method:"POST",body:JSON.stringify(input)}),
+  /** Làm lại từ đầu: xóa mọi bảng trong schema riêng của sinh viên cho bài này. */
+  resetStudentDatabase: (id: string, input: {source: "Practice" | "Assignments" | "ExamSession"; context: string}): Promise<WorkspaceDatabaseState> =>
+    apiFetch(`/api/problems/${encodeURIComponent(id)}/workspace/reset`, {method:"POST",body:JSON.stringify(input)}),
   getDashboard: async (): Promise<DashboardStats> => {
-    const tzOffset = new Date().getTimezoneOffset();
     const [dashboardResult, enrolledResult] = await Promise.allSettled([
-      apiFetch(`/api/student/dashboard?tz_offset=${tzOffset}`) as Promise<DashboardStats>,
+      apiFetch("/api/student/dashboard") as Promise<DashboardStats>,
       apiFetch("/api/student/assignments") as Promise<StudentAssignments>,
     ]);
     if (dashboardResult.status === "rejected") throw dashboardResult.reason;

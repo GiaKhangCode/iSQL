@@ -3,6 +3,7 @@ import { Download, Key, Link2, List, Maximize2, Minimize2, Network, Table as Tab
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import type { SchemaTable } from "@/shared/lib/sql/parseDatabaseSchema";
+import { columnTraits, constraintTags } from "@/shared/lib/sql/columnConstraints";
 import "@/shared/components/DatabaseDiagram.css";
 
 type Relationship = {
@@ -13,13 +14,13 @@ type Relationship = {
   id: string;
 };
 
-const CARD_WIDTH = 264;
+const CARD_WIDTH = 380;
 const HEADER_HEIGHT = 40;
 const ROW_HEIGHT = 32;
 const COLUMN_GAP = 84;
 const PADDING = 28;
 
-export function DatabaseDiagram({ tables, allowDownload = true }: { tables: SchemaTable[]; allowDownload?: boolean }) {
+export function DatabaseDiagram({ tables, allowDownload = true, showTitle = true }: { tables: SchemaTable[]; allowDownload?: boolean; showTitle?: boolean }) {
   const { t: tr } = useLanguage("teacher");
   const arrowId = useId().replace(/:/g, "");
   const panelRef = useRef<HTMLElement>(null);
@@ -240,7 +241,17 @@ export function DatabaseDiagram({ tables, allowDownload = true }: { tables: Sche
           }
           context.font = `10px ${fontFamily}`;
           context.fillStyle = text;
+          const nameWidth = Math.min(130, context.measureText(column.name).width);
           context.fillText(column.name, x, y + 20, 130);
+          // Ràng buộc viết đầy đủ (NOT NULL, UNIQUE, DEFAULT <giá trị>) ngay sau tên cột, trước cột kiểu dữ liệu.
+          const tags = constraintTags(columnTraits(table, column));
+          const tagsX = x + nameWidth + 8;
+          const tagsRoom = node.x + CARD_WIDTH - 118 - tagsX;
+          if (tags.length && tagsRoom > 24) {
+            context.font = `600 8px ${fontFamily}`;
+            context.fillStyle = accent;
+            context.fillText(tags.map((tag) => tag.text).join(" · "), tagsX, y + 20, tagsRoom);
+          }
           context.font = `9px ${fontFamily}`;
           context.fillStyle = muted;
           context.textAlign = "right";
@@ -268,7 +279,7 @@ export function DatabaseDiagram({ tables, allowDownload = true }: { tables: Sche
 
   return <section ref={panelRef} className="teacher-schema-diagram-panel database-schema-panel" aria-label={tr("Database structure")}>
     <header className="teacher-schema-diagram-heading database-schema-heading">
-      <div className="database-schema-title"><TableIcon size={16} aria-hidden="true" /><strong><TranslatedText>{tr("Database structure")}</TranslatedText></strong></div>
+      {showTitle && <div className="database-schema-title"><TableIcon size={16} aria-hidden="true" /><strong><TranslatedText>{tr("Database structure")}</TranslatedText></strong></div>}
       <div className="database-schema-view-switch" role="group" aria-label={tr("Database display mode")}>
         <button type="button" aria-pressed={view === "list"} aria-controls={contentId} onClick={() => setView("list")}><List size={14} aria-hidden="true" /><TranslatedText>{tr("List view")}</TranslatedText></button>
         <button type="button" aria-pressed={view === "diagram"} aria-controls={contentId} onClick={() => setView("diagram")}><Network size={14} aria-hidden="true" /><TranslatedText>{tr("Diagram view")}</TranslatedText></button>
@@ -306,6 +317,7 @@ export function DatabaseDiagram({ tables, allowDownload = true }: { tables: Sche
               const foreignKey = table.foreignKeys.find((key) => key.columns.some((name) => name.toLowerCase() === column.name.toLowerCase()));
               const foreignKeyColumnIndex = foreignKey?.columns.findIndex((name) => name.toLowerCase() === column.name.toLowerCase()) ?? -1;
               const foreignKeyTarget = foreignKey ? `${foreignKey.referencedTable}.${foreignKey.referencedColumns[foreignKeyColumnIndex] || foreignKey.referencedColumns[0] || ""}` : "";
+              const tags = constraintTags(columnTraits(table, column));
               return <div
                 title={foreignKeyTarget || column.constraints || column.name}
                 className={`teacher-schema-diagram-column${isPk ? " is-pk" : ""}${foreignKey ? " is-fk" : ""}`}
@@ -317,6 +329,7 @@ export function DatabaseDiagram({ tables, allowDownload = true }: { tables: Sche
                   {isPk && <span className="teacher-schema-key-badge is-pk" title={tr("Primary key (PK)")}><Key size={10} aria-hidden="true" /> PK</span>}
                   {foreignKey && <span className="teacher-schema-key-badge is-fk" title={tr("Foreign key (FK)")}><Link2 size={10} aria-hidden="true" /> FK</span>}
                   <strong>{column.name}</strong>
+                  {tags.map((tag) => <span key={tag.text} className={`teacher-schema-constraint-tag is-${tag.kind}`} title={tag.text}>{tag.text}</span>)}
                 </div>
                 <span className="teacher-schema-diagram-type"><TranslatedText>{column.type || tr("Unknown type")}</TranslatedText></span>
                 {view === "list" && foreignKeyTarget && <small className="database-schema-reference">→ {foreignKeyTarget}</small>}

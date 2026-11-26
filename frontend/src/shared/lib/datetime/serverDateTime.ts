@@ -29,3 +29,13 @@ export function submissionTimeLabel(value: string, locale?: string): string {
   const date = parseServerDateTime(value);
   return Number.isFinite(date.getTime()) ? date.toLocaleString(locale) : value;
 }
+
+/**
+ * Nhãn tháng ngắn cho ô ngày nhỏ (vd "THG 11" / "NOV"). `toLocaleString("vi-VN", { month: "short" })` trả
+ * "tháng 11", quá dài cho ô 44px nên chữ bị xuống dòng và đẩy số ngày lệch xuống.
+ */
+export function shortMonthLabel(date: Date, locale?: string): string {
+  if (!Number.isFinite(date.getTime())) return "—";
+  if (locale?.toLowerCase().startsWith("vi")) return `THG ${date.getMonth() + 1}`;
+  return date.toLocaleString(locale, { month: "short" }).toUpperCase();
+}

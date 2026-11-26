@@ -1,20 +1,19 @@
 /**
  * Adapter between the role UI and the capability endpoints (`/api/admin/access`).
- * A role is a named set of capability codes; the interface areas it opens are derived by the server. Every role is editable except the
- * super-admin role, which always holds everything and is shown read-only.
+ * A role is a named set of capability codes. Every role is also an interface area for its holders (the navigation tabs come from the
+ * role's permissions). No role holds everything automatically, so every role is editable.
  */
 import { apiFetch } from "@/shared/api/apiClient";
 import type { IRoleService, RoleForm, RoleGroup, RolesCatalog, UserRoleAssignment } from "./types";
 
-interface ApiRole { id: string; name: string; areas?: string[]; isSuper?: boolean; userCount?: number; permissions: string[] }
+interface ApiRole { id: string; name: string; userCount?: number; permissions: string[] }
 interface ApiCatalog { roles: ApiRole[]; permissions: Record<string, string> }
 interface ApiMembership { actor: string; studentCode?: string | null; role_ids: string[]; direct_permissions?: string[]; permissions: string[] }
 
 function toRole(role: ApiRole): RoleGroup {
-  const isSuper = Boolean(role.isSuper);
   return {
-    id: role.id, name: role.name, areas: role.areas, userCount: role.userCount,
-    isSystem: isSuper, readOnly: isSuper, permissions: [...(role.permissions || [])].sort(),
+    id: role.id, name: role.name, userCount: role.userCount,
+    permissions: [...(role.permissions || [])].sort(),
   };
 }
 
@@ -25,12 +24,8 @@ function toAssignment(userId: string, data: ApiMembership): UserRoleAssignment {
 export const legacyRoleService: IRoleService = {
   async getCatalog(): Promise<RolesCatalog> {
     const data = await apiFetch<ApiCatalog>("/api/admin/access");
-    const customRoles: RoleGroup[] = [];
-    const systemRoles: RoleGroup[] = [];
-    for (const role of data.roles || []) {
-      (role.isSuper ? systemRoles : customRoles).push(toRole(role));
-    }
-    return { customRoles, systemRoles, permissions: data.permissions || {} };
+    const customRoles = (data.roles || []).map(toRole);
+    return { customRoles, systemRoles: [], permissions: data.permissions || {} };
   },
 
   async createRole(payload: RoleForm): Promise<RoleGroup> {

@@ -268,18 +268,13 @@ export function OfficeStatisticsPage() {
               <article className="statistics-card col-span-5">
                 <header>
                   <div>
-                    <h3>Tình hình xử lý đơn phúc khảo</h3>
-                    <p>Phân công giảng viên và tiến độ chấm lại</p>
+                    <h3>Tình hình phúc khảo bài thi</h3>
+                    <p>Giảng viên được phân công và tiến độ chấm lại</p>
                   </div>
                   {regrade && <span className="dash-pill is-good">Đổi điểm: {regrade.scoreChanged}</span>}
                 </header>
                 <DonutChart
                   segments={[
-                    {
-                      label: "Chưa phân công",
-                      count: regrade?.unassignedAppeals ?? 0,
-                      color: CHART_PALETTE.rose,
-                    },
                     {
                       label: "Đang chờ chấm phúc khảo",
                       count: regrade?.awaitingRegrade ?? 0,
@@ -292,7 +287,6 @@ export function OfficeStatisticsPage() {
                     },
                   ]}
                   centerLabel={
-                    (regrade?.unassignedAppeals ?? 0) +
                     (regrade?.awaitingRegrade ?? 0) +
                     (regrade?.completedRegrade ?? 0)
                   }
@@ -389,7 +383,6 @@ export function OfficeStatisticsPage() {
 function OfficeKpis({ data }: { data: TeacherStatistics }) {
   const office = data.officeOverview;
   const regradeTotal =
-    (office?.regradeSummary.unassignedAppeals ?? 0) +
     (office?.regradeSummary.awaitingRegrade ?? 0) +
     (office?.regradeSummary.completedRegrade ?? 0);
 

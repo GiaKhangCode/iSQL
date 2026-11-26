@@ -6,9 +6,7 @@ use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\RegisterLecturerRequest;
 use App\Models\ExamAdmission;
 use App\Services\ExamAdmissionService;
 use App\Services\ExamLoginService;
@@ -35,32 +33,6 @@ class AuthController extends Controller
         $this->examLoginService = $examLoginService;
     }
 
-    public function register(RegisterRequest $request): JsonResponse
-    {
-        $validatedData = $request->validated();
-        $user = $this->userService->registerStudent($validatedData);
-        $token = $user->createToken('auth-token')->plainTextToken;
-
-        return response()->json([
-            'access_token' => $token,
-            'token_type'   => 'bearer',
-            'user'         => $this->formatAuthUser($user),
-        ], 201);
-    }
-
-    public function registerLecturer(RegisterLecturerRequest $request): JsonResponse
-    {
-        $validatedData = $request->validated();
-        $user = $this->userService->registerLecturer($validatedData);
-        $token = $user->createToken('auth-token')->plainTextToken;
-
-        return response()->json([
-            'access_token' => $token,
-            'token_type'   => 'bearer',
-            'user'         => $this->formatAuthUser($user),
-        ], 201);
-    }
-
     public function login(LoginRequest $request): JsonResponse
     {
         $accountInput = trim((string) ($request->email ?? $request->input('email', '')));
@@ -77,8 +49,8 @@ class AuthController extends Controller
                 'user'         => $this->formatAuthUser($user),
             ], 200);
         } catch (Exception $e) {
-            // If user account is specifically pending or disabled, return 403 immediately
-            if ($e->getCode() === 403 || str_contains($e->getMessage(), 'chờ phê duyệt') || str_contains($e->getMessage(), 'bị vô hiệu hóa')) {
+            // If the user account is locked, return 403 immediately
+            if ($e->getCode() === 403 || str_contains($e->getMessage(), 'bị vô hiệu hóa')) {
                 return response()->json(['detail' => $e->getMessage()], 403);
             }
             // Otherwise, fall through to check temporary exam admission

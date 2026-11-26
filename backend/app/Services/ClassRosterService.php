@@ -320,7 +320,7 @@ class ClassRosterService
     {
         abort_unless($this->access->can($actor, 'student.reset_password'), 403, 'Bạn không có quyền đặt lại mật khẩu sinh viên.');
 
-        $class = $this->classService->getClass($classId, $this->access->isSuperAdmin($actor) ? null : $actor->id);
+        $class = $this->classService->getClass($classId, $this->classService->seesEveryClass($actor) ? null : $actor->id);
 
         if (! $class->students()->where('users.id', $studentId)->exists()) {
             throw ValidationException::withMessages(['student_id' => ['The student is not enrolled in this class.']]);

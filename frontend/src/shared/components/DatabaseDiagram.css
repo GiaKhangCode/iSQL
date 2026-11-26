@@ -14,6 +14,7 @@
 .database-schema-list .teacher-schema-diagram-column { display:grid; grid-template-columns:minmax(0,1fr) auto; height:auto; min-height:34px; gap:4px 8px; padding:8px 10px; }
 .database-schema-list .teacher-schema-diagram-column-name > strong { white-space:normal; overflow-wrap:anywhere; }
 .database-schema-list .teacher-schema-diagram-type { max-width:145px; white-space:normal; overflow-wrap:anywhere; text-align:right; }
+.database-schema-list .teacher-schema-diagram-column-name { flex-wrap:wrap; }
 .database-schema-reference { grid-column:1/-1; color:var(--muted); font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
 .database-schema-panel:fullscreen .teacher-schema-diagram-board.database-schema-list-board { overflow:auto; }
 .database-schema-panel:fullscreen .database-schema-list { width:min(100%,760px); margin:0 auto; }

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\AssignRegradeRequest;
-use App\Http\Requests\RegradeCandidatesRequest;
 use App\Models\User;
 use App\Services\Access\StaffAccess;
 use App\Services\RegradeAssignmentService;
@@ -24,41 +23,35 @@ class RegradeAssignmentController extends Controller
         abort_unless($this->staff->canManageExaminations($user), 403, 'Bạn không có quyền phân công chấm phúc khảo.');
     }
 
-    public function candidates(RegradeCandidatesRequest $request): JsonResponse
-    {
-        $this->requireAssigner($request->user());
-
-        return response()->json($this->regrades->candidates($request->filters()));
-    }
-
     public function reviewers(Request $request): JsonResponse
     {
         $this->requireAssigner($request->user());
 
-        $submissionId = trim((string) ($request->query('submission_id') ?? $request->query('submissionId') ?? ''));
+        $activityId = trim((string) ($request->query('activity_id') ?? $request->query('activityId') ?? ''));
+        $studentId = trim((string) ($request->query('student_id') ?? $request->query('studentId') ?? ''));
 
-        return response()->json($this->regrades->reviewers($submissionId));
+        return response()->json($this->regrades->reviewers($activityId, $studentId));
     }
 
-    public function assign(AssignRegradeRequest $request, string $submissionId): JsonResponse
+    public function assign(AssignRegradeRequest $request, string $activityId, string $studentId): JsonResponse
     {
         $user = $request->user();
         $this->requireAssigner($user);
 
-        return response()->json($this->regrades->assign($submissionId, $request->reviewerId(), $request->note(), $user));
+        return response()->json($this->regrades->assign($activityId, $studentId, $request->reviewerId(), $request->note(), $user));
     }
 
-    public function unassign(Request $request, string $submissionId): JsonResponse
+    public function unassign(Request $request, string $activityId, string $studentId): JsonResponse
     {
         $this->requireAssigner($request->user());
 
-        return response()->json($this->regrades->unassign($submissionId));
+        return response()->json($this->regrades->unassign($activityId, $studentId));
     }
 
     public function mine(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($this->staff->canGrade($user), 403, 'Bạn không có quyền xem danh sách chấm phúc khảo.');
+        abort_unless($this->staff->canRegrade($user), 403, 'Bạn không có quyền xem danh sách chấm phúc khảo.');
 
         return response()->json($this->regrades->mine($user));
     }

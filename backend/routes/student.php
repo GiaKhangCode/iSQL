@@ -12,12 +12,17 @@ use App\Http\Controllers\SubmissionController;
 // Khu vực sinh viên: quyền practice.solve. Phạm vi (lớp, bài được giao) do service quyết định.
 Route::middleware(['auth:sanctum', 'active', 'capability:practice.solve'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
-    Route::get('/assignments', [AssignmentController::class, 'index']);
     Route::get('/profile', [SubmissionController::class, 'studentProfile']);
     Route::get('/preferences', [PreferenceController::class, 'index']);
     Route::post('/preferences/favorites/{id}', [PreferenceController::class, 'toggleFavorite']);
     Route::get('/personal-db/status', [PersonalDbController::class, 'status']);
     Route::post('/personal-db/run', [PersonalDbController::class, 'runQuery']);
+
+});
+
+// Tab Bài tập: assignment.do. Tài khoản thi tạm (exam.session) vẫn làm bài trong ca thi.
+Route::middleware(['auth:sanctum', 'active', 'capability:assignment.do,exam.session'])->group(function () {
+    Route::get('/assignments', [AssignmentController::class, 'index']);
 
     // Activity Attempts (Exams / Assignments)
     Route::get('/activity-attempts/{activityId}', [ActivityAttemptController::class, 'show']);

@@ -1,4 +1,3 @@
-import {SharedContentPage, SharedPreviewPage} from "@/features/teacher/ContentSharing";
 import {ProfilePage} from "@/features/student/ProfilePage";
 import {ExamLoginPage} from "@/features/office/ExamSessionApp";
 import {apiFetch, ApiError} from "@/shared/api/apiClient";
@@ -6,7 +5,6 @@ import {ProctorPage, ProctorRoomsView} from "@/features/office/ProctorPage";
 import {AdminAccessPage} from "@/features/admin/AccessPages";
 import {ExaminationsPage} from "@/features/office/ExaminationsPage";
 import {ExamAdmissionsPage} from "@/features/office/ExamAdmissionsPage";
-import {RegradeAssignmentsPage} from "@/features/office/RegradeAssignmentsPage";
 import {MyRegradesPage} from "@/features/teacher/MyRegradesPage";
 import {ExaminationBuilderPage} from "@/features/teacher/builder/BuilderPages";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
@@ -25,12 +23,12 @@ import {
   TeacherRoute,
   OfficeRoute,
   HomeRedirect,
+  AreaIndex,
+  ExtraHome,
 } from "@/app/routes/ProtectedRoute";
 import {
   ForgotPasswordPage,
   LoginPage,
-  RegisterPage,
-  RegisterLecturerPage,
   ResetPasswordPage,
   VerifyOtpPage,
 } from "@/features/auth/AuthPages";
@@ -65,12 +63,11 @@ import {
   AdminCoursesPage,
   AdminEditClassPage,
   AdminEditAccountPage,
-  AdminLecturerApprovalsPage,
   AdminLecturersPage,
   AdminOverviewPage,
   AdminUsersPage,
 } from "@/features/admin/AdminPages";
-import { AdminExerciseTagsPage } from "@/features/admin/AdminExerciseTagsPage";
+import { ExerciseTagsPage } from "@/features/teacher/ExerciseTagsPage";
 export function App() {
   const { t } = useLanguage();
   useEffect(() => {
@@ -119,36 +116,35 @@ export function App() {
           element={<HomeRedirect />}
         />
         <Route path="/exam-login" element={<ExamLoginPage/>}/>
+        <Route path="/extra" element={<ExtraHome/>}/>
         <Route path="/proctor" element={<ProctorPage/>}/>
         <Route path="/proctor/:sessionId" element={<ProctorPage/>}/>
         <Route element={<PublicOnlyRoute />}>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/register-lecturer" element={<RegisterLecturerPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/verify-otp" element={<VerifyOtpPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route element={<Shell />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<CapabilityGuard permission="practice.solve"><DashboardPage /></CapabilityGuard>} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/practice" element={<Navigate replace to="/dashboard" />} />
-            <Route path="/assignments" element={<AssignmentsPage />} />
+            <Route path="/assignments" element={<CapabilityGuard permission="assignment.do"><AssignmentsPage /></CapabilityGuard>} />
             <Route
               path="/assignments/work/:assignmentId"
-              element={<AssignmentWorkPage />}
+              element={<CapabilityGuard permission="assignment.do"><AssignmentWorkPage /></CapabilityGuard>}
             />
             <Route
               path="/assignments/classes/:scopeId"
-              element={<AssignmentDetailPage />}
+              element={<CapabilityGuard permission="assignment.do"><AssignmentDetailPage /></CapabilityGuard>}
             />
             <Route path="/examinations" element={<StudentExaminationsPage />} />
             <Route
               path="/examinations/:examinationId"
               element={<StudentExaminationDetailPage />}
             />
-            <Route path="/submissions" element={<SubmissionsPage />} />
+            <Route path="/submissions" element={<CapabilityGuard permission="submission.view"><SubmissionsPage /></CapabilityGuard>} />
           </Route>
           <Route
             path="/workspace/:problemId"
@@ -169,28 +165,24 @@ export function App() {
         </Route>
         <Route element={<TeacherRoute />}>
           <Route path="/teacher" element={<TeacherShell />}>
-            <Route index element={<Navigate replace to="problems" />} />
-            <Route path="practice" element={<CapabilityGuard permission="practice.solve"><DashboardPage/></CapabilityGuard>}/>
+            <Route index element={<AreaIndex area="teacher" />} />
             <Route path="problems" element={<CapabilityGuard permission="problem.create"><ProblemLibraryPage /></CapabilityGuard>} />
             <Route path="problems/new" element={<CapabilityGuard permission="problem.create"><ProblemEditorPage /></CapabilityGuard>} />
             <Route path="problems/:problemId/edit" element={<CapabilityGuard permission="problem.create"><ProblemEditorPage /></CapabilityGuard>} />
+            <Route path="exercise-tags" element={<CapabilityGuard permission="tag.manage"><ExerciseTagsPage /></CapabilityGuard>} />
             <Route path="database-library" element={<CapabilityGuard permission="library.manage"><DatabaseLibraryPage /></CapabilityGuard>} />
             <Route path="assignments" element={<CapabilityGuard permission="assignment.create"><AssignmentsListPage /></CapabilityGuard>} />
             <Route path="assignments/new" element={<CapabilityGuard permission="assignment.create"><AssignmentBuilderPage /></CapabilityGuard>} />
             <Route path="assignments/:id/edit" element={<CapabilityGuard permission="assignment.create"><AssignmentBuilderPage /></CapabilityGuard>} />
-            <Route path="shared" element={<SharedContentPage/>}/>
-            <Route path="problems/:id/preview" element={<SharedPreviewPage kind="problem"/>}/>
-            <Route path="database-library/:id/preview" element={<SharedPreviewPage kind="library"/>}/>
-            <Route path="classes" element={<ClassesPage />} />
-            <Route path="exams" element={<ProctorRoomsView />} />
-            <Route path="exams/:sessionId" element={<ProctorRoomsView />} />
+            <Route path="classes" element={<CapabilityGuard permission="class.teach"><ClassesPage /></CapabilityGuard>} />
+            <Route path="exams" element={<CapabilityGuard permission="exam.proctor"><ProctorRoomsView /></CapabilityGuard>} />
+            <Route path="exams/:sessionId" element={<CapabilityGuard permission="exam.proctor"><ProctorRoomsView /></CapabilityGuard>} />
             <Route path="exams/:activityId/grade" element={<CapabilityGuard permission="results.grade"><ActivityResultsPage /></CapabilityGuard>} />
             <Route path="exams/review/:submissionId" element={<CapabilityGuard permission="results.grade"><ManualReviewPage /></CapabilityGuard>} />
             <Route path="exams/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="results.grade"><ManualReviewPage /></CapabilityGuard>} />
-            <Route path="regrade" element={<CapabilityGuard permission="results.grade"><MyRegradesPage /></CapabilityGuard>} />
-            <Route path="regrade-assignments" element={<CapabilityGuard permission="examination.manage"><RegradeAssignmentsPage /></CapabilityGuard>} />
+            <Route path="regrade" element={<CapabilityGuard permission="results.regrade"><MyRegradesPage /></CapabilityGuard>} />
             <Route path="results" element={<CapabilityGuard permission="results.grade"><ResultsDashboardPage /></CapabilityGuard>} />
-            <Route path="statistics" element={<CapabilityGuard permission="results.grade"><StatisticsPage /></CapabilityGuard>} />
+            <Route path="statistics" element={<CapabilityGuard permission="statistics.view"><StatisticsPage /></CapabilityGuard>} />
             <Route path="results/activity/:activityId" element={<CapabilityGuard permission="results.grade"><ActivityResultsPage /></CapabilityGuard>} />
             <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="results.grade"><ManualReviewPage /></CapabilityGuard>} />
             <Route path="results/review/:submissionId" element={<CapabilityGuard permission="results.grade"><ManualReviewPage /></CapabilityGuard>} />
@@ -198,47 +190,34 @@ export function App() {
         </Route>
         <Route element={<OfficeRoute/>}>
           <Route path="/office" element={<OfficeShell/>}>
-            <Route index element={<Navigate replace to="examinations"/>}/>
+            <Route index element={<AreaIndex area="office"/>}/>
             <Route path="examinations" element={<CapabilityGuard permission="examination.manage"><ExaminationsPage/></CapabilityGuard>}/>
             <Route path="examinations/:examId/admissions" element={<CapabilityGuard permission="exam.credentials"><ExamAdmissionsPage/></CapabilityGuard>}/>
             <Route path="examinations/new" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
             <Route path="examinations/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExaminationBuilderPage/></CapabilityGuard>}/>
             <Route path="sessions" element={<CapabilityGuard permission="examination.manage"><ExamSessionsListPage/></CapabilityGuard>}/>
             <Route path="sessions/:id/edit" element={<CapabilityGuard permission="examination.manage"><ExamSessionBuilderPage/></CapabilityGuard>}/>
-            <Route path="regrade" element={<CapabilityGuard permission="examination.manage"><RegradeAssignmentsPage/></CapabilityGuard>}/>
-            <Route path="results" element={<CapabilityGuard permission="examination.manage"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
-            <Route path="statistics" element={<CapabilityGuard permission="examination.manage"><OfficeStatisticsPage/></CapabilityGuard>}/>
-            <Route path="results/activity/:activityId" element={<CapabilityGuard permission="examination.manage"><ActivityResultsPage/></CapabilityGuard>}/>
-            <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="examination.manage"><ManualReviewPage/></CapabilityGuard>}/>
-            <Route path="results/review/:submissionId" element={<CapabilityGuard permission="examination.manage"><ManualReviewPage/></CapabilityGuard>}/>
+            <Route path="results" element={<CapabilityGuard permission="exam.results"><ResultsDashboardPage defaultKind="exams" onlyExams/></CapabilityGuard>}/>
+            <Route path="statistics" element={<CapabilityGuard permission="statistics.faculty"><OfficeStatisticsPage/></CapabilityGuard>}/>
+            <Route path="results/activity/:activityId" element={<CapabilityGuard permission="exam.results"><ActivityResultsPage/></CapabilityGuard>}/>
+            <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<CapabilityGuard permission="exam.results"><ManualReviewPage/></CapabilityGuard>}/>
+            <Route path="results/review/:submissionId" element={<CapabilityGuard permission="exam.results"><ManualReviewPage/></CapabilityGuard>}/>
           </Route>
         </Route>
         <Route element={<AdminRoute />}>
           <Route path="/admin" element={<AdminShell />}>
-            <Route index element={<Navigate replace to="overview" />} />
-            <Route path="examinations" element={<ExaminationsPage/>}/>
-            <Route path="examinations/new" element={<ExaminationBuilderPage/>}/>
-            <Route path="examinations/:id/edit" element={<ExaminationBuilderPage/>}/>
-            <Route path="examinations/:examId/admissions" element={<ExamAdmissionsPage/>}/>
-            <Route path="sessions" element={<ExamSessionsListPage/>}/>
-            <Route path="sessions/:id/edit" element={<ExamSessionBuilderPage/>}/>
-            <Route path="regrade" element={<RegradeAssignmentsPage/>}/>
-            <Route path="results" element={<ResultsDashboardPage defaultKind="exams" onlyExams/>}/>
-            <Route path="results/activity/:activityId" element={<ActivityResultsPage/>}/>
-            <Route path="results/activity/:activityId/students/:studentId/problems/:problemId/review" element={<ManualReviewPage/>}/>
-            <Route path="results/review/:submissionId" element={<ManualReviewPage/>}/>
-            <Route path="users" element={<AdminUsersPage />} />
-            <Route path="users/:email/edit" element={<AdminEditAccountPage />} />
-            <Route path="users/approvals" element={<AdminLecturerApprovalsPage />} />
-            <Route path="roles" element={<AdminAccessPage />} />
-            <Route path="courses" element={<AdminCoursesPage />} />
-            <Route path="courses/classes/:classId/edit" element={<AdminEditClassPage />} />
-            <Route path="courses/lecturers" element={<AdminLecturersPage />} />
-            <Route path="assignments" element={<AdminExerciseTagsPage />} />
+            <Route index element={<AreaIndex area="admin" />} />
+            <Route path="users" element={<CapabilityGuard permission="user.manage"><AdminUsersPage /></CapabilityGuard>} />
+            <Route path="users/:email/edit" element={<CapabilityGuard permission="user.manage"><AdminEditAccountPage /></CapabilityGuard>} />
+            <Route path="roles" element={<CapabilityGuard permission="access.manage"><AdminAccessPage /></CapabilityGuard>} />
+            <Route path="courses" element={<CapabilityGuard permission="class.manage"><AdminCoursesPage /></CapabilityGuard>} />
+            <Route path="courses/classes/:classId/edit" element={<CapabilityGuard permission="class.manage"><AdminEditClassPage /></CapabilityGuard>} />
+            <Route path="courses/lecturers" element={<CapabilityGuard permission="class.manage"><AdminLecturersPage /></CapabilityGuard>} />
+            <Route path="assignments" element={<Navigate replace to="/admin/overview" />} />
             <Route path="lecturers" element={<Navigate replace to="/admin/courses/lecturers" />} />
             <Route path="practice" element={<Navigate replace to="/admin/overview" />} />
             <Route path="moderation" element={<Navigate replace to="/admin/overview" />} />
-            <Route path="overview" element={<AdminOverviewPage />} />
+            <Route path="overview" element={<CapabilityGuard permission="system.overview"><AdminOverviewPage /></CapabilityGuard>} />
           </Route>
         </Route>
         <Route

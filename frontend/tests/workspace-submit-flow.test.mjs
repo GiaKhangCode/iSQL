@@ -28,7 +28,7 @@ const output=await build({stdin:{contents:`
   export function Limit({exam=false}){const [value,set]=useState(exam?2:null);return <><SubmissionLimitControl value={value} onChange={set}/><output id="limit">{String(value)}</output></>}
 `,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'cjs',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',plugins:[{name:'submit-adapters',setup(b){
  const stub=(filter,contents)=>b.onLoad({filter},()=>({contents,loader:'tsx',resolveDir:process.cwd()}));
- stub(/[\\/]AppHeader\.tsx$/,'export const AppHeader=({workspace,workspaceActions})=><header><strong>{workspace.context}</strong>{workspaceActions}</header>;');
+ stub(/[\\/]AppHeader\.tsx$/,'export const AppHeader=({workspace,workspaceActions,workspaceExit})=><header><strong>{workspace.context}</strong>{workspaceExit}{workspaceActions}</header>;');
  stub(/[\\/]AuthContext\.tsx$/,'export const useAuth=()=>({session:{id:"S",name:"Student"}});');
  stub(/context[\\/]LanguageContext\.tsx$/,'const t=s=>s;export const useLanguage=()=>({t});');
  stub(/[\\/]studentApi\.ts$/,'export const studentApi=globalThis.__submitApi;');
@@ -49,19 +49,20 @@ try{
  const edit=async(selector,value)=>act(async()=>{const input=document.querySelector(selector);input.value=value;input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
  await mount();
  assert.equal(document.querySelector('header strong').textContent,'Final SQL Exam session','Resolve the exam session title even when an old workspace URL has no contextTitle');
- assert.equal(document.querySelector('.workspace-submission-count b').textContent,'0 / 3');
+ assert.equal(document.querySelector('.workspace-submission-count b').textContent,'0/3');
  await edit('#workspace-stage-DDL textarea','CREATE TABLE Customers(id INT)');
  await edit('#workspace-stage-DML textarea','INSERT INTO Customers VALUES(1)');
  await edit('#workspace-stage-SQL .sql-editor textarea','SELECT * FROM Customers');
  await click(button('Exit',document.querySelector('header')));
- assert.ok(document.querySelector('dialog').textContent.includes('Exiting will submit your current work'));
+ assert.ok(document.querySelector('dialog').textContent.includes('keep your draft in this browser'));
+ assert.ok(button('Leave, keep draft',document.querySelector('dialog')),'Unsubmitted work can be left as a draft without submitting');
  await click(button('Stay here',document.querySelector('dialog')));
  assert.equal(calls.length,0,'Cancelling Exit must not submit');
  await click(button('Exit',document.querySelector('header')));
  failNext=true;
  await click(button('Submit & Exit',document.querySelector('dialog')));
  assert.equal(document.querySelector('#location').textContent,'/workspace/P','A failed submission must never leave the workspace');
- assert.ok(document.querySelector('dialog [role=alert]').textContent.includes('Network unavailable'));
+ assert.ok(document.querySelector('dialog'),'A failed submission keeps the exit dialog open (the error is shown as a toast)');
  assert.equal(calls[0].input.ddl,'CREATE TABLE Customers(id INT)');
  assert.equal(calls[0].input.dml,'INSERT INTO Customers VALUES(1)');
  assert.equal(calls[0].input.query,'SELECT * FROM Customers');
@@ -77,7 +78,7 @@ try{
  await click(button('Submit',document.querySelector('dialog')));
  assert.equal(document.querySelectorAll('.workspace-submission-lock').length,3,'Every editor has a clear lock status after a combined submission');
  assert.ok([...document.querySelectorAll('.stage-code textarea,.sql-editor textarea')].every(node=>node.readOnly));
- assert.equal(document.querySelector('.workspace-submission-count b').textContent,'1 / 3');
+ assert.equal(document.querySelector('.workspace-submission-count b').textContent,'1/3');
  const savedCalls=calls.length;
  await click(button('Exit',document.querySelector('header')));
  assert.ok(document.querySelector('dialog').textContent.includes('already submitted'));

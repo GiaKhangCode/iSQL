@@ -16,6 +16,7 @@ use App\Models\WorkspaceSubmissionResult;
 use App\Services\Grading\QuestionScoring;
 use App\Services\SqlServer\QueryRewriter;
 use App\Services\SqlServer\SandboxService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -85,6 +86,46 @@ class ProblemWorkspaceService
             if ($batch !== '') {
                 $pdo->exec($batch);
             }
+        }
+    }
+
+    /**
+     * Như executeSqlBatches nhưng ghi lại số dòng của từng câu lệnh, để workspace hiện "(n rows affected)" như SSMS.
+     *
+     * Số dòng được ghi vào $rowCounts theo thứ tự chạy, kể cả khi một câu sau đó lỗi (ngoại lệ vẫn được ném ra như cũ).
+     * Với pdo_sqlsrv, mỗi câu INSERT/UPDATE/DELETE/MERGE/SELECT là một rowset riêng; câu PRINT cho -1 (bỏ qua).
+     * Batch chỉ có DDL (CREATE/ALTER/DROP) cũng trả về đúng một rowset 0, giống UPDATE không trúng dòng nào, nên số 0
+     * chỉ được ghi khi batch có lệnh DML (không tính ON DELETE/ON UPDATE của khóa ngoại).
+     *
+     * @param  list<int>  $rowCounts
+     */
+    public function executeSqlBatchesCountingRows(\PDO $pdo, string $script, array &$rowCounts): void
+    {
+        if (trim($script) === '') {
+            return;
+        }
+
+        $script = preg_replace('/^\s*USE\s+[^;\n]+;?/mi', '', $script);
+
+        foreach ($this->splitSqlBatches($script) as $batch) {
+            $batch = trim($batch);
+            if ($batch === '') {
+                continue;
+            }
+            $code = preg_replace(["/'(?:[^']|'')*'/", '/--[^\n]*/', '/\/\*.*?\*\//s'], ' ', $batch);
+            $hasDml = (bool) preg_match('/(?<!\bON\s)\b(INSERT|UPDATE|DELETE|MERGE|SELECT)\b/i', $code);
+
+            $stmt = $pdo->query($batch);
+            do {
+                if ($stmt->columnCount() > 0) {
+                    $rowCounts[] = count($stmt->fetchAll(\PDO::FETCH_NUM));
+                    continue;
+                }
+                $count = $stmt->rowCount();
+                if ($count > 0 || ($count === 0 && $hasDml)) {
+                    $rowCounts[] = $count;
+                }
+            } while ($stmt->nextRowset());
         }
     }
 
@@ -525,20 +566,86 @@ class ProblemWorkspaceService
     }
 
     /**
-     * Order-independent schema comparison keyed by lowercase table name.
+     * So sánh cấu trúc hai schema, không phụ thuộc thứ tự bảng (khóa theo tên bảng viết thường).
+     * Khóa ngoại, CHECK, DEFAULT, UNIQUE được sắp theo nội dung nên tên ràng buộc và thứ tự tạo không ảnh hưởng.
+     * Thứ tự cột (và cột khóa chính) chỉ được tính khi `$checkColumnOrder` = true (tùy chọn của câu DDL).
      */
-    public function schemasMatch(array $actual, array $expected): bool
+    public function schemasMatch(array $actual, array $expected, bool $checkColumnOrder = false): bool
     {
-        $index = function (array $tables): array {
-            $map = [];
-            foreach ($tables as $t) {
-                $key = strtolower((string) ($t['name'] ?? ''));
-                $map[$key] = $t;
-            }
-            ksort($map);
-            return $map;
+        return $this->normalizeSchemaForCompare($actual, $checkColumnOrder) == $this->normalizeSchemaForCompare($expected, $checkColumnOrder);
+    }
+
+    private function normalizeSchemaForCompare(array $tables, bool $checkColumnOrder): array
+    {
+        $sortByJson = function (array $items): array {
+            $items = array_values($items);
+            usort($items, fn ($a, $b) => strcmp(json_encode($a), json_encode($b)));
+            return $items;
         };
-        return $index($actual) == $index($expected);
+
+        $map = [];
+        foreach ($tables as $t) {
+            $key = strtolower((string) ($t['name'] ?? ''));
+            $columns = array_values($t['columns'] ?? []);
+            $primaryKeys = array_values($t['primaryKeys'] ?? []);
+            if (!$checkColumnOrder) {
+                usort($columns, fn ($a, $b) => strcmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? '')));
+                sort($primaryKeys);
+            }
+            $map[$key] = [
+                'name'        => $key,
+                'columns'     => $columns,
+                'primaryKeys' => $primaryKeys,
+                'foreignKeys' => $sortByJson($t['foreignKeys'] ?? []),
+                'constraints' => $sortByJson($t['constraints'] ?? []),
+            ];
+        }
+        ksort($map);
+
+        return $map;
+    }
+
+    /**
+     * DML: dữ liệu khớp đáp án khi mọi bảng có trong kết quả đáp án đều có ở bài làm với cùng cột và cùng các dòng
+     * (không tính thứ tự dòng). Bảng bài làm tạo thêm (bảng tạm...) bị bỏ qua; thiếu bảng hoặc khác dữ liệu là sai.
+     */
+    public function dataMatchesExpected(array $expectedTables, array $actualTables): bool
+    {
+        $actualByName = [];
+        foreach ($actualTables as $t) {
+            $actualByName[strtolower((string) ($t['name'] ?? ''))] = $t;
+        }
+        foreach ($expectedTables as $t) {
+            $name = strtolower((string) ($t['name'] ?? ''));
+            $other = $actualByName[$name] ?? null;
+            if ($other === null || $this->tableFingerprint($t) !== $this->tableFingerprint($other)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Dấu vân tay một bảng: tên cột (viết thường, theo thứ tự) + các dòng đã sắp (không tính thứ tự dòng). */
+    private function tableFingerprint(array $table): string
+    {
+        $columns = array_map(fn ($c) => strtolower((string) $c), $table['columns'] ?? []);
+        $rows = array_map(fn ($r) => json_encode(array_values((array) $r)), $table['rows'] ?? []);
+        sort($rows);
+
+        return json_encode([$columns, $rows]);
+    }
+
+    /** Dấu vân tay toàn bộ dữ liệu (mọi bảng) sau một kịch bản trigger; dùng để so giá trị mà không trả dữ liệu ra ngoài. */
+    private function dataFingerprint(array $tables): string
+    {
+        $parts = [];
+        foreach ($tables as $t) {
+            $parts[strtolower((string) ($t['name'] ?? ''))] = $this->tableFingerprint($t);
+        }
+        ksort($parts);
+
+        return md5(json_encode($parts));
     }
 
     /**
@@ -671,8 +778,24 @@ class ProblemWorkspaceService
         $schema = !empty($data['schemaName']) ? $this->sandbox()->sanitizeSchemaName((string) $data['schemaName']) : 'dbo';
         $persist = !empty($data['persist']) && $schema !== 'dbo';
 
+        // Chạy "cô lập" (DML, Trigger, xem trước CSDL xuất phát, chấm điểm): dựng lại từ đầu trong một schema tạm
+        // riêng (`<schema>_x`) rồi dọn, không bao giờ đụng vào schema sinh viên đang làm bài.
+        // DDL chạy thường trong workspace (persist, không isolated) là "cộng dồn": chỉ dựng trạng thái xuất phát khi
+        // schema còn trống, các lần sau chạy tiếp script trên những gì đang có.
+        // Chỉ DDL làm việc trên schema của sinh viên. DML và Trigger luôn chạy trên bản sao tạm của CSDL tham chiếu
+        // (trạng thái xuất phát do giảng viên đặt) rồi xóa ngay.
+        $isolated = ($prepareOnly || !empty($data['isolated']) || $part !== 'DDL') && $schema !== 'dbo';
+        if ($isolated) {
+            $schema = $this->sandbox()->sanitizeSchemaName($schema . '_x');
+            $persist = true;
+        }
+        $cumulative = $persist && !$isolated;
+
         if ($part === 'TRIGGER') {
-            $result = $this->runTriggerSingle($schemaSql, $seedData, $startFrom, $setupDdl, $setupDml, $prepareOnly ? '' : $answer, '', false, $schema, $persist);
+            $result = $this->runTriggerSingle($schemaSql, $seedData, $startFrom, $setupDdl, $setupDml, $prepareOnly ? '' : $answer, '', false, $schema, $persist, $cumulative);
+            if ($isolated) {
+                $this->dropScratchContents($schema);
+            }
             if (($result['status'] ?? '') === 'Error') {
                 return $result;
             }
@@ -697,7 +820,7 @@ class ProblemWorkspaceService
                 $knownTables = $schema !== 'dbo'
                     ? array_values(array_unique(array_merge(
                         $this->sandbox()->listTables($pdo, $schema),
-                        $this->rewriter()->extractTableNames("{$schemaSql}\n{$setupDdl}\n{$answer}")
+                        $this->rewriter()->extractTableNames("{$schemaSql}\n{$setupDdl}\n{$setupDml}\n{$answer}")
                     )))
                     : [];
 
@@ -705,10 +828,9 @@ class ProblemWorkspaceService
                     ? $this->rewriter()->rewrite($sql, $schema, $knownTables)
                     : $sql;
 
-                // In persist + prepareOnly mode, if the student already has tables in their schema,
-                // keep and inspect their persisted schema rather than wiping it.
-                $hasExistingTables = $persist && $prepareOnly && !empty($this->sandbox()->listTables($pdo, $schema));
-                if (!$hasExistingTables) {
+                // Cộng dồn: schema sinh viên đã có bảng thì giữ nguyên và chạy tiếp; chỉ dựng trạng thái xuất phát khi trống.
+                $needsBaseline = !$cumulative || empty($this->sandbox()->listTables($pdo, $schema));
+                if ($needsBaseline) {
                     $this->cleanDboSchema($pdo, $schema);
 
                     if (in_array($startFrom, ['structure', 'provided'], true)) {
@@ -729,9 +851,10 @@ class ProblemWorkspaceService
                 $startingDataTables = $part === 'DML' ? $this->readWorkspaceTables($pdo, $startingSchemaTables, 1000, true, $schema) : [];
 
                 $elapsedMs = 0.0;
+                $rowCounts = [];
                 if (!$prepareOnly) {
                     $start = microtime(true);
-                    $this->executeSqlBatches($pdo, $rewrite($answer));
+                    $this->executeSqlBatchesCountingRows($pdo, $rewrite($answer), $rowCounts);
                     $elapsedMs = round((microtime(true) - $start) * 1000, 3);
                 }
 
@@ -750,6 +873,7 @@ class ProblemWorkspaceService
                     'schemaTables'    => $afterSchemaTables,
                     'schemaName'      => $schema,
                     'executionTimeMs' => $elapsedMs,
+                    'rowCounts'       => $rowCounts,
                 ];
 
                 if (!$prepareOnly && $part === 'DDL') {
@@ -764,12 +888,16 @@ class ProblemWorkspaceService
                 if (!$persist && $pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
+                if ($isolated) {
+                    $this->dropScratchContents($schema, $pdo);
+                }
             }
         } catch (\Throwable $e) {
             $errResult = [
                 'status'          => 'Error',
                 'message'         => $e->getMessage(),
                 'executionTimeMs' => 0,
+                'rowCounts'       => $rowCounts ?? [],
             ];
             if ($persist && isset($pdo)) {
                 try {
@@ -797,7 +925,8 @@ class ProblemWorkspaceService
         string $probeSql = '',
         bool $allTables = false,
         string $schema = 'dbo',
-        bool $persist = false
+        bool $persist = false,
+        bool $cumulative = false
     ): array {
         $prepareOnly = trim($triggerSql) === '';
         $elapsedMs = 0.0;
@@ -819,7 +948,7 @@ class ProblemWorkspaceService
                 $knownTables = $safeSchema !== 'dbo'
                     ? array_values(array_unique(array_merge(
                         $this->sandbox()->listTables($pdo, $safeSchema),
-                        $this->rewriter()->extractTableNames("{$schemaSql}\n{$setupDdl}\n{$triggerSql}")
+                        $this->rewriter()->extractTableNames("{$schemaSql}\n{$setupDdl}\n{$setupDml}\n{$triggerSql}")
                     )))
                     : [];
 
@@ -827,19 +956,22 @@ class ProblemWorkspaceService
                     ? $this->rewriter()->rewrite($sql, $safeSchema, $knownTables)
                     : $sql;
 
-                $this->cleanDboSchema($pdo, $safeSchema);
+                // Cộng dồn: giữ những gì sinh viên đã có, chỉ dựng trạng thái xuất phát khi schema còn trống.
+                if (!$cumulative || empty($this->sandbox()->listTables($pdo, $safeSchema))) {
+                    $this->cleanDboSchema($pdo, $safeSchema);
 
-                if ($startFrom !== 'empty') {
-                    $this->executeSqlBatches($pdo, $rewrite($schemaSql));
-                }
-                if ($startFrom === 'provided') {
-                    $this->executeSqlBatches($pdo, $rewrite($seedData));
-                }
-                if (trim($setupDdl) !== '') {
-                    $this->executeSqlBatches($pdo, $rewrite($setupDdl));
-                }
-                if (trim($setupDml) !== '') {
-                    $this->executeSqlBatches($pdo, $rewrite($setupDml));
+                    if ($startFrom !== 'empty') {
+                        $this->executeSqlBatches($pdo, $rewrite($schemaSql));
+                    }
+                    if ($startFrom === 'provided') {
+                        $this->executeSqlBatches($pdo, $rewrite($seedData));
+                    }
+                    if (trim($setupDdl) !== '') {
+                        $this->executeSqlBatches($pdo, $rewrite($setupDdl));
+                    }
+                    if (trim($setupDml) !== '') {
+                        $this->executeSqlBatches($pdo, $rewrite($setupDml));
+                    }
                 }
 
                 [$beforeSchema] = $this->readWorkspaceSchema($pdo, $safeSchema);
@@ -851,7 +983,23 @@ class ProblemWorkspaceService
                     $elapsedMs = round((microtime(true) - $start) * 1000, 3);
 
                     if (trim($probeSql) !== '') {
-                        $this->executeSqlBatches($pdo, $rewrite($probeSql));
+                        try {
+                            $this->executeSqlBatches($pdo, $rewrite($probeSql));
+                        } catch (\Throwable $e) {
+                            // Trigger chặn thao tác (RAISERROR/THROW/ROLLBACK): đây là một kết quả hợp lệ của kịch bản,
+                            // không phải lỗi chạy. Giao dịch ngoài có thể đã bị trigger hủy nên không đọc lại dữ liệu.
+                            return [
+                                'status'          => 'Success',
+                                'part'            => 'TRIGGER',
+                                'message'         => $e->getMessage(),
+                                'blocked'         => true,
+                                'schemaTables'    => $beforeSchema,
+                                'schemaName'      => $safeSchema,
+                                'tables'          => [],
+                                'triggers'        => [],
+                                'executionTimeMs' => $elapsedMs,
+                            ];
+                        }
                     }
 
                     $quotedSchema = $pdo->quote($safeSchema);
@@ -965,6 +1113,18 @@ class ProblemWorkspaceService
                 continue;
             }
 
+            if (!empty($run['blocked'])) {
+                $preview[] = [
+                    'scenario'      => $scenarioNum,
+                    'ok'            => true,
+                    'blocked'       => true,
+                    'changedTables' => [],
+                    'dataHash'      => null,
+                    'message'       => (string) ($run['message'] ?? ''),
+                ];
+                continue;
+            }
+
             $changed = [];
             foreach ($run['tables'] ?? [] as $tbl) {
                 $tName = $tbl['name'];
@@ -973,11 +1133,15 @@ class ProblemWorkspaceService
                 }
             }
 
+            // Không bảng nào đổi nghĩa là trigger đã chặn thao tác (kể cả chặn êm, không báo lỗi).
             $preview[] = [
                 'scenario'      => $scenarioNum,
-                'ok'            => !empty($changed),
+                'ok'            => true,
+                'blocked'       => empty($changed),
                 'changedTables' => $changed,
-                'message'       => !empty($changed) ? '' : 'This scenario changed no table, so it cannot tell a correct trigger from a wrong one.',
+                // So giá trị dữ liệu sau kịch bản (không chỉ tên bảng bị đổi).
+                'dataHash'      => $this->dataFingerprint($run['tables'] ?? []),
+                'message'       => '',
             ];
         }
 
@@ -987,8 +1151,16 @@ class ProblemWorkspaceService
     /**
      * Compare two result tables (columns and rows).
      */
-    public function compareResults(array $actual, array $expected): array
+    /**
+     * So kết quả truy vấn. Tùy chọn (của câu SQL, xem sqlCompareOptions):
+     * - checkRowOrder: so dòng theo đúng thứ tự (mặc định không tính thứ tự dòng);
+     * - ignoreColumnNames: chỉ so số cột và giá trị theo vị trí, bỏ qua tên cột.
+     * Giá trị số được so theo giá trị (10.50 = 10.5).
+     */
+    public function compareResults(array $actual, array $expected, array $options = []): array
     {
+        $checkRowOrder = (bool) ($options['checkRowOrder'] ?? false);
+        $ignoreColumnNames = (bool) ($options['ignoreColumnNames'] ?? false);
         $actCols = array_map(fn ($c) => strtolower((string) $c), $actual['columns'] ?? []);
         $expCols = array_map(fn ($c) => strtolower((string) $c), $expected['columns'] ?? []);
 
@@ -996,7 +1168,7 @@ class ProblemWorkspaceService
             return [false, 'Column count mismatch: returned ' . count($actCols) . ', expected ' . count($expCols) . '.'];
         }
 
-        if ($actCols !== $expCols) {
+        if (!$ignoreColumnNames && $actCols !== $expCols) {
             return [false, 'Column names or their order do not match the expected result.'];
         }
 
@@ -1007,11 +1179,13 @@ class ProblemWorkspaceService
             return [false, 'Row count mismatch: returned ' . count($actRows) . ', expected ' . count($expRows) . '.'];
         }
 
-        $normalize = function (array $rows): array {
+        $normalize = function (array $rows) use ($checkRowOrder): array {
             $norm = array_map(function ($r) {
-                return implode('|', array_map(fn ($v) => $v !== null ? (string) $v : 'NULL', (array) $r));
+                return json_encode(array_map(fn ($v) => $this->normalizeCellValue($v), array_values((array) $r)));
             }, $rows);
-            sort($norm);
+            if (!$checkRowOrder) {
+                sort($norm);
+            }
             return $norm;
         };
 
@@ -1020,6 +1194,65 @@ class ProblemWorkspaceService
         }
 
         return [true, 'Correct!'];
+    }
+
+    /** Giá trị ô để so: số được chuẩn hóa (bỏ số 0 thừa sau dấu thập phân), NULL giữ riêng. */
+    private function normalizeCellValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+        if (preg_match('/^-?\d+\.\d+$/', $text)) {
+            $text = rtrim(rtrim($text, '0'), '.');
+        }
+        if ($text === '-0') {
+            $text = '0';
+        }
+
+        return $text;
+    }
+
+    /**
+     * Tùy chọn so kết quả của một câu SQL. `_checkRowOrder` = null nghĩa là tự động: tính thứ tự dòng khi
+     * truy vấn đáp án có ORDER BY ở mức ngoài cùng.
+     */
+    public function sqlCompareOptions(?array $expectedPayload, string $referenceQuery): array
+    {
+        $payload = $expectedPayload ?? [];
+        $rowOrder = $payload['_checkRowOrder'] ?? null;
+
+        return [
+            'checkRowOrder'     => is_bool($rowOrder) ? $rowOrder : $this->hasTopLevelOrderBy($referenceQuery),
+            'ignoreColumnNames' => (bool) ($payload['_ignoreColumnNames'] ?? false),
+        ];
+    }
+
+    /** Truy vấn có ORDER BY ở mức ngoài cùng (không tính trong ngoặc như OVER (ORDER BY ...) hay truy vấn con). */
+    public function hasTopLevelOrderBy(string $sql): bool
+    {
+        $clean = preg_replace('~/\*.*?\*/~s', ' ', $sql) ?? $sql;
+        $clean = preg_replace('/--[^\n]*/', ' ', $clean) ?? $clean;
+        $clean = preg_replace("/'(?:[^']|'')*'/", "''", $clean) ?? $clean;
+        $clean = preg_replace('/\[[^\]]*\]/', 'x', $clean) ?? $clean;
+
+        $depth = 0;
+        $flat = '';
+        foreach (str_split($clean) as $ch) {
+            if ($ch === '(') {
+                $depth++;
+                $flat .= ' ';
+                continue;
+            }
+            if ($ch === ')') {
+                $depth = max(0, $depth - 1);
+                $flat .= ' ';
+                continue;
+            }
+            $flat .= $depth === 0 ? $ch : ' ';
+        }
+
+        return (bool) preg_match('/\bORDER\s+BY\b/i', $flat);
     }
 
     /**
@@ -1085,7 +1318,10 @@ class ProblemWorkspaceService
             $this->ensureSqlServerDatabase();
             /** @var \PDO $pdo */
             $pdo = DB::connection('sqlsrv')->getPdo();
-            $this->sandbox()->ensureSchema($pdo, $schemaName);
+            // Truy vấn chạy trên bản sao tạm của CSDL tham chiếu (schema `<schema>_x`), xóa ngay sau khi chạy;
+            // không dùng và không đổi các bảng sinh viên tự tạo ở câu DDL.
+            $workSchema = $this->sandbox()->sanitizeSchemaName($schemaName . '_x');
+            $this->sandbox()->ensureSchema($pdo, $workSchema);
 
             foreach ($casesToRun as [$datasetIndex, $tc]) {
                 $script = $tc->scripts->first();
@@ -1094,42 +1330,43 @@ class ProblemWorkspaceService
                 $refQuery = $targetSolution ? $targetSolution->query : ($tc->expected_query ?? '');
 
                 $useStudentSchema = ($datasetIndex === 0);
-                $targetSchema = $useStudentSchema ? $schemaName : 'dbo';
+                $targetSchema = $useStudentSchema ? $workSchema : 'dbo';
 
                 if ($useStudentSchema) {
-                    $existingTables = $this->sandbox()->listTables($pdo, $schemaName);
-                    $knownTables = array_values(array_unique(array_merge(
-                        $existingTables,
-                        $this->rewriter()->extractTableNames("{$schemaSql}\n{$setupSql}")
-                    )));
-                    if (empty($existingTables) && trim($schemaSql) !== '') {
-                        $this->executeSqlBatches($pdo, $this->rewriter()->rewrite($schemaSql, $schemaName, $knownTables));
-                        if (trim($seedSql) !== '') {
-                            $this->executeSqlBatches($pdo, $this->rewriter()->rewrite($seedSql, $schemaName, $knownTables));
-                        }
-                        if (trim($setupSql) !== '') {
-                            $this->executeSqlBatches($pdo, $this->rewriter()->rewrite($setupSql, $schemaName, $knownTables));
-                        }
-                        $knownTables = array_values(array_unique(array_merge(
-                            $knownTables,
-                            $this->sandbox()->listTables($pdo, $schemaName)
-                        )));
-                    }
-
-                    $rewrittenRef = trim($refQuery) !== '' ? $this->rewriter()->rewrite($refQuery, $schemaName, $knownTables) : '';
-                    $rewrittenStudent = $this->rewriter()->rewrite($query, $schemaName, $knownTables);
-
-                    $pdo->beginTransaction();
+                    $knownTables = $this->rewriter()->extractTableNames("{$schemaSql}\n{$setupSql}");
                     try {
-                        $expected = $expectedOutputs[$datasetIndex] ?? null;
-                        if (!$expected && $rewrittenRef !== '') {
-                            $expected = $this->executeSelectQuery($pdo, $rewrittenRef, 10000);
+                        $this->cleanDboSchema($pdo, $workSchema);
+                        if (trim($schemaSql) !== '') {
+                            $this->executeSqlBatches($pdo, $this->rewriter()->rewrite($schemaSql, $workSchema, $knownTables));
+                            if (trim($seedSql) !== '') {
+                                $this->executeSqlBatches($pdo, $this->rewriter()->rewrite($seedSql, $workSchema, $knownTables));
+                            }
+                            if (trim($setupSql) !== '') {
+                                $this->executeSqlBatches($pdo, $this->rewriter()->rewrite($setupSql, $workSchema, $knownTables));
+                            }
+                            $knownTables = array_values(array_unique(array_merge(
+                                $knownTables,
+                                $this->sandbox()->listTables($pdo, $workSchema)
+                            )));
                         }
-                        $actual = $this->executeSelectQuery($pdo, $rewrittenStudent, 10000);
+
+                        $rewrittenRef = trim($refQuery) !== '' ? $this->rewriter()->rewrite($refQuery, $workSchema, $knownTables) : '';
+                        $rewrittenStudent = $this->rewriter()->rewrite($query, $workSchema, $knownTables);
+
+                        $pdo->beginTransaction();
+                        try {
+                            $expected = $expectedOutputs[$datasetIndex] ?? null;
+                            if (!$expected && $rewrittenRef !== '') {
+                                $expected = $this->executeSelectQuery($pdo, $rewrittenRef, 10000);
+                            }
+                            $actual = $this->executeSelectQuery($pdo, $rewrittenStudent, 10000);
+                        } finally {
+                            if ($pdo->inTransaction()) {
+                                $pdo->rollBack();
+                            }
+                        }
                     } finally {
-                        if ($pdo->inTransaction()) {
-                            $pdo->rollBack();
-                        }
+                        $this->dropScratchContents($workSchema, $pdo);
                     }
                 } else {
                     $pdo->beginTransaction();
@@ -1167,7 +1404,10 @@ class ProblemWorkspaceService
                 }
 
                 if ($expected) {
-                    [$correct, $msg] = $this->compareResults($actual, $expected);
+                    [$correct, $msg] = $this->compareResults($actual, $expected, $this->sqlCompareOptions(
+                        is_array($targetSolution?->expected) ? $targetSolution->expected : null,
+                        (string) $refQuery
+                    ));
                     $publicExpected = [
                         'name'     => $expected['name'] ?? 'Result',
                         'columns'  => $expected['columns'] ?? [],
@@ -1270,29 +1510,195 @@ class ProblemWorkspaceService
             // `_forGrading`: bên chấm (ActivityAttemptGradingService) cần kết quả thật để tính điểm; việc che điểm
             // với sinh viên do bên gọi/bên đọc lo. Không có cờ này thì ca thi ẩn điểm sẽ luôn bị chấm 0.
             $scoreVisible = !empty($data['_forGrading']) || !$activity || (bool) $activity->show_scores_after_submit;
+            // Nộp từng câu trong kỳ thi: đúng/sai và bảng so sánh luôn hiện, điểm số vẫn theo "Hiện điểm sau khi nộp".
+            $resultVisible = $scoreVisible || ($isQuestionSub && $this->isExamActivity($activity));
 
             return [
                 'id'              => $subId,
                 'questionId'      => $isQuestionSub ? $solutionId : null,
                 'questionOnly'    => $isQuestionSub,
-                'status'          => $scoreVisible ? $status : 'Submitted',
-                'message'         => $scoreVisible ? $section['message'] : 'Your submission has been saved. Scores are hidden by your instructor.',
-                'table'           => $scoreVisible ? $lastTable : null,
-                'passed'          => $scoreVisible ? $passed : 0,
+                'status'          => $resultVisible ? $status : 'Submitted',
+                'message'         => $resultVisible ? $section['message'] : 'Your submission has been saved. Scores are hidden by your instructor.',
+                'table'           => $resultVisible ? $lastTable : null,
+                'passed'          => $resultVisible ? $passed : 0,
                 'total'           => $total,
                 'score'           => $scoreVisible ? $score : null,
                 'maxScore'        => 100,
                 'scoreVisible'    => $scoreVisible,
                 'executionTimeMs' => round($elapsedMs, 3),
-                'comparisons'     => $scoreVisible ? $comparisons : [],
-                'datasets'        => $scoreVisible ? $datasets : [],
-                'sections'        => $scoreVisible ? [$section] : [],
+                'comparisons'     => $resultVisible ? $comparisons : [],
+                'datasets'        => $resultVisible ? $datasets : [],
+                'sections'        => $resultVisible ? [$this->publicQuestionSection($section, $scoreVisible)] : [],
             ];
         } catch (\Throwable $e) {
             return [
                 'status'  => 'Runtime Error',
                 'message' => $e->getMessage(),
             ];
+        }
+    }
+
+    /**
+     * Bảng "Kết quả mong đợi" của một câu DQL cho sinh viên xem trong mô tả câu hỏi.
+     *
+     * Chỉ các bộ dữ liệu không ẩn. Bảng đã lưu sẵn (`_expectedOutputs`) thì dùng luôn; chưa có thì chạy đáp án của giảng
+     * viên trên bản sao tạm của bộ dữ liệu rồi nhớ kết quả (cache theo nội dung đáp án + dữ liệu, nên sửa đáp án là tự tính lại).
+     * Giảng viên tắt "hiện kết quả mong đợi" thì trả visible = false.
+     *
+     * @return array{visible: bool, samples: list<array{dataset: int, table: array}>}
+     */
+    public function expectedOutputSamples(Problem $problem, string $questionId): array
+    {
+        $solutions = $problem->sqlSolutions()->orderBy('order_index')->get()
+            ->filter(fn ($s) => $s->enabled && trim((string) $s->query) !== '')->values();
+        $target = $questionId !== '' ? $solutions->firstWhere('id', $questionId) : $solutions->first();
+        $meta = $target && is_array($target->expected) ? $target->expected : [];
+
+        if (($meta['_expectedOutputVisible'] ?? true) === false) {
+            return ['visible' => false, 'samples' => []];
+        }
+
+        $stored = is_array($meta['_expectedOutputs'] ?? null) ? $meta['_expectedOutputs'] : [];
+        $setupSql = (string) ($meta['_setupSql'] ?? '');
+        $samples = [];
+
+        foreach ($problem->testCases()->with('scripts')->orderBy('order_index')->get() as $idx => $tc) {
+            if ($tc->is_hidden) {
+                continue;
+            }
+            $table = $stored[$idx] ?? null;
+            if (!$table) {
+                $refQuery = $target ? (string) $target->query : (string) ($tc->expected_query ?? '');
+                if (trim($refQuery) === '') {
+                    continue;
+                }
+                $script = $tc->scripts->first();
+                $table = $this->referenceOutput($refQuery, (string) ($script?->create_script ?? ''), (string) ($script?->insert_script ?? ''), $setupSql);
+            }
+            if (!$table) {
+                continue;
+            }
+            $samples[] = [
+                'dataset' => $idx + 1,
+                'table'   => [
+                    'name'     => $table['name'] ?? 'Result',
+                    'columns'  => $table['columns'] ?? [],
+                    'rows'     => array_slice($table['rows'] ?? [], 0, 100),
+                    'rowCount' => count($table['rows'] ?? []),
+                ],
+            ];
+        }
+
+        return ['visible' => true, 'samples' => $samples];
+    }
+
+    /** Chạy đáp án trên bản sao tạm của một bộ dữ liệu; null khi lỗi (không cache lỗi). */
+    protected function referenceOutput(string $refQuery, string $schemaSql, string $seedSql, string $setupSql): ?array
+    {
+        $key = 'dql-expected:' . sha1(json_encode([$refQuery, $schemaSql, $seedSql, $setupSql]));
+
+        return Cache::remember($key, now()->addDay(), function () use ($refQuery, $schemaSql, $seedSql, $setupSql, $key) {
+            $schema = $this->sandbox()->sanitizeSchemaName('exp_' . substr(sha1($key), 0, 20));
+            try {
+                $this->ensureSqlServerDatabase();
+                /** @var \PDO $pdo */
+                $pdo = DB::connection('sqlsrv')->getPdo();
+                $this->sandbox()->ensureSchema($pdo, $schema);
+                try {
+                    $this->cleanDboSchema($pdo, $schema);
+                    $known = $this->rewriter()->extractTableNames("{$schemaSql}\n{$setupSql}");
+                    foreach ([$schemaSql, $seedSql, $setupSql] as $script) {
+                        if (trim($script) !== '') {
+                            $this->executeSqlBatches($pdo, $this->rewriter()->rewrite($script, $schema, $known));
+                        }
+                    }
+                    $known = array_values(array_unique(array_merge($known, $this->sandbox()->listTables($pdo, $schema))));
+
+                    $pdo->beginTransaction();
+                    try {
+                        return $this->executeSelectQuery($pdo, $this->rewriter()->rewrite($refQuery, $schema, $known), 10000);
+                    } finally {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                    }
+                } finally {
+                    $this->dropScratchContents($schema, $pdo);
+                }
+            } catch (\Throwable) {
+                return null;
+            }
+        });
+    }
+
+    /** Dọn sạch schema tạm của chạy cô lập (giữ lại schema rỗng cho lần sau). Lỗi dọn dẹp bị bỏ qua. */
+    protected function dropScratchContents(string $schema, ?\PDO $pdo = null): void
+    {
+        try {
+            $pdo ??= DB::connection('sqlsrv')->getPdo();
+            if ($pdo->inTransaction()) {
+                return;
+            }
+            $this->cleanDboSchema($pdo, $schema);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
+     * Làm lại từ đầu: xóa mọi bảng/ràng buộc/trigger trong schema riêng của sinh viên cho bài này.
+     * Lần chạy kế tiếp sẽ dựng lại trạng thái xuất phát của câu hỏi đang làm.
+     */
+    public function resetStudentDatabase(Problem $problem, array $data, User $user): array
+    {
+        $context = (string) ($data['context'] ?? 'Practice');
+        $schema = $this->sandbox()->studentSchemaName($user->id, $context, $problem->id);
+        $empty = ['schemaName' => $schema, 'schemaTables' => [], 'tables' => []];
+
+        try {
+            $this->ensureSqlServerDatabase();
+            /** @var \PDO $pdo */
+            $pdo = DB::connection('sqlsrv')->getPdo();
+            if ($this->sandbox()->schemaExists($pdo, $schema)) {
+                $this->cleanDboSchema($pdo, $schema);
+            }
+
+            return ['status' => 'Success'] + $empty;
+        } catch (\Throwable $e) {
+            return ['status' => 'Error', 'message' => $e->getMessage()] + $empty;
+        }
+    }
+
+    /**
+     * Cấu trúc và dữ liệu đang có trong schema riêng của sinh viên cho bài này (đọc lại tại thời điểm gọi).
+     * Chỉ đọc: không tạo schema, không chạy script. Chưa có schema hoặc chưa có bảng thì trả danh sách rỗng.
+     *
+     * @return array{status: string, schemaName: string, schemaTables: array, tables: array}
+     */
+    public function readStudentDatabase(Problem $problem, array $data, User $user): array
+    {
+        $context = (string) ($data['context'] ?? 'Practice');
+        $schema = $this->sandbox()->studentSchemaName($user->id, $context, $problem->id);
+        $empty = ['status' => 'Success', 'schemaName' => $schema, 'schemaTables' => [], 'tables' => []];
+
+        try {
+            $this->ensureSqlServerDatabase();
+            /** @var \PDO $pdo */
+            $pdo = DB::connection('sqlsrv')->getPdo();
+
+            if (!$this->sandbox()->schemaExists($pdo, $schema)) {
+                return $empty;
+            }
+
+            [$schemaTables] = $this->readWorkspaceSchema($pdo, $schema);
+
+            return [
+                'status'       => 'Success',
+                'schemaName'   => $schema,
+                'schemaTables' => $schemaTables,
+                'tables'       => $this->readWorkspaceTables($pdo, $schemaTables, 1000, false, $schema),
+            ];
+        } catch (\Throwable $e) {
+            return ['status' => 'Error', 'message' => $e->getMessage()] + $empty;
         }
     }
 
@@ -1357,7 +1763,6 @@ class ProblemWorkspaceService
             'persist'     => true,
             'question'    => [
                 'id'        => $stageQuestion['id'] ?? 'q1',
-                'name'      => $stageQuestion['name'] ?? "{$part}1.sql",
                 'answer'    => $answerScript,
                 'startFrom' => $stageQuestion['startFrom'] ?? $stageQuestion['start_from'] ?? ($part === 'DDL' ? 'empty' : 'provided'),
                 'setupDdl'  => $stageQuestion['setupDdl'] ?? $stageQuestion['setup_ddl'] ?? '',
@@ -1371,6 +1776,37 @@ class ProblemWorkspaceService
         }
 
         return $result;
+    }
+
+    protected function isExamActivity(?Assignment $activity): bool
+    {
+        return $activity !== null && (bool) ($activity->examination_id || $activity->exam_mode);
+    }
+
+    /** Sinh viên chỉ nộp kiểm tra được câu thuộc đề (mã đề) của mình, và chỉ khi chưa nộp toàn bài. */
+    protected function assertQuestionInStudentExam(Assignment $activity, Problem $problem, string $part, string $questionId, User $user): void
+    {
+        if (\App\Models\ActivityAttempt::where('assignment_id', $activity->id)->where('user_id', $user->id)->where('status', 'submitted')->exists()) {
+            abort(403, 'Bài thi đã được nộp.');
+        }
+        if ($questionId === '') {
+            return;
+        }
+        $member = AssignmentProblem::where('assignment_id', $activity->id)->where('problem_id', $problem->id)->first();
+        $selection = app(ExaminationService::class)->studentSelectionForProblem($user, $activity, $member);
+        if (is_array($selection) && isset($selection[$part]['questionIds']) && !in_array($questionId, $selection[$part]['questionIds'], true)) {
+            abort(403, 'Câu hỏi này không thuộc đề của bạn.');
+        }
+    }
+
+    /** Bản kết quả từng câu gửi cho sinh viên: bỏ điểm ghi kèm khi kỳ thi ẩn điểm. */
+    protected function publicQuestionSection(array $section, bool $scoreVisible): array
+    {
+        if (!$scoreVisible) {
+            unset($section['_questionSubmission']);
+        }
+
+        return $section;
     }
 
     public function assertActivitySubmissionWindow(?Assignment $activity, User $user): void
@@ -1402,7 +1838,6 @@ class ProblemWorkspaceService
             if ($legacyQuery !== '') {
                 $sols = collect([(object) [
                     'id'          => '__base_sql__',
-                    'name'        => 'query.sql',
                     'description' => '',
                     'query'       => $legacyQuery,
                     'expected'    => is_array($problem->expected) ? $problem->expected : null,
@@ -1450,7 +1885,6 @@ class ProblemWorkspaceService
         if ($part === 'DML' && trim($schemaSql) !== '' && trim($seedSql) !== '' && (empty($questions) || (is_array($selectedIds) && in_array('__base_dml__', $selectedIds, true)))) {
             array_unshift($questions, [
                 'id'        => '__base_dml__',
-                'name'      => 'insert_data.sql',
                 'answer'    => $seedSql,
                 'startFrom' => 'structure',
                 'setupDdl'  => '',
@@ -1480,11 +1914,12 @@ class ProblemWorkspaceService
         $activity = (in_array($source, ['Assignments', 'ExamSession', 'Assignment'], true) && $context && $context !== 'Practice')
             ? Assignment::find($context)
             : null;
-        if ($activity && $activity->exam_mode && !app(StaffAccess::class)->isStaff($user)) {
-            abort(403, 'Use Submit & Exit to submit the complete exam.');
+        // Trong kỳ thi sinh viên được nộp từng câu để biết đúng/sai; lần nộp này chỉ lưu kết quả của câu, không phải nộp
+        // toàn bài (xem ActivityAttemptGradingService::applyBestQuestionSubmissions), nên không tính vào số lượt nộp.
+        $this->assertActivitySubmissionWindow($activity, $user);
+        if ($this->isExamActivity($activity) && !app(StaffAccess::class)->isStaff($user)) {
+            $this->assertQuestionInStudentExam($activity, $problem, $part, (string) ($data['solutionId'] ?? $data['solution_id'] ?? $data['questionId'] ?? $data['question_id'] ?? ''), $user);
         }
-        $this->assertActivitySubmissionWindow($activity, $user);
-        $this->assertActivitySubmissionWindow($activity, $user);
 
         if ($activity && $activity->max_submissions !== null) {
             $officialCount = Submission::where('user_id', $user->id)
@@ -1552,9 +1987,9 @@ class ProblemWorkspaceService
             'prepareOnly' => false,
             'schemaName'  => $schemaName,
             'persist'     => true,
+            'isolated'    => true,
             'question'    => [
                 'id'        => $stageQuestion['id'] ?? 'q1',
-                'name'      => $stageQuestion['name'] ?? "{$part}1.sql",
                 'answer'    => $studentScript,
                 'startFrom' => $startFrom,
                 'setupDdl'  => $setupDdl,
@@ -1576,7 +2011,6 @@ class ProblemWorkspaceService
                 'prepareOnly' => false,
                 'question'    => [
                     'id'        => $stageQuestion['id'] ?? 'q1',
-                    'name'      => $stageQuestion['name'] ?? "{$part}1.sql",
                     'answer'    => $expectedAnswer,
                     'startFrom' => $startFrom,
                     'setupDdl'  => $setupDdl,
@@ -1586,12 +2020,11 @@ class ProblemWorkspaceService
             ]);
 
             if ($part === 'DDL') {
-                $matched = $this->schemasMatch($actualRun['schemaTables'] ?? [], $expectedRun['schemaTables'] ?? []);
+                $matched = $this->schemasMatch($actualRun['schemaTables'] ?? [], $expectedRun['schemaTables'] ?? [], !empty($stageQuestion['checkColumnOrder']));
             } elseif ($part === 'DML') {
-                $changes = $this->computeDataChanges($expectedRun['tables'] ?? [], $actualRun['tables'] ?? []);
-                $matched = empty($changes);
+                $matched = $this->dataMatchesExpected($expectedRun['tables'] ?? [], $actualRun['tables'] ?? []);
             } else {
-                $matched = ($actualRun['tables'] ?? []) == ($expectedRun['tables'] ?? []);
+                $matched = $this->triggerMatchesExpected($actualRun, $expectedRun, $probes);
             }
 
             $status = $matched ? 'Accepted' : 'Wrong Answer';
@@ -1620,7 +2053,6 @@ class ProblemWorkspaceService
         $section = [
             'part'                => $part,
             'questionId'          => $qid,
-            'questionName'        => $stageQuestion['name'] ?? null,
             'status'              => $status,
             'message'             => $msg,
             'passed'              => $passed,
@@ -1641,20 +2073,22 @@ class ProblemWorkspaceService
         );
 
         $scoreVisible = !$activity || (bool) $activity->show_scores_after_submit;
+        // Trong kỳ thi, đúng/sai của câu luôn hiện (đó là mục đích nộp từng câu); chỉ điểm số phụ thuộc "Hiện điểm sau khi nộp".
+        $resultVisible = $scoreVisible || $this->isExamActivity($activity);
 
         return [
             'id'              => $subId,
             'questionId'      => $qid,
             'questionOnly'    => true,
-            'status'          => $scoreVisible ? $status : 'Submitted',
-            'message'         => $scoreVisible ? $msg : 'Your submission has been saved. Scores are hidden by your instructor.',
-            'passed'          => $scoreVisible ? $passed : 0,
+            'status'          => $resultVisible ? $status : 'Submitted',
+            'message'         => $resultVisible ? $msg : 'Your submission has been saved. Scores are hidden by your instructor.',
+            'passed'          => $resultVisible ? $passed : 0,
             'total'           => $total,
             'score'           => $scoreVisible ? $score : null,
             'maxScore'        => 100,
             'scoreVisible'    => $scoreVisible,
             'executionTimeMs' => $actualRun['executionTimeMs'] ?? 0,
-            'sections'        => $scoreVisible ? [$section] : [],
+            'sections'        => $resultVisible ? [$this->publicQuestionSection($section, $scoreVisible)] : [],
         ];
     }
 
@@ -1749,7 +2183,6 @@ class ProblemWorkspaceService
                     if ($studentSql === '') {
                         $qResults[] = [
                             'id'          => $sol->id,
-                            'name'        => $sol->name,
                             'description' => $sol->description ?? '',
                             'status'      => 'Not Answered',
                             'message'     => 'No query submitted for this question.',
@@ -1782,7 +2215,6 @@ class ProblemWorkspaceService
 
                     $qResults[] = [
                         'id'              => $sol->id,
-                        'name'            => $sol->name,
                         'description'     => $sol->description ?? '',
                         'status'          => $matched ? 'Accepted' : (($run['status'] ?? '') === 'Runtime Error' ? 'Runtime Error' : 'Wrong Answer'),
                         'message'         => $matched ? 'Passed all checks.' : ($run['message'] ?? 'Wrong Answer'),
@@ -1825,7 +2257,6 @@ class ProblemWorkspaceService
                     if ($studentScript === '') {
                         $qResults[] = [
                             'id'          => $qid,
-                            'name'        => $q['name'] ?? "{$part}.sql",
                             'description' => $q['description'] ?? '',
                             'status'      => 'Not Answered',
                             'message'     => 'No SQL submitted for this question.',
@@ -1851,9 +2282,9 @@ class ProblemWorkspaceService
                         'prepareOnly' => false,
                         'schemaName'  => $schemaName,
                         'persist'     => true,
+                        'isolated'    => true,
                         'question'    => [
                             'id'        => $qid,
-                            'name'      => $q['name'] ?? "{$part}.sql",
                             'answer'    => $studentScript,
                             'startFrom' => $startFrom,
                             'setupDdl'  => $setupDdl,
@@ -1872,7 +2303,6 @@ class ProblemWorkspaceService
                             'prepareOnly' => false,
                             'question'    => [
                                 'id'        => $qid,
-                                'name'      => $q['name'] ?? "{$part}.sql",
                                 'answer'    => $expectedAnswer,
                                 'startFrom' => $startFrom,
                                 'setupDdl'  => $setupDdl,
@@ -1881,10 +2311,9 @@ class ProblemWorkspaceService
                             ],
                         ]);
                         if ($part === 'DDL') {
-                            $matched = $this->schemasMatch($actualRun['schemaTables'] ?? [], $expectedRun['schemaTables'] ?? []);
+                            $matched = $this->schemasMatch($actualRun['schemaTables'] ?? [], $expectedRun['schemaTables'] ?? [], !empty($q['checkColumnOrder']));
                         } elseif ($part === 'DML') {
-                            $changes = $this->computeDataChanges($expectedRun['tables'] ?? [], $actualRun['tables'] ?? []);
-                            $matched = empty($changes);
+                            $matched = $this->dataMatchesExpected($expectedRun['tables'] ?? [], $actualRun['tables'] ?? []);
                         } else {
                             $matched = $this->triggerMatchesExpected($actualRun, $expectedRun, $probes);
                         }
@@ -1898,7 +2327,6 @@ class ProblemWorkspaceService
 
                     $qResults[] = [
                         'id'              => $qid,
-                        'name'            => $q['name'] ?? "{$part}.sql",
                         'description'     => $q['description'] ?? '',
                         'status'          => $matched ? 'Accepted' : (($actualRun['status'] ?? '') === 'Error' ? 'Runtime Error' : 'Wrong Answer'),
                         'message'         => $msg,
@@ -2005,6 +2433,28 @@ class ProblemWorkspaceService
     }
 
     /**
+     * Một kịch bản trigger khớp đáp án khi cả hai chạy được và cùng kết quả:
+     * - cùng bị chặn (không đổi dữ liệu, hoặc trigger báo lỗi): khớp, không so thông báo lỗi;
+     * - cùng không bị chặn: đổi cùng các bảng và dữ liệu sau kịch bản giống hệt.
+     */
+    public function triggerScenarioMatches(array $actual, array $expected): bool
+    {
+        if (empty($actual['ok']) || empty($expected['ok'])) {
+            return false;
+        }
+        $blocked = !empty($expected['blocked']);
+        if ($blocked !== !empty($actual['blocked'])) {
+            return false;
+        }
+        if ($blocked) {
+            return true;
+        }
+
+        return ($actual['changedTables'] ?? []) == ($expected['changedTables'] ?? [])
+            && ($actual['dataHash'] ?? null) === ($expected['dataHash'] ?? null);
+    }
+
+    /**
      * Compare TRIGGER execution results using probe scenarios when defined, falling back to table snapshots.
      */
     public function triggerMatchesExpected(array $actualRun, array $expectedRun, array $probes = []): bool
@@ -2013,8 +2463,7 @@ class ProblemWorkspaceService
         $actScenarios = $actualRun['scenarios'] ?? [];
         if (!empty($probes) && !empty($expScenarios)) {
             foreach ($expScenarios as $idx => $es) {
-                $as = $actScenarios[$idx] ?? [];
-                if (empty($as['ok']) || empty($es['ok']) || ($as['changedTables'] ?? []) != ($es['changedTables'] ?? [])) {
+                if (!$this->triggerScenarioMatches($actScenarios[$idx] ?? [], $es)) {
                     return false;
                 }
             }

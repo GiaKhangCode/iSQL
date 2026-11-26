@@ -20,14 +20,13 @@ class ClassService
     }
 
     /**
-     * Người xem được MỌI lớp: siêu quản trị, người quản lý lớp (class.manage), người xem kết quả mọi lớp
+     * Người xem được MỌI lớp: người quản lý lớp (class.manage), người xem kết quả mọi lớp
      * (results.view_all) và người lập kỳ thi chọn lớp (examination.manage). Người còn lại chỉ thấy lớp mình dạy.
      * Không đọc users.role.
      */
     public function seesEveryClass(User $user): bool
     {
-        return $this->access->isSuperAdmin($user)
-            || $this->access->canAny($user, ['class.manage', 'results.view_all', 'examination.manage']);
+        return $this->access->canAny($user, ['class.manage', 'results.view_all', 'examination.manage', 'exam.results']);
     }
 
     /** Danh sách lớp người dùng được xem. */
@@ -46,7 +45,7 @@ class ClassService
 
     /**
      * Người được phân công dạy lớp: tài khoản Active có quyền class.teach (qua vai trò thường hoặc gán riêng).
-     * Không đọc users.role. Siêu quản trị không tự có class.teach (PermissionCatalog::NEVER_FOR_SUPER).
+     * Không đọc users.role.
      */
     private function eligibleInstructorQuery(): Builder
     {
