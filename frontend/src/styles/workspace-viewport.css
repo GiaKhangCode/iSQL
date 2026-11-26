@@ -24,3 +24,33 @@ body:has(.problem-workspace, .workspace-standalone) {
 .problem-workspace .workspace-header .workspace-context-title,
 .workspace-standalone .workspace-header .workspace-context-title { flex:1; max-width:none; }
 @media (max-width:760px) { .workspace-header .workspace-context-title { flex:1 1 160px; max-width:calc(100% - 52px); } }
+
+/* Thanh trên của workspace (kiểu DataLemur): logo · nút Thoát · chuyển phần/câu ··· Nộp bài. Không tiêu đề, không avatar. */
+.workspace-header .workspace-exit-button { display:inline-flex; flex:none; align-items:center; gap:6px; height:36px; padding:0 14px 0 10px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface); color:var(--text); font-size:12px; font-weight:600; }
+.workspace-header .workspace-exit-button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.workspace-header .problem-workspace-tabs { justify-content:flex-start; }
+.workspace-header .workspace-action-tooltips, .workspace-header .workspace-exam-controls { margin-left:auto; }
+/* Tên bài tập ở đầu cột đề bài, trên các tab Mô tả / Cơ sở dữ liệu / Bài nộp. */
+.workspace-pane-title { flex:none; padding:14px 18px 4px; }
+.workspace-pane-title h2 { margin:0; overflow:hidden; color:var(--text); font-size:18px; line-height:26px; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Cụm trạng thái trên thanh trên cùng, bên trái nút Nộp bài: thời gian còn lại · số lần nộp · số lần rời (khi thi). */
+.workspace-header .workspace-header-status { display:flex; flex:none; align-items:center; gap:6px; margin-left:auto; }
+.workspace-header .workspace-header-status ~ .workspace-action-tooltips, .workspace-header .workspace-header-status ~ .workspace-exam-controls { margin-left:0; }
+.workspace-header-chip { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--subtle); color:var(--muted); font-size:12px; white-space:nowrap; }
+.workspace-header-chip b { color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
+.workspace-header-chip.workspace-deadline b { color:var(--accent); }
+.workspace-header-chip.is-urgent { border-color:var(--danger); background:var(--danger-subtle); color:var(--danger); }
+.workspace-header-chip.is-urgent b { color:var(--danger); }
+/* Dòng dưới editor giờ chỉ còn các nút Chạy, dồn sang phải. */
+.stage-editor-actions .stage-run-actions { margin-left:auto; }
+
+/* Nút Chạy phần đã chọn / Chạy tất cả trên thanh trên cùng, bên trái đồng hồ (đưa vào bằng portal từ editor đang mở). */
+.workspace-header .workspace-run-slot { display:flex; flex:none; align-items:center; margin-left:auto; }
+.workspace-header .workspace-run-slot:empty { display:none; }
+.workspace-header .workspace-run-slot:empty ~ .workspace-header-status { margin-left:auto; }
+.workspace-header .workspace-run-slot:not(:empty) ~ .workspace-header-status,
+.workspace-header .workspace-run-slot:not(:empty) ~ .workspace-action-tooltips,
+.workspace-header .workspace-run-slot:not(:empty) ~ .workspace-exam-controls { margin-left:0; }
+.workspace-header .workspace-run-slot .stage-run-actions { display:flex; align-items:center; gap:8px; }
+.workspace-header .workspace-run-slot .button { display:inline-flex; align-items:center; gap:6px; height:36px; white-space:nowrap; }

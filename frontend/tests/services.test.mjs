@@ -47,7 +47,7 @@ globalThis.fetch = async (url, options = {}) => {
     return response({ id: "teacher-1", name: "Teacher", initials: "T", email: "instructor@demo.local", role: "instructor" });
   }
   if (url === "/api/student/assignments") return response(enrolled);
-  if (url.startsWith("/api/student/dashboard?tz_offset=")) return response({ solved: 0, easy: 0, medium: 0, hard: 0, continuing: [], deadlines: [], submissionsPerDay: [] });
+  if (url === "/api/student/dashboard") return response({ solved: 0, easy: 0, medium: 0, hard: 0, continuing: [], deadlines: [], submissionsPerDay: [] });
   if (url === "/api/problems") return response([
     { id: "P1", title: "First query", number: "001", topic: "SELECT, WHERE", topics: ["SELECT", "WHERE"], difficulty: "Easy", progress: null, practiceListed: true },
     { id: "P2", title: "Private class query", number: "002", topic: "JOIN", topics: ["JOIN"], difficulty: "Hard", progress: null, practiceListed: false },

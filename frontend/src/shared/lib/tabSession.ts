@@ -3,21 +3,16 @@ const SESSION_PREFIX = "sqluit:tab-session:";
 /**
  * Checks whether a given pathname belongs to a tab's base path.
  * Supports exact match, prefix match (/path/...), and special aliases
- * (such as /office/sessions or /admin/sessions belonging to examinations).
+ * (such as /office/sessions belonging to examinations).
  */
 export function isPathMatchingTab(pathname: string, tabBasePath: string): boolean {
   if (!pathname || !tabBasePath) return false;
   if (pathname === tabBasePath || pathname.startsWith(tabBasePath + "/")) {
     return true;
   }
-  // Alias for examination sessions in office and admin
+  // Alias for examination sessions in office
   if (tabBasePath === "/office/examinations") {
     if (pathname === "/office/sessions" || pathname.startsWith("/office/sessions/")) {
-      return true;
-    }
-  }
-  if (tabBasePath === "/admin/examinations") {
-    if (pathname === "/admin/sessions" || pathname.startsWith("/admin/sessions/")) {
       return true;
     }
   }

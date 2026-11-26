@@ -54,17 +54,17 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
   * **[Controllers/](./app/Http/Controllers)**: Bộ điều khiển nhận yêu cầu từ client, gọi các Service để xử lý và trả về JSON:
     * **Quy tắc cứng:** controller không gọi model hay `DB::` (chỉ type-hint model và dùng hằng). Test [tests/Unit/ControllerLayerTest.php](./tests/Unit/ControllerLayerTest.php) quét thư mục này và báo đỏ khi vi phạm; danh sách ngoại lệ `LEGACY` đang rỗng.
     * [Auth/AuthController.php](./app/Http/Controllers/Auth/AuthController.php): Đăng nhập (kể cả tài khoản ca thi qua `ExamLoginService`), đăng ký sinh viên, đăng ký giảng viên, quên mật khẩu qua OTP, cấp Sanctum token.
-    * [Auth/MyPermissionsController.php](./app/Http/Controllers/Auth/MyPermissionsController.php): `GET /api/auth/permissions`: quyền hiệu lực và khu vực giao diện (`student|teacher|office|admin`) suy ra từ quyền.
+    * [Auth/MyPermissionsController.php](./app/Http/Controllers/Auth/MyPermissionsController.php): `GET /api/auth/permissions`: quyền hiệu lực, các vai trò đang giữ (mỗi vai trò kèm quyền của nó, là một khu vực giao diện) và quyền gán riêng.
     * [Admin/UserController.php](./app/Http/Controllers/Admin/UserController.php): Quản trị viên quản lý danh sách user, kích hoạt/khóa tài khoản, duyệt giảng viên, loại tài khoản (`account_type`).
     * [Admin/AccessController.php](./app/Http/Controllers/Admin/AccessController.php): Quản trị vai trò, quyền và gán vai trò cho tài khoản (`/api/admin/access*`).
     * [Admin/ClassController.php](./app/Http/Controllers/Admin/ClassController.php): Quản lý danh sách lớp học toàn trường, phân công giảng viên.
-    * [Admin/CourseController.php](./app/Http/Controllers/Admin/CourseController.php), [Admin/AcademicTermController.php](./app/Http/Controllers/Admin/AcademicTermController.php), [Admin/ExerciseTagController.php](./app/Http/Controllers/Admin/ExerciseTagController.php): Danh mục môn học, học kỳ, thẻ bài tập.
+    * [Admin/CourseController.php](./app/Http/Controllers/Admin/CourseController.php), [Admin/AcademicTermController.php](./app/Http/Controllers/Admin/AcademicTermController.php), [Admin/ExerciseTagController.php](./app/Http/Controllers/Admin/ExerciseTagController.php): Danh mục môn học, học kỳ, thẻ câu hỏi.
     * [Admin/OverviewController.php](./app/Http/Controllers/Admin/OverviewController.php): Thống kê tổng quan số lượng sinh viên, giảng viên, bài nộp.
     * [Teacher/ProblemController.php](./app/Http/Controllers/Teacher/ProblemController.php): Giảng viên CRUD ngân hàng câu hỏi, test truy vấn.
     * [Teacher/AssignmentController.php](./app/Http/Controllers/Teacher/AssignmentController.php): Giảng viên tạo bài tập và giao cho lớp.
     * [Teacher/ClassController.php](./app/Http/Controllers/Teacher/ClassController.php): Giảng viên xem lớp mình dạy (chỉ đọc; tạo lớp, thêm sinh viên, phân giảng viên thuộc quyền `class.manage` của admin).
     * [ClassRosterController.php](./app/Http/Controllers/ClassRosterController.php): Danh sách sinh viên của lớp, import, đặt lại mật khẩu sinh viên.
-    * [Teacher/DatabaseLibraryController.php](./app/Http/Controllers/Teacher/DatabaseLibraryController.php), [ContentSharingController.php](./app/Http/Controllers/ContentSharingController.php): Thư viện CSDL mẫu và chia sẻ bài toán/thư viện giữa giảng viên.
+    * [Teacher/DatabaseLibraryController.php](./app/Http/Controllers/Teacher/DatabaseLibraryController.php): Thư viện CSDL mẫu.
     * [ExaminationController.php](./app/Http/Controllers/ExaminationController.php), [ExamSessionController.php](./app/Http/Controllers/ExamSessionController.php), [ExamAdmissionController.php](./app/Http/Controllers/ExamAdmissionController.php): Kỳ thi, ca thi (kế hoạch, giám thị) và tài khoản/phòng thi.
     * [ExamLoginProctorController.php](./app/Http/Controllers/ExamLoginProctorController.php): Đăng nhập ca thi trực tiếp và phòng giám thị (trạng thái phòng, mở khóa, kiểm tra/thêm sinh viên, duyệt trình duyệt).
     * [RegradeAssignmentController.php](./app/Http/Controllers/RegradeAssignmentController.php), [StatisticsController.php](./app/Http/Controllers/StatisticsController.php): Phân công phúc khảo; thống kê cho giảng viên và giáo vụ.
@@ -82,8 +82,8 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
     * [EnsureActiveAccount.php](./app/Http/Middleware/EnsureActiveAccount.php): Chặn những tài khoản đang ở trạng thái `Pending` (chờ duyệt) hoặc `Inactive`.
     * *Tại sao cần:* Ngăn chặn request không hợp lệ ngay từ cửa sổ, bảo mật API mà không cần lặp lại code kiểm tra trong từng hàm Controller.
   * **[Requests/](./app/Http/Requests)**: Tầng xác thực dữ liệu đầu vào (Form Request Validation):
-    * [LoginRequest.php](./app/Http/Requests/Auth/LoginRequest.php), [RegisterRequest.php](./app/Http/Requests/Auth/RegisterRequest.php), [RegisterLecturerRequest.php](./app/Http/Requests/Auth/RegisterLecturerRequest.php): Kiểm tra định dạng email, password khi xác thực.
-    * Thư mục con theo khu vực: `Admin/` (lớp, người dùng, vai trò, danh mục), `Teacher/` (roster, thư viện CSDL, chia sẻ), `Student/` (dashboard); ngoài ra `AssignRegradeRequest`, `RegradeCandidatesRequest`.
+    * [LoginRequest.php](./app/Http/Requests/Auth/LoginRequest.php): Kiểm tra định dạng email, password khi xác thực.
+    * Thư mục con theo khu vực: `Admin/` (lớp, người dùng, vai trò, danh mục), `Teacher/` (roster, thư viện CSDL), `Student/` (dashboard); ngoài ra `AssignRegradeRequest`.
     * [ProblemRequest.php](./app/Http/Requests/ProblemRequest.php): Kiểm tra tiêu đề, độ khó, mô tả câu hỏi.
     * [AssignmentRequest.php](./app/Http/Requests/AssignmentRequest.php): Kiểm tra cấu hình bài tập (thời gian mở/đóng, lớp được giao).
     * [RunQueryRequest.php](./app/Http/Requests/RunQueryRequest.php), [SubmitExamRequest.php](./app/Http/Requests/SubmitExamRequest.php): Kiểm tra câu query gửi lên.
@@ -175,7 +175,7 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
 
 * **Vai trò:** Quản trị cấu trúc database bằng code (Database as Code).
 * **Các thư mục con:**
-  * **[migrations/](./database/migrations)**: Chứa 20 file migration định nghĩa cấu trúc của 20 bảng MySQL theo đúng Blueprint (`0001_create_users_table.php` đến `0020_create_assignment_problems_table.php`).
+  * **[migrations/](./database/migrations)**: Mỗi bảng MySQL một file migration (45 file `2026_01_01_*_create_<bảng>_table.php`, đánh số theo thứ tự phụ thuộc khóa ngoại), mô tả trạng thái hiện tại của cấu trúc. Thay đổi về sau thêm file mới có ngày hiện tại. Database tạo từ bộ migration cũ cần `php artisan migrate:fresh --seed` (mất dữ liệu dev).
     * *Tại sao cần:* Giúp kiểm soát phiên bản CSDL (tương tự Git). Bất kỳ thành viên nào trong nhóm chỉ cần gõ `php artisan migrate` là có ngay cơ sở dữ liệu hoàn chỉnh giống hệt nhau mà không cần xuất/nhập file `.sql` thủ công.
   * **[seeders/](./database/seeders)**:
     * [DatabaseSeeder.php](./database/seeders/DatabaseSeeder.php): Bộ gọi seeder chính.
@@ -232,7 +232,6 @@ Thư mục `app/` là nơi chứa hầu hết toàn bộ mã nguồn nghiệp v�
   * [routes/exam_sessions.php](./routes/exam_sessions.php): `/api/exam-sessions/{id}/*` (sandbox làm bài của ca thi). Các route quản lý kỳ thi/ca thi/coi thi/phúc khảo/thống kê khai báo thẳng trong `routes/api.php`.
   * [routes/submissions.php](./routes/submissions.php): `/api/submissions/*`.
   * [routes/notifications.php](./routes/notifications.php): `/api/notifications/*`.
-  * [routes/sharing.php](./routes/sharing.php): `/api/sharing/*` (chia sẻ bài toán/thư viện CSDL).
   * [routes/web.php](./routes/web.php): Route giao diện web mặc định.
   * [routes/console.php](./routes/console.php): Định nghĩa các lệnh console closure.
 

@@ -17,10 +17,7 @@ trait UsesDefaultRolePermissions
 {
     protected function useDefaultRolePermissions(): void
     {
-        foreach (AccessRoleSeeder::DEFAULT_ROLES as $slug => [, $isSuper, $permissions]) {
-            if ($isSuper) {
-                continue;
-            }
+        foreach (AccessRoleSeeder::DEFAULT_ROLES as $slug => [, $permissions]) {
             AccessRole::where('slug', $slug)->first()?->syncPermissions($permissions);
         }
 

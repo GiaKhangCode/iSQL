@@ -40,7 +40,7 @@ class GradingPermissionTest extends TestCase
 
         if ($permissions !== null) {
             DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-            $role = AccessRole::create(['name' => 'Role ' . uniqid(), 'is_super' => false]);
+            $role = AccessRole::create(['name' => 'Role ' . uniqid()]);
             $role->syncPermissions($permissions);
             $user->accessRoles()->attach($role->id);
             app(AccessControlService::class)->forget();
@@ -93,7 +93,7 @@ class GradingPermissionTest extends TestCase
         $this->assertSame(7.5, (float) $sub->fresh()->evaluated_score);
     }
 
-    public function test_admin_never_grades_but_a_person_who_is_also_a_grader_does(): void
+    public function test_admin_never_grades_and_has_no_implicit_view_of_other_lecturers_work(): void
     {
         $owner = $this->makeUser('instructor');
         [, $sub] = $this->submissionFixture($owner);
@@ -102,12 +102,13 @@ class GradingPermissionTest extends TestCase
         Sanctum::actingAs($admin);
         $this->putJson("/api/submissions/{$sub->id}/review", ['finalScore' => 5])->assertStatus(403);
 
-        // Admin đồng thời giữ vai trò có results.grade: quyền được cộng gộp, chấm được (xem mọi bài nhờ siêu quản trị).
-        $role = AccessRole::create(['name' => 'Chấm ' . uniqid(), 'is_super' => false]);
+        // Có thêm vai trò results.grade thì quyền được cộng gộp, nhưng Admin không còn mặc định xem mọi bài:
+        // bài của lớp khác (không phải lớp mình dạy) vẫn ngoài phạm vi chấm.
+        $role = AccessRole::create(['name' => 'Chấm ' . uniqid()]);
         $role->syncPermissions(['results.grade']);
         $admin->accessRoles()->attach($role->id);
         app(AccessControlService::class)->forget();
-        $this->putJson("/api/submissions/{$sub->id}/review", ['finalScore' => 5])->assertOk();
+        $this->putJson("/api/submissions/{$sub->id}/review", ['finalScore' => 5])->assertStatus(403);
     }
 
     public function test_viewers_without_grade_but_with_view_all_can_open_but_not_edit(): void
@@ -177,41 +178,46 @@ class GradingPermissionTest extends TestCase
         $this->getJson($url)->assertOk();
     }
 
-    public function test_publishing_results_is_limited_to_staff_and_their_own_activities(): void
+    public function test_the_publish_results_route_no_longer_exists(): void
     {
         $owner = $this->makeUser('student', ['assignment.create', 'results.grade']);
         [$assignment] = $this->submissionFixture($owner);
-        $other = $this->makeUser('instructor', ['assignment.create', 'results.grade']);
-        $viewer = $this->makeUser('student', ['practice.solve']);
-        $manager = $this->makeUser('student', ['examination.manage']);
 
-        Sanctum::actingAs($viewer);
-        $this->postJson("/api/results/{$assignment->id}/publish", ['published' => false])->assertStatus(403);
-        Sanctum::actingAs($other);
-        $this->postJson("/api/results/{$assignment->id}/publish", ['published' => false])->assertStatus(403);
         Sanctum::actingAs($owner);
-        $this->postJson("/api/results/{$assignment->id}/publish", ['published' => false])->assertOk()->assertJson(['published' => false]);
-        Sanctum::actingAs($manager);
-        $this->postJson("/api/results/{$assignment->id}/publish", ['published' => true])->assertOk()->assertJson(['published' => true]);
+        $this->postJson("/api/results/{$assignment->id}/publish", ['published' => false])->assertStatus(404);
+        $this->assertTrue((bool) $assignment->fresh()->show_scores_after_submit);
+    }
+
+    public function test_plain_assignments_always_show_scores_and_only_exam_sessions_follow_the_flag(): void
+    {
+        $plain = \App\Models\Assignment::create(['title' => 'GP plain ' . uniqid(), 'published' => true, 'show_scores_after_submit' => false]);
+        $exam = \App\Models\Assignment::create(['title' => 'GP exam ' . uniqid(), 'published' => true, 'show_scores_after_submit' => false, 'examination_id' => 'GP-' . uniqid()]);
+        $shown = \App\Models\Assignment::create(['title' => 'GP exam on ' . uniqid(), 'published' => true, 'show_scores_after_submit' => true, 'examination_id' => 'GP-' . uniqid()]);
+
+        $this->assertTrue($plain->fresh()->show_scores_after_submit);
+        $this->assertFalse($exam->fresh()->show_scores_after_submit);
+        $this->assertTrue($shown->fresh()->show_scores_after_submit);
     }
 
     // ───────────── phúc khảo ─────────────
 
-    public function test_regrade_assignment_needs_examination_manage_and_reviewers_hold_results_grade(): void
+    public function test_regrade_assignment_needs_examination_manage_and_reviewers_hold_results_regrade(): void
     {
         $owner = $this->makeUser('instructor');
         [, $sub] = $this->submissionFixture($owner);
-        $reviewer = $this->makeUser('student', ['results.grade'], 'Reviewer ' . uniqid());
+        $reviewer = $this->makeUser('student', ['results.regrade'], 'Reviewer ' . uniqid());
+        $graderOnly = $this->makeUser('student', ['results.grade'], 'GraderOnly ' . uniqid());
         $notReviewer = $this->makeUser('instructor', ['problem.create'], 'NotReviewer ' . uniqid());
         $manager = $this->makeUser('student', ['examination.manage']);
 
         Sanctum::actingAs($notReviewer);
         $this->getJson('/api/regrade-assignments/reviewers')->assertStatus(403);
-        $this->putJson("/api/regrade-assignments/{$sub->id}", ['instructor_id' => $reviewer->id])->assertStatus(403);
+        $this->putJson("/api/regrade-assignments/{$sub->context}/{$sub->user_id}", ['instructor_id' => $reviewer->id])->assertStatus(403);
 
         Sanctum::actingAs($manager);
         $ids = collect($this->getJson('/api/regrade-assignments/reviewers')->assertOk()->json())->pluck('id')->all();
         $this->assertContains($reviewer->id, $ids);
+        $this->assertNotContains($graderOnly->id, $ids, 'chấm bài thường (results.grade) không tự là người chấm phúc khảo');
         $this->assertNotContains($notReviewer->id, $ids);
         $this->assertNotContains($manager->id, $ids);
 
@@ -235,7 +241,7 @@ class GradingPermissionTest extends TestCase
         $this->getJson('/api/examinations')->assertOk();
 
         Sanctum::actingAs($this->makeUser('admin'));
-        $this->getJson('/api/examinations')->assertOk();
+        $this->getJson('/api/examinations')->assertStatus(403);
     }
 
     public function test_examination_visibility_comes_from_examination_manage_not_the_owner_role(): void
@@ -297,15 +303,21 @@ class GradingPermissionTest extends TestCase
         $this->getJson('/api/teacher/statistics')->assertStatus(403);
         $this->getJson('/api/office/statistics')->assertStatus(403);
 
+        // Mỗi tab Thống kê có quyền riêng.
         Sanctum::actingAs($this->makeUser('student', ['results.grade']));
+        $this->getJson('/api/teacher/statistics')->assertStatus(403);
+
+        Sanctum::actingAs($this->makeUser('student', ['statistics.view']));
         $this->getJson('/api/teacher/statistics')->assertOk();
         $this->getJson('/api/office/statistics')->assertStatus(403);
 
-        Sanctum::actingAs($this->makeUser('student', ['results.view_all']));
-        $this->getJson('/api/teacher/statistics')->assertOk();
+        Sanctum::actingAs($this->makeUser('student', ['statistics.faculty']));
+        $this->getJson('/api/office/statistics')->assertOk();
+        $this->getJson('/api/teacher/statistics')->assertStatus(403);
         $this->getJson('/api/office/statistics')->assertOk();
 
         Sanctum::actingAs($this->makeUser('admin'));
-        $this->getJson('/api/office/statistics')->assertOk();
+        $this->getJson('/api/office/statistics')->assertStatus(403);
+        $this->getJson('/api/teacher/statistics')->assertStatus(403);
     }
 }

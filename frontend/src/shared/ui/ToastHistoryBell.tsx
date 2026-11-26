@@ -157,18 +157,6 @@ export function ToastHistoryBell({ userId, sharedNotifications }: { userId: stri
                     </>
                   )}
                   <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString(locale)}</time>
-                  {item.path && (
-                    <NotificationLink
-                      to={item.path}
-                      className="toast-history-path-link"
-                      onClick={() => {
-                        setOpen(false);
-                        if (!item.read) toastHistory.markRead(item.id);
-                      }}
-                    >
-                      <small>{item.path}</small>
-                    </NotificationLink>
-                  )}
                 </div>
                 <div className="toast-history-item-actions">
                   <button

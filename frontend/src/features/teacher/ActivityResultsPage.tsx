@@ -17,6 +17,7 @@ import { WORKSPACE_PART_LABELS } from "@/shared/lib/workspace/workspaceParts";
 import { submissionTimeLabel } from "@/shared/lib/datetime/serverDateTime";
 import "@/features/teacher/submissions/SubmissionReviewPage.css";
 import "./ActivityResultsPage.css";
+import { notify } from "@/shared/ui/notify";
 
 export function ActivityResultsPage() {
   const routeParams = useParams();
@@ -38,8 +39,6 @@ export function ActivityResultsPage() {
   // Khớp backend: phân công phúc khảo cần examination.manage; xem cả kỳ thi cần examination.manage hoặc results.view_all.
   const canAssignRegrade = Boolean(permissions?.includes("examination.manage"));
   const seesWholeExam = canAssignRegrade || Boolean(permissions?.includes("results.view_all"));
-  const [publishing, setPublishing] = useState(false);
-  const [publication, setPublication] = useState("");
   const [regradeOpen, setRegradeOpen] = useState(false);
   const [reviewers, setReviewers] = useState<RegradeReviewer[]>([]);
   const [reviewersLoading, setReviewersLoading] = useState(false);
@@ -47,35 +46,8 @@ export function ActivityResultsPage() {
   const [regradeNote, setRegradeNote] = useState("");
   const [regradeBusy, setRegradeBusy] = useState(false);
   const [regradeError, setRegradeError] = useState("");
-  const [regradeNotice, setRegradeNotice] = useState("");
   const [filterTarget, setFilterTarget] = useState<HTMLDivElement | null>(null);
   const [selectedKey, setSelectedKey] = useState("");
-
-  const isPublished = Boolean(data?.activity?.studentOptions?.showScoresAfterSubmit);
-
-  const publish = async (nextPublished: boolean) => {
-    setPublishing(true);
-    try {
-      const res = await apiFetch<{ published: boolean }>(`/api/results/${activityId}/publish`, {
-        method: "POST",
-        body: JSON.stringify({ published: nextPublished }),
-      });
-      if (data) {
-        setData({
-          ...data,
-          activity: {
-            ...data.activity,
-            studentOptions: { ...data.activity?.studentOptions, showScoresAfterSubmit: res.published },
-          },
-        });
-      }
-      setPublication(res.published ? "Đã công bố điểm cho sinh viên." : "Đã ẩn điểm đối với sinh viên.");
-    } catch (e) {
-      setPublication(e instanceof Error ? e.message : "Không thể cập nhật trạng thái công bố điểm.");
-    } finally {
-      setPublishing(false);
-    }
-  };
 
   const fromTeacherExams = location.pathname.startsWith("/teacher/exams/");
   const reviewBase = fromTeacherExams ? "/teacher/exams/review" : `${root}/results/review`;
@@ -207,24 +179,17 @@ export function ActivityResultsPage() {
         <div className="teacher-filter-side">
           <div className="grading-actions">
             <div ref={setFilterTarget} className="teacher-filter-actions"/>
-            <button type="button" className={`button${isPublished ? "" : " primary"}`} disabled={publishing} onClick={() => {
-              const msg = isPublished ? "Ẩn điểm của hoạt động này đối với sinh viên?" : "Công bố toàn bộ điểm của hoạt động cho sinh viên?";
-              if (window.confirm(msg)) void publish(!isPublished);
-            }}>{publishing ? "Đang cập nhật…" : isPublished ? "Ẩn điểm" : "Công bố điểm"}</button>
             <Link className="button" to={exitPath}>Thoát</Link>
           </div>
-          {publication && <p role="status" className="grading-publication">{publication}</p>}
-          {!publication && <p className="muted tiny" style={{ textAlign: "right", margin: "4px 0 0" }}>{isPublished ? "Trạng thái: Đã công bố điểm" : "Trạng thái: Đang ẩn điểm"}</p>}
           <aside className="teacher-class-details teacher-list-detail-panel grading-details">
             <div className="grading-detail-body">
               <p className="muted">{data.activity.title}</p>
               {selected ? <>
                 <div className="teacher-class-detail-heading"><div><h2>{selected.student}</h2><p>{selected.studentCode || "—"} · {selected.className || "—"}</p></div><Status value={selected.status}/></div>
-                <dl><dt>Bài toán</dt><dd>{selected.problem}</dd><dt>Mã đề</dt><dd>{selected.variantCode || "—"}</dd><dt>Loại truy vấn</dt><dd>{selected.parts.map(value => WORKSPACE_PART_LABELS[value]).join(" · ")}</dd><dt>Điểm</dt><dd>{formatPoints(selected.score)} / {formatPoints(selected.maxScore)}</dd><dt>Thời gian nộp</dt><dd>{selected.submittedAt ? submissionTimeLabel(selected.submittedAt, locale) : "Chưa nộp bài"}</dd>{selected.appealRequested && <><dt>Đơn phúc khảo</dt><dd>{selected.appealReason || "Có đơn phúc khảo"}</dd></>}{selected.regradeReviewerName && <><dt>Phúc khảo</dt><dd>{selected.regradeReviewerName}{selected.regradeCompletedAt ? " · Đã chấm" : " · Chờ chấm"}{selected.regradeNote ? ` — ${selected.regradeNote}` : ""}</dd></>}</dl>
+                <dl><dt>Bài toán</dt><dd>{selected.problem}</dd><dt>Mã đề</dt><dd>{selected.variantCode || "—"}</dd><dt>Loại truy vấn</dt><dd>{selected.parts.map(value => WORKSPACE_PART_LABELS[value]).join(" · ")}</dd><dt>Điểm</dt><dd>{formatPoints(selected.score)} / {formatPoints(selected.maxScore)}</dd><dt>Thời gian nộp</dt><dd>{selected.submittedAt ? submissionTimeLabel(selected.submittedAt, locale) : "Chưa nộp bài"}</dd>{selected.regradeReviewerName && <><dt>Phúc khảo</dt><dd>{selected.regradeReviewerName}{selected.regradeCompletedAt ? " · Đã chấm" : " · Chờ chấm"}{selected.regradeNote ? ` — ${selected.regradeNote}` : ""}</dd></>}</dl>
                 {!selected.id && <p className="muted">Sinh viên chưa nộp bài thi.</p>}
               </> : <p>Chọn sinh viên để xem chi tiết.</p>}
               <p className="muted grading-summary">Đã nộp: {studentStats.submitted} · Chưa nộp: {studentStats.unsubmitted} · Điểm TB: {studentStats.average}</p>
-              {regradeNotice && <p role="status" className="muted tiny" style={{ marginTop: 8 }}>{regradeNotice}</p>}
             </div>
             <footer className="grading-detail-footer" style={{ display: "grid", gap: 8 }}>
               {canAssignRegrade && Boolean(data.activity?.isExamSession || data.activity?.examinationId || data.activity?.studentOptions?.examMode || isExam) && (
@@ -237,11 +202,10 @@ export function ActivityResultsPage() {
                     if (!selected?.id) return;
                     setRegradeOpen(true);
                     setRegradeError("");
-                    setRegradeNotice("");
                     setSelectedReviewerId(selected.regradeReviewerId || "");
                     setRegradeNote(selected.regradeNote || "");
                     setReviewersLoading(true);
-                    void regradeAssignments.reviewers(selected.id)
+                    void regradeAssignments.reviewers(activityId!, selected.studentId!)
                       .then(list => {
                         setReviewers(list);
                         if ((!selected.regradeReviewerId || !list.some(r => r.id === selected.regradeReviewerId)) && list.length > 0) {
@@ -262,10 +226,7 @@ export function ActivityResultsPage() {
       </div>
       {regradeOpen && selected?.id && <Dialog title="Phân công phúc khảo" onClose={() => !regradeBusy && setRegradeOpen(false)}>
         <div style={{ display: "grid", gap: 12 }}>
-          <p className="muted tiny">Chọn giảng viên chấm phúc khảo cho bài làm của <strong>{selected.student}</strong> (không bao gồm giảng viên thực hành đứng lớp của sinh viên).</p>
-          {selected.appealReason && (
-            <p className="tiny"><strong>Lý do phúc khảo:</strong> {selected.appealReason}</p>
-          )}
+          <p className="muted tiny">Chọn giảng viên chấm phúc khảo cho bài thi của <strong>{selected.student}</strong> (không bao gồm giảng viên thực hành đứng lớp của sinh viên).</p>
           {reviewersLoading ? <p className="muted">Đang tải danh sách giảng viên…</p> : reviewers.length ? <>
             <label style={{ display: "grid", gap: 6 }}>
               <span className="muted tiny">Giảng viên phúc khảo</span>
@@ -290,16 +251,16 @@ export function ActivityResultsPage() {
               if (!selected?.id || regradeBusy) return;
               setRegradeBusy(true);
               setRegradeError("");
-              void regradeAssignments.unassign(selected.id)
+              void regradeAssignments.unassign(activityId!, selected.studentId!)
                 .then(async () => {
                   if (data) {
                     const fresh = await teacherService.getAssignmentSubmissions(activityId!);
                     setData({ ...data, submissions: fresh });
                   }
-                  setRegradeNotice("Đã hủy phân công phúc khảo.");
+                  notify.success("Đã hủy phân công phúc khảo.");
                   setRegradeOpen(false);
                 })
-                .catch(err => setRegradeError(err instanceof Error ? err.message : "Không thể hủy phân công."))
+                .catch(err => notify.fail("Không thể hủy phân công.", err))
                 .finally(() => setRegradeBusy(false));
             }}>Hủy phân công</button>}
             <button type="button" className="button" disabled={regradeBusy} onClick={() => setRegradeOpen(false)}>Đóng</button>
@@ -307,7 +268,7 @@ export function ActivityResultsPage() {
               if (!selected?.id || !selectedReviewerId || regradeBusy) return;
               setRegradeBusy(true);
               setRegradeError("");
-              void regradeAssignments.assign(selected.id, selectedReviewerId, regradeNote)
+              void regradeAssignments.assign(activityId!, selected.studentId!, selectedReviewerId, regradeNote)
                 .then(res => {
                   if (data) {
                     setData({
@@ -322,10 +283,10 @@ export function ActivityResultsPage() {
                       } : row),
                     });
                   }
-                  setRegradeNotice(`Đã phân công phúc khảo cho ${res.reviewerName}.`);
+                  notify.success(`Đã phân công phúc khảo cho ${res.reviewerName}.`);
                   setRegradeOpen(false);
                 })
-                .catch(err => setRegradeError(err instanceof Error ? err.message : "Không thể phân công phúc khảo."))
+                .catch(err => notify.fail("Không thể phân công phúc khảo.", err))
                 .finally(() => setRegradeBusy(false));
             }}>{regradeBusy ? "Đang lưu…" : "Xác nhận phân công"}</button>
           </div>

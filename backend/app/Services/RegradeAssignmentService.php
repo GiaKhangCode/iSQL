@@ -7,11 +7,9 @@ use App\Models\AssignmentProblem;
 use App\Models\ClassEnrollment;
 use App\Models\ClassModel;
 use App\Models\Problem;
+use App\Models\ExamRegrade;
 use App\Models\Submission;
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
 use App\Models\User;
-use App\Models\WorkspaceSubmissionResult;
 use App\Services\Access\AccessControlService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,15 +18,12 @@ use Illuminate\Validation\ValidationException;
 /**
  * Phân công giảng viên chấm phúc khảo cho bài thi (giáo vụ phân công, giảng viên được giao chấm).
  *
- * Quyền gọi (examination.manage để phân công, results.grade để xem việc của mình) được kiểm ở route và controller;
- * service chỉ lo dữ liệu và luật nghiệp vụ. Người chấm là tài khoản Active giữ results.grade (siêu quản trị
+ * Quyền gọi (examination.manage để phân công, results.regrade để xem việc của mình) được kiểm ở route và controller;
+ * service chỉ lo dữ liệu và luật nghiệp vụ. Người chấm là tài khoản Active giữ results.regrade (siêu quản trị
  * không tự có quyền này) và không phải giảng viên thực hành đứng lớp của chính sinh viên đó.
  */
 class RegradeAssignmentService
 {
-    /** Số dòng tối đa trả về trong một lần liệt kê. */
-    private const MAX_ROWS = 500;
-
     public function __construct(
         private readonly ExaminationService $examinationService,
         private readonly NotificationService $notificationService,
@@ -37,128 +32,17 @@ class RegradeAssignmentService
     }
 
     /**
-     * Danh sách bài nộp có thể phân công phúc khảo, ưu tiên bài có đơn phúc khảo rồi bài đã phân công rồi bài mới nhất.
-     *
-     * @param  array{examination_id?: string, session_id?: string, q?: string, appeal_only?: bool}  $filters
-     * @return array{rows: array<int, array>, truncated: bool, activities: array<int, array>}
-     */
-    public function candidates(array $filters): array
-    {
-        $examinationId = (string) ($filters['examination_id'] ?? '');
-        $sessionId = (string) ($filters['session_id'] ?? '');
-        $keyword = mb_strtolower(trim((string) ($filters['q'] ?? '')));
-        $appealOnly = (bool) ($filters['appeal_only'] ?? false);
-
-        $standaloneActivities = Assignment::whereNull('examination_id')
-            ->where('exam_mode', true)
-            ->orderByDesc('created_at')
-            ->get(['id', 'title', 'exam_mode'])
-            ->map(fn (Assignment $a) => [
-                'id'       => (string) $a->id,
-                'title'    => (string) $a->title,
-                'examMode' => (bool) $a->exam_mode,
-            ])->values()->all();
-
-        $empty = ['rows' => [], 'truncated' => false, 'activities' => $standaloneActivities];
-
-        $subsQuery = Submission::whereIn('source', ['Assignments', 'ExamSession', 'Assignment'])
-            ->whereNotNull('context')
-            ->where('context', '!=', 'Practice')
-            ->whereDoesntHave('workspaceResult', function ($q) {
-                $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
-            })
-            ->orderByDesc('submitted_at');
-
-        if ($sessionId !== '') {
-            $subsQuery->where('context', $sessionId);
-        } elseif ($examinationId !== '') {
-            $examSessionIds = Assignment::where('examination_id', $examinationId)->pluck('id')->all();
-            if (empty($examSessionIds)) {
-                return $empty;
-            }
-            $subsQuery->whereIn('context', $examSessionIds);
-        } else {
-            $examActivityIds = Assignment::where(function ($q) {
-                $q->whereNotNull('examination_id')
-                    ->orWhere('exam_mode', true);
-            })->pluck('id')->all();
-            if (empty($examActivityIds)) {
-                return $empty;
-            }
-            $subsQuery->whereIn('context', $examActivityIds);
-        }
-
-        $subs = $subsQuery->get();
-
-        $appealIds = SubmissionAppeal::pluck('submission_id')->flip()->all();
-        $assignedIds = SubmissionRegradeAssignment::pluck('submission_id')->flip()->all();
-
-        // Mỗi (ca thi, sinh viên, câu) chỉ giữ lần nộp mới nhất, trừ bản đã có đơn phúc khảo hoặc đã được phân công.
-        $seen = [];
-        $candidates = [];
-        foreach ($subs as $sub) {
-            $key = "{$sub->context}:{$sub->user_id}:{$sub->problem_id}";
-            $hasRecord = isset($appealIds[$sub->id]) || isset($assignedIds[$sub->id]);
-            if (isset($seen[$key]) && !$hasRecord) {
-                continue;
-            }
-            $seen[$key] = true;
-            $candidates[] = $sub;
-        }
-
-        if ($appealOnly) {
-            $candidates = array_values(array_filter($candidates, fn (Submission $s) => isset($appealIds[$s->id])));
-        }
-
-        usort($candidates, function (Submission $a, Submission $b) use ($appealIds, $assignedIds) {
-            $pa = isset($appealIds[$a->id]) ? 0 : (isset($assignedIds[$a->id]) ? 1 : 2);
-            $pb = isset($appealIds[$b->id]) ? 0 : (isset($assignedIds[$b->id]) ? 1 : 2);
-            if ($pa !== $pb) {
-                return $pa <=> $pb;
-            }
-            return ($b->submitted_at?->getTimestamp() ?? 0) <=> ($a->submitted_at?->getTimestamp() ?? 0);
-        });
-
-        $rows = $this->serializeRows(collect($candidates));
-
-        if ($keyword !== '') {
-            $rows = array_values(array_filter($rows, function (array $row) use ($keyword) {
-                $haystack = mb_strtolower(implode(' ', array_filter([
-                    $row['studentName'] ?? '',
-                    $row['studentCode'] ?? '',
-                    $row['studentEmail'] ?? '',
-                    $row['className'] ?? '',
-                    $row['problemTitle'] ?? '',
-                    $row['sessionTitle'] ?? '',
-                ])));
-                return str_contains($haystack, $keyword);
-            }));
-        }
-
-        $truncated = count($rows) > self::MAX_ROWS;
-        if ($truncated) {
-            $rows = array_slice($rows, 0, self::MAX_ROWS);
-        }
-
-        return [
-            'rows'       => $rows,
-            'truncated'  => $truncated,
-            'activities' => $standaloneActivities,
-        ];
-    }
-
-    /**
-     * Người có thể được chọn chấm phúc khảo; nếu biết bài nộp thì loại giảng viên thực hành đứng lớp của sinh viên.
+     * Người có thể được chọn chấm phúc khảo; nếu biết ca thi và sinh viên thì loại giảng viên thực hành đứng lớp của sinh viên.
      *
      * @return array<int, array{id: string, name: string, email: string}>
      */
-    public function reviewers(?string $submissionId = null): array
+    public function reviewers(?string $activityId = null, ?string $studentId = null): array
     {
         $excludedIds = [];
-        if ($submissionId !== null && $submissionId !== '') {
-            $sub = Submission::find($submissionId);
-            if ($sub) {
-                $excludedIds = $this->classInstructorIdsForSubmission($sub);
+        if (!empty($activityId) && !empty($studentId)) {
+            $activity = Assignment::find($activityId);
+            if ($activity) {
+                $excludedIds = $this->classInstructorIds($studentId, $activity);
             }
         }
 
@@ -175,15 +59,17 @@ class RegradeAssignmentService
             ])->values()->all();
     }
 
-    /** Phân công (hoặc đổi người chấm) cho một bài nộp. @return array dòng ứng viên sau khi phân công */
-    public function assign(string $submissionId, string $reviewerId, ?string $note, User $assigner): array
+    /**
+     * Phân công (hoặc đổi người chấm) phúc khảo cho cả bài thi của một sinh viên trong một ca thi.
+     * Chỉ bài thi đã có điểm chính thức mới được phân công.
+     *
+     * @return array dòng ứng viên sau khi phân công
+     */
+    public function assign(string $activityId, string $studentId, string $reviewerId, ?string $note, User $assigner): array
     {
-        $sub = Submission::findOrFail($submissionId);
-        abort_if(empty($sub->context) || $sub->context === 'Practice', 422, 'Chỉ bài nộp trong kỳ thi hoặc cuộc thi mới được phân công chấm phúc khảo.');
-        $activity = Assignment::find($sub->context);
-        abort_unless($this->isRegradeEligibleActivity($activity, $sub) || SubmissionAppeal::where('submission_id', $sub->id)->exists(), 422, 'Chỉ bài thi hoặc cuộc thi mới được phân công chấm phúc khảo.');
-        $this->assertNotQuestionOnly($sub);
-        $existing = $this->assertNotCompleted($sub);
+        [$activity, $sub] = $this->examOf($activityId, $studentId);
+        abort_unless($sub->evaluated_score !== null, 422, 'Bài thi chưa được chấm chính thức, chưa thể phân công chấm phúc khảo.');
+        $existing = $this->assertNotCompleted($activity->id, $studentId);
 
         // Người chấm nằm trong dữ liệu gửi lên nên chọn sai là lỗi dữ liệu (422, gắn vào reviewerId), không phải 404.
         $reviewer = $this->eligibleReviewerQuery()->where('id', $reviewerId)->first();
@@ -191,7 +77,7 @@ class RegradeAssignmentService
             throw ValidationException::withMessages(['reviewerId' => ['Không tìm thấy giảng viên chấm phúc khảo.']]);
         }
 
-        $excludedIds = $this->classInstructorIdsForSubmission($sub, $activity);
+        $excludedIds = $this->classInstructorIds($studentId, $activity);
         if (in_array((string) $reviewer->id, $excludedIds, true)) {
             throw ValidationException::withMessages([
                 'reviewerId' => ['Không được chọn giảng viên đứng lớp của sinh viên này để chấm phúc khảo.'],
@@ -201,6 +87,7 @@ class RegradeAssignmentService
         $previousReviewerId = $existing && $existing->assigned_instructor_id !== $reviewer->id
             ? (string) $existing->assigned_instructor_id
             : null;
+
         // Ảnh chụp điểm và nhận xét trước phúc khảo được giữ từ lần phân công đầu tiên.
         $previousEvaluatedScore = $existing && $existing->previous_evaluated_score !== null
             ? $existing->previous_evaluated_score
@@ -209,8 +96,8 @@ class RegradeAssignmentService
             ? $existing->previous_feedback
             : $sub->feedback;
 
-        SubmissionRegradeAssignment::updateOrCreate(
-            ['submission_id' => $sub->id],
+        ExamRegrade::updateOrCreate(
+            ['activity_id' => $activity->id, 'student_id' => $studentId],
             [
                 'assigned_instructor_id'   => $reviewer->id,
                 'assigned_by_id'           => $assigner->id,
@@ -223,11 +110,12 @@ class RegradeAssignmentService
         );
 
         $problemTitle = $this->problemTitle($sub);
+
         if ($previousReviewerId) {
             $this->notificationService->create(
                 $previousReviewerId,
                 'Thay đổi phân công chấm phúc khảo: ' . $problemTitle,
-                'Bài nộp này đã được chuyển phân công phúc khảo cho giảng viên khác.',
+                'Bài thi này đã được chuyển phân công phúc khảo cho giảng viên khác.',
                 'Info',
                 '/teacher/regrade',
             );
@@ -236,7 +124,7 @@ class RegradeAssignmentService
         $this->notificationService->create(
             $reviewer->id,
             'Phân công chấm phúc khảo: ' . $problemTitle,
-            $note ?: 'Giáo vụ khoa đã phân công một bài nộp cần chấm phúc khảo cho bạn.',
+            $note ?: 'Giáo vụ khoa đã phân công một bài thi cần chấm phúc khảo cho bạn.',
             'Review',
             "/teacher/results/review/{$sub->id}",
         );
@@ -245,21 +133,19 @@ class RegradeAssignmentService
     }
 
     /** Hủy phân công (chưa chấm xong). @return array dòng ứng viên sau khi hủy */
-    public function unassign(string $submissionId): array
+    public function unassign(string $activityId, string $studentId): array
     {
-        $sub = Submission::findOrFail($submissionId);
-        abort_if(empty($sub->context) || $sub->context === 'Practice', 422, 'Chỉ bài nộp trong kỳ thi hoặc cuộc thi mới được phân công chấm phúc khảo.');
-        $this->assertNotQuestionOnly($sub);
-        $existing = $this->assertNotCompleted($sub);
-
+        [$activity, $sub] = $this->examOf($activityId, $studentId);
+        $existing = $this->assertNotCompleted($activity->id, $studentId);
         $previousReviewerId = $existing ? (string) $existing->assigned_instructor_id : null;
-        SubmissionRegradeAssignment::where('submission_id', $sub->id)->delete();
+
+        ExamRegrade::where('activity_id', $activity->id)->where('student_id', $studentId)->delete();
 
         if ($previousReviewerId) {
             $this->notificationService->create(
                 $previousReviewerId,
                 'Hủy phân công chấm phúc khảo: ' . $this->problemTitle($sub),
-                'Giáo vụ khoa đã hủy phân công chấm phúc khảo cho bài nộp này.',
+                'Giáo vụ khoa đã hủy phân công chấm phúc khảo cho bài thi này.',
                 'Info',
                 '/teacher/regrade',
             );
@@ -268,30 +154,26 @@ class RegradeAssignmentService
         return array_merge($this->serializeRow($sub), ['ok' => true]);
     }
 
-    /** Các bài được phân công cho $reviewer chấm, phân công mới nhất trước. @return array<int, array> */
+    /** Các bài thi được phân công cho $reviewer chấm, phân công mới nhất trước. @return array<int, array> */
     public function mine(User $reviewer): array
     {
-        $rows = SubmissionRegradeAssignment::where('assigned_instructor_id', $reviewer->id)
+        $rows = ExamRegrade::where('assigned_instructor_id', $reviewer->id)
             ->orderByDesc('assigned_at')
             ->get();
 
-        $subIds = $rows->pluck('submission_id')->all();
-        if (empty($subIds)) {
-            return [];
-        }
+        $subs = $rows->map(fn (ExamRegrade $row) => $this->examSubmission((string) $row->activity_id, (string) $row->student_id))
+            ->filter()
+            ->values();
 
-        $subsById = Submission::whereIn('id', $subIds)->get()->keyBy('id');
-        $orderedSubs = $rows->map(fn ($r) => $subsById->get($r->submission_id))->filter()->values();
-
-        return $this->serializeRows($orderedSubs);
+        return $this->serializeRows($subs);
     }
 
     // ───────────────────────── nội bộ ─────────────────────────
 
-    /** Tài khoản Active giữ results.grade (siêu quản trị không tự có quyền này). */
+    /** Tài khoản Active giữ results.regrade (siêu quản trị không tự có quyền này). */
     private function eligibleReviewerQuery()
     {
-        return User::whereIn('id', $this->access->holdersOf('results.grade'))
+        return User::whereIn('id', $this->access->holdersOf('results.regrade'))
             ->where('status', 'Active');
     }
 
@@ -302,53 +184,73 @@ class RegradeAssignmentService
         return $problem ? $problem->title : 'Bài nộp SQL';
     }
 
-    /** Bài nộp từng câu (workspace) không được phân công phúc khảo. */
-    private function assertNotQuestionOnly(Submission $sub): void
+    /**
+     * Bài nộp chính thức của sinh viên trong ca thi (mỗi bài thi chỉ có một; nếu dữ liệu cũ có nhiều thì lấy bài điểm
+     * tự động cao nhất, bằng điểm thì lấy bài nộp sau cùng). Bài nộp từng câu (workspace) không được tính.
+     */
+    private function examSubmission(string $activityId, string $studentId): ?Submission
     {
-        $isQuestionOnly = WorkspaceSubmissionResult::where('submission_id', $sub->id)
-            ->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL")
-            ->exists();
-        abort_if($isQuestionOnly, 422, 'Không thể phân công phúc khảo cho bài nộp từng câu.');
+        return Submission::where('context', $activityId)
+            ->where('user_id', $studentId)
+            ->whereIn('source', ['ExamSession', 'Assignments', 'Assignment'])
+            ->whereDoesntHave('workspaceResult', function ($q) {
+                $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
+            })
+            ->orderByDesc('score')
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**
-     * @return SubmissionRegradeAssignment|null phân công hiện có; 409 nếu đã chấm xong. Yêu cầu hợp lệ nhưng
-     *         bài nộp đang ở trạng thái không cho phép thao tác (xung đột trạng thái), nên không phải 422.
+     * Ca thi và bài nộp của sinh viên. 404 nếu ca thi hoặc sinh viên không tồn tại; 422 nếu không phải bài thi hoặc
+     * sinh viên chưa nộp bài.
+     *
+     * @return array{0: Assignment, 1: Submission}
      */
-    private function assertNotCompleted(Submission $sub): ?SubmissionRegradeAssignment
+    private function examOf(string $activityId, string $studentId): array
     {
-        $existing = SubmissionRegradeAssignment::find($sub->id);
+        $activity = Assignment::findOrFail($activityId);
+        User::findOrFail($studentId);
+        abort_unless($activity->examination_id || $activity->exam_mode, 422, 'Chỉ bài thi mới được phân công chấm phúc khảo.');
+
+        $sub = $this->examSubmission($activity->id, $studentId);
+        abort_if($sub === null, 422, 'Sinh viên chưa nộp bài thi này.');
+
+        return [$activity, $sub];
+    }
+
+    /**
+     * @return ExamRegrade|null phân công hiện có; 409 nếu đã chấm xong. Yêu cầu hợp lệ nhưng
+     *         bài thi đang ở trạng thái không cho phép thao tác (xung đột trạng thái), nên không phải 422.
+     */
+    private function assertNotCompleted(string $activityId, string $studentId): ?ExamRegrade
+    {
+        $existing = ExamRegrade::where('activity_id', $activityId)->where('student_id', $studentId)->first();
         if ($existing && $existing->completed_at !== null) {
-            abort(409, 'Bài nộp này đã được chấm phúc khảo xong, không thể phân công lại hoặc hủy.');
+            abort(409, 'Bài thi này đã được chấm phúc khảo xong, không thể phân công lại hoặc hủy.');
         }
 
         return $existing;
     }
 
     /**
-     * Giảng viên thực hành đứng lớp của sinh viên trong ca thi của bài nộp: không được chấm phúc khảo
+     * Giảng viên thực hành đứng lớp của sinh viên trong ca thi: không được chấm phúc khảo
      * chính sinh viên của mình.
      *
      * @return string[]
      */
-    private function classInstructorIdsForSubmission(Submission $sub, ?Assignment $activity = null, ?array $activityClassIds = null): array
+    private function classInstructorIds(string $studentId, Assignment $activity, ?array $activityClassIds = null): array
     {
-        $activity = $activity ?? ((!empty($sub->context) && $sub->context !== 'Practice')
-            ? Assignment::find($sub->context)
-            : null);
-
         $excluded = [];
-        $activityClassIds = $activityClassIds ?? ($activity
-            ? $activity->classes()->pluck('classes.id')->all()
-            : []);
+        $activityClassIds = $activityClassIds ?? $activity->classes()->pluck('classes.id')->all();
 
-        $studentClassIds = ClassEnrollment::where('student_id', $sub->user_id)
+        $studentClassIds = ClassEnrollment::where('student_id', $studentId)
             ->when(!empty($activityClassIds), fn ($q) => $q->whereIn('class_id', $activityClassIds))
             ->pluck('class_id')
             ->all();
-
         if (empty($studentClassIds)) {
-            $studentClassIds = ClassEnrollment::where('student_id', $sub->user_id)
+            $studentClassIds = ClassEnrollment::where('student_id', $studentId)
                 ->pluck('class_id')
                 ->all();
         }
@@ -365,14 +267,6 @@ class RegradeAssignmentService
         return array_values(array_unique(array_filter($excluded)));
     }
 
-    private function isRegradeEligibleActivity(?Assignment $activity, Submission $sub): bool
-    {
-        if (in_array($sub->source, ['ExamSession'], true)) {
-            return true;
-        }
-        return $activity !== null && (bool) ($activity->examination_id || $activity->exam_mode);
-    }
-
     private function serializeRow(Submission $sub): array
     {
         return $this->serializeRows(collect([$sub]))[0];
@@ -385,13 +279,11 @@ class RegradeAssignmentService
             return [];
         }
 
-        $subIds = $subs->pluck('id')->all();
         $userIds = $subs->pluck('user_id')->filter()->unique()->values()->all();
         $problemIds = $subs->pluck('problem_id')->filter()->unique()->values()->all();
         $contextIds = $subs->pluck('context')->filter(fn ($c) => $c && $c !== 'Practice')->unique()->values()->all();
 
-        $appealsMap = SubmissionAppeal::whereIn('submission_id', $subIds)->get()->keyBy('submission_id');
-        $assignmentsMap = SubmissionRegradeAssignment::whereIn('submission_id', $subIds)->get()->keyBy('submission_id');
+        $assignmentsMap = ExamRegrade::mapForSubmissions($subs);
         $reviewerIds = $assignmentsMap->pluck('assigned_instructor_id')->filter()->unique()->values()->all();
         $allUserIds = array_values(array_unique(array_merge($userIds, $reviewerIds)));
 
@@ -432,7 +324,6 @@ class RegradeAssignmentService
             $problem = $problemsMap->get($sub->problem_id);
             $activity = (!empty($sub->context) && $sub->context !== 'Practice') ? $activitiesMap->get($sub->context) : null;
             $ap = $activity ? ($apMap["{$activity->id}:{$sub->problem_id}"] ?? null) : null;
-            $appeal = $appealsMap->get($sub->id);
             $assignment = $assignmentsMap->get($sub->id);
             $reviewer = $assignment ? $usersMap->get($assignment->assigned_instructor_id) : null;
 
@@ -484,12 +375,6 @@ class RegradeAssignmentService
                 'maxScore'                => $maxScore,
                 'status'                  => (string) ($sub->result ?: 'Submitted'),
                 'submittedAt'             => $sub->submitted_at ? $sub->submitted_at->toISOString() : null,
-                'appealRequested'         => $appeal !== null,
-                'appealReviewed'          => $appeal !== null && $appeal->resolved_at !== null,
-                'appealStatus'            => $appeal ? (string) $appeal->status : null,
-                'appealReason'            => $appeal ? (string) $appeal->reason : null,
-                'appealCreatedAt'         => $appeal && $appeal->created_at ? $appeal->created_at->toISOString() : null,
-                'appealResolvedAt'        => $appeal && $appeal->resolved_at ? $appeal->resolved_at->toISOString() : null,
                 'reviewerId'              => $assignment ? (string) $assignment->assigned_instructor_id : null,
                 'reviewerName'            => $reviewer ? (string) $reviewer->name : null,
                 'assignedInstructorId'    => $assignment ? (string) $assignment->assigned_instructor_id : null,

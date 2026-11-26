@@ -6,6 +6,8 @@ import { RoleEditor } from "./RoleEditor";
 import { UserRoleAssignmentPanel } from "./UserRoleAssignmentPanel";
 import type { RoleForm, RoleGroup, UserRoleAssignment } from "./types";
 import "./roles.css";
+import { notify } from "@/shared/ui/notify";
+import { Loading } from "@/shared/ui/ui";
 
 const NEW_ROLE = "new";
 
@@ -29,7 +31,6 @@ export const AdminRolesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   const groups = useMemo(() => buildPermissionGroups(serverPermissions), [serverPermissions]);
 
@@ -61,7 +62,7 @@ export const AdminRolesPage: React.FC = () => {
   const allRoles = useMemo(() => [...customRoles, ...systemRoles], [customRoles, systemRoles]);
   const selectedRole = selectedRoleId === NEW_ROLE ? null : allRoles.find((role) => role.id === selectedRoleId) || null;
 
-  const clearMessages = () => { setError(""); setNotice(""); };
+  const clearMessages = () => setError("");
 
   /** Ask before throwing away unsaved role edits. */
   const confirmDiscard = () => !editorDirty || window.confirm("Bạn có thay đổi chưa lưu ở vai trò đang mở. Bỏ thay đổi?");
@@ -91,7 +92,7 @@ export const AdminRolesPage: React.FC = () => {
     if (!confirmDiscard()) return;
     setSelectedRoleId(NEW_ROLE);
     setTemplate([...permissions]);
-    setNotice("Đã sao chép quyền. Hãy đặt tên và tạo vai trò mới.");
+    notify.info("Đã sao chép quyền. Hãy đặt tên và tạo vai trò mới.");
     setError("");
   };
 
@@ -107,17 +108,17 @@ export const AdminRolesPage: React.FC = () => {
         const saved = await roleService.updateRole(form.id, form);
         const replace = (list: RoleGroup[]) => list.map((role) => (role.id === saved.id ? saved : role));
         if (saved.isSystem) setSystemRoles(replace); else setCustomRoles(replace);
-        setNotice(`Đã cập nhật “${saved.name}”.`);
+        notify.success(`Đã cập nhật “${saved.name}”.`);
       } else {
         const saved = await roleService.createRole(form);
         setCustomRoles((current) => [...current, saved]);
         setSelectedRoleId(saved.id);
         setTemplate(undefined);
-        setNotice(`Đã tạo vai trò “${saved.name}”.`);
+        notify.success(`Đã tạo vai trò “${saved.name}”.`);
       }
       await refreshAssignment();
     } catch (e) {
-      setError(getErrorMessage(e));
+      notify.fail("Không lưu được vai trò.", e);
     } finally {
       setBusy(false);
     }
@@ -128,9 +129,9 @@ export const AdminRolesPage: React.FC = () => {
     clearMessages();
     try {
       setAssignment(await roleService.saveUserRoles(userId, roleIds, directPermissions));
-      setNotice("Đã cập nhật vai trò và quyền riêng của người dùng.");
+      notify.success("Đã cập nhật vai trò và quyền riêng của người dùng.");
     } catch (e) {
-      setError(getErrorMessage(e));
+      notify.fail("Không lưu được vai trò và quyền của người dùng.", e);
     } finally {
       setBusy(false);
     }
@@ -141,9 +142,9 @@ export const AdminRolesPage: React.FC = () => {
     clearMessages();
     try {
       await roleService.saveStudentCode?.(userId, code);
-      setNotice("Đã lưu mã số sinh viên.");
+      notify.success("Đã lưu mã số sinh viên.");
     } catch (e) {
-      setError(getErrorMessage(e));
+      notify.fail("Không lưu được mã số sinh viên.", e);
     } finally {
       setBusy(false);
     }
@@ -179,19 +180,18 @@ export const AdminRolesPage: React.FC = () => {
       <div className="roles-tabs" role="tablist" aria-label="Phân quyền">
         <button type="button" role="tab" aria-selected={activeTab === "roles"} className={activeTab === "roles" ? "is-active" : ""} onClick={() => switchTab("roles")}>
           Vai trò
-          <span className="roles-tab-count">{customRoles.length + systemRoles.length}</span>
+          <span className="roles-tab-count">{loading ? "…" : customRoles.length + systemRoles.length}</span>
         </button>
         <button type="button" role="tab" aria-selected={activeTab === "users"} className={activeTab === "users" ? "is-active" : ""} onClick={() => switchTab("users")}>
           Gán cho người dùng
-          <span className="roles-tab-count">{users.length}</span>
+          <span className="roles-tab-count">{loading ? "…" : users.length}</span>
         </button>
       </div>
 
       {error && <p role="alert" className="roles-banner is-error">{error}</p>}
-      {notice && <p role="status" className="roles-banner is-ok">{notice}</p>}
 
       {loading ? (
-        <p role="status" className="roles-loading">Đang tải vai trò và quyền…</p>
+        <Loading variant="detail" label="Đang tải vai trò và quyền…" />
       ) : activeTab === "roles" ? (
         <div className="roles-main-layout">
           <aside className="roles-nav-pane roles-card">

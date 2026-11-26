@@ -7,14 +7,13 @@ import { teacherService } from "@/shared/api/teacherService";
 import { ProblemSqlEditor } from "@/features/teacher/problem-editor/ProblemSqlEditor";
 import { TeacherExerciseCollection } from "@/features/teacher/problem-editor/TeacherExerciseCollection";
 import { TeacherQuestionCard } from "@/features/teacher/problem-editor/TeacherQuestionCard";
-import { SqlFileNameInput } from "@/features/teacher/problem-editor/SqlFileNameInput";
 import { TeacherSchemaComparison, type SchemaChange } from "@/features/teacher/problem-editor/TeacherSchemaComparison";
 import { TeacherDataComparison, type DataChange } from "@/features/teacher/problem-editor/TeacherDataComparison";
 import { TeacherRunResult } from "@/features/teacher/problem-editor/TeacherRunResult";
 import { QuestionTagSelectors } from "@/features/teacher/problem-editor/QuestionTagSelectors";
 
 type Part = "DDL" | "DML" | "TRIGGER";
-type Run = { source: string; running: boolean; results: { dataset: number; summary?: string; error?: string; changes?: SchemaChange[]; triggers?: {name:string;table:string;isDisabled:boolean}[]; dataChanges?: DataChange[]; scenarios?: {scenario:number;ok:boolean;message?:string;changedTables:string[]}[] }[] };
+type Run = { source: string; running: boolean; results: { dataset: number; summary?: string; error?: string; changes?: SchemaChange[]; triggers?: {name:string;table:string;isDisabled:boolean}[]; dataChanges?: DataChange[]; scenarios?: {scenario:number;ok:boolean;blocked?:boolean;message?:string;changedTables:string[]}[] }[] };
 
 export function initialStageExercise(part: Part, exercise?: TeacherStageExercise | null): TeacherStageExercise {
   if (exercise?.questions?.length) return { questions: exercise.questions.map(question => ({ ...question, enabled: question.enabled !== false })) };
@@ -22,7 +21,7 @@ export function initialStageExercise(part: Part, exercise?: TeacherStageExercise
 }
 
 function newStageQuestion(part: Part, number: number): TeacherStageQuestion {
-  return { id: crypto.randomUUID(), name: `${part}${number}.sql`, description: "", answer: "", enabled: true,
+  return { id: crypto.randomUUID(), description: "", answer: "", enabled: true,
     startFrom: number === 1 ? part === "DDL" ? "empty" : part === "TRIGGER" ? "provided" : "structure" : "provided", setupDdl: "", setupDml: "",
     ...(part === "TRIGGER" ? { probes: [] } : {}) };
 }
@@ -93,8 +92,6 @@ export function TeacherStageExercises({ part, exercise, schema, datasets, onChan
               disabled={readOnly} readOnly={readOnly}
               onChange={event => change(question.id, { description: event.target.value })} />
           </label>}
-          fileName={<SqlFileNameInput label={tr("Question {value0} file name", { value0: index + 1 })}
-            value={question.name} disabled={readOnly || run?.running} onChange={name => change(question.id, { name })} />}
           tagControls={<QuestionTagSelectors
             part={part}
             difficulty={question.difficulty}
@@ -130,11 +127,14 @@ export function TeacherStageExercises({ part, exercise, schema, datasets, onChan
             />
             <span className="teacher-stage-setup-hint"><TranslatedText>{tr("Runs after loading the starting database and before this question. Each question runs independently.")}</TranslatedText></span>
           </details>
+          {part === "DDL" && <label className="teacher-grading-option teacher-grading-check">
+            <input type="checkbox" checked={Boolean(question.checkColumnOrder)} disabled={readOnly}
+              onChange={event => change(question.id, { checkColumnOrder: event.target.checked })} />
+            <span><TranslatedText>{tr("Check column order when grading")}</TranslatedText></span>
+          </label>}
           {part === "TRIGGER" && <section className="teacher-trigger-scenarios" aria-label={tr("Hidden test scenarios")}>
             <div className="teacher-question-answer-label"><TranslatedText>{tr("Hidden test scenarios")}</TranslatedText></div>
-            <p className="teacher-stage-setup-hint"><TranslatedText>{tr((question.probes || []).length
-              ? "Each scenario runs after the trigger is created, on the starting database. Student and reference results are compared table by table, so code formatting and names do not matter. Include a statement that changes several rows."
-              : "No scenarios: the trigger is graded by exact reference code, allowing only outer whitespace and Windows newline differences. Add scenarios to grade by behaviour.")}</TranslatedText></p>
+            {!(question.probes || []).length && <p className="teacher-stage-setup-hint"><TranslatedText>{tr("Add at least one test scenario. A trigger question cannot be saved without one.")}</TranslatedText></p>}
             {(question.probes || []).map((probe, probeIndex) => <div key={probeIndex} className="teacher-trigger-scenario">
               <ProblemSqlEditor value={probe} label={tr("Scenario {value0}", { value0: probeIndex + 1 })}
                 readOnly={readOnly}
@@ -166,7 +166,9 @@ export function TeacherStageExercises({ part, exercise, schema, datasets, onChan
               {result.triggers?.map(trigger=><p key={trigger.name}>{trigger.name} → {trigger.table}</p>)}
               {result.scenarios?.map(item => <p key={item.scenario} role={item.ok ? undefined : "alert"} className={item.ok ? undefined : "teacher-state-failed"}>
                 <TranslatedText>{tr("Scenario {value0}", { value0: item.scenario })}</TranslatedText>: {item.ok
-                  ? <TranslatedText>{tr("changes {value0}", { value0: item.changedTables.join(", ") })}</TranslatedText>
+                  ? item.blocked
+                    ? <TranslatedText>{tr("blocked, no data changed")}{item.message ? ` (${item.message})` : ""}</TranslatedText>
+                    : <TranslatedText>{tr("changes {value0}", { value0: item.changedTables.join(", ") })}</TranslatedText>
                   : <TranslatedText>{tr(item.message || "Scenario failed.")}</TranslatedText>}</p>)}
               {part !== "TRIGGER" && changeCount > 0 && (part === "DDL"
                 ? <TeacherSchemaComparison changes={changes} /> : <TeacherDataComparison changes={dataChanges} />)}

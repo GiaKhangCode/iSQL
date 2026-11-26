@@ -4,7 +4,6 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { parseDatabaseSchema } from "@/shared/lib/sql/parseDatabaseSchema";
 import { TeacherSchemaDiagram } from "@/features/teacher/problem-editor/TeacherSchemaDiagram";
 import { ProblemSqlEditor } from "@/features/teacher/problem-editor/ProblemSqlEditor";
-import { SqlFileNameField } from "@/features/teacher/DatabaseLibraryParts";
 
 export type SchemaDiagramState = { source: string; tables: ReturnType<typeof parseDatabaseSchema> } | null;
 
@@ -42,7 +41,7 @@ export function SchemaPanel({ variant, sql, onSqlChange, fileName, onFileNameCha
       </div>;
 
   const fileNameField = isLibrary
-    ? <SqlFileNameField compact label={tr("Table file name")} value={fileName} onChange={onFileNameChange} />
+    ? null
     : <label className="teacher-schema-filename">
         <input aria-label={tr("Database file name")} value={(fileName || "database.sql").replace(/\.sql$/i, "")}
           onChange={event => {

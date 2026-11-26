@@ -105,7 +105,6 @@ iSQL-backend/
 │   │   └── Requests/                             # Form Requests (Validation)
 │   │       ├── Auth/
 │   │       │   ├── LoginRequest.php
-│   │       │   ├── RegisterRequest.php
 │   │       │   └── RegisterLecturerRequest.php
 │   │       ├── ProblemRequest.php
 │   │       ├── AssignmentRequest.php
@@ -221,6 +220,8 @@ iSQL-backend/
 ## 3. MySQL Migration — Chi Tiết Từng Bảng
 
 > Tất cả các migration nằm trong `database/migrations/`. Dưới đây là schema tương ứng 1:1 với Python `models.py` hiện tại, chuyển đổi sang cú pháp Laravel Blueprint.
+>
+> **Lưu ý (26/11/2026):** phần này là bản thiết kế ban đầu. Migration thật đã được gộp lại thành mỗi bảng một file (`database/migrations/2026_01_01_*`) và khác nhiều so với các đoạn mã dưới đây; khi cần cấu trúc hiện tại, đọc các file migration.
 
 ### 3.1 `users` — Bảng Người dùng
 
@@ -572,8 +573,6 @@ Schema::create('assignment_problems', function (Blueprint $table) {
 | Method | Endpoint | Controller | Ghi chú |
 | :--- | :--- | :--- | :--- |
 | POST | `/api/auth/login` | `AuthController@login` | Trả về JWT + user object |
-| POST | `/api/auth/register` | `AuthController@register` | Tạo sinh viên mới |
-| POST | `/api/auth/register-lecturer` | `AuthController@registerLecturer` | Tạo GV (status=Pending) |
 | POST | `/api/auth/demo` | `AuthController@demoLogin` | Đăng nhập demo |
 | POST | `/api/auth/token` | `AuthController@tokenLogin` | Cho Swagger UI |
 | GET | `/api/auth/me` | `AuthController@me` | Trả info user từ JWT |

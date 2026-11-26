@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Services\AdminOverviewService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class OverviewController extends Controller
 {
@@ -12,18 +13,23 @@ class OverviewController extends Controller
     {
     }
 
-    public function stats(): JsonResponse
+    public function health(): JsonResponse
     {
-        return response()->json($this->overviewService->stats());
+        return response()->json($this->overviewService->health());
+    }
+
+    public function attention(Request $request): JsonResponse
+    {
+        return response()->json($this->overviewService->attention($request->user()));
+    }
+
+    public function exams(): JsonResponse
+    {
+        return response()->json($this->overviewService->upcomingExams());
     }
 
     public function activities(): JsonResponse
     {
         return response()->json($this->overviewService->recentActivities());
-    }
-
-    public function errors(): JsonResponse
-    {
-        return response()->json($this->overviewService->recentGradingErrors());
     }
 }

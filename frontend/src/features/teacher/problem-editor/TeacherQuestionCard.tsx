@@ -7,7 +7,6 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 export function TeacherQuestionCard({
   id,
   number,
-  fileName,
   tagControls,
   description,
   descriptionText,
@@ -16,7 +15,6 @@ export function TeacherQuestionCard({
 }: {
   id: string;
   number: number;
-  fileName: ReactNode;
   tagControls?: ReactNode;
   description: ReactNode;
   descriptionText: string;
@@ -45,7 +43,6 @@ export function TeacherQuestionCard({
             <span><TranslatedText>{tr("Question")}</TranslatedText> {number}</span>
           </button>
         </h3>
-        {fileName}
         {tagControls && <div className="teacher-question-tag-controls">{tagControls}</div>}
         <div className="database-description-row-actions">{actions}</div>
       </header>

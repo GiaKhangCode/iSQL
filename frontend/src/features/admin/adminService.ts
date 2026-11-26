@@ -7,7 +7,7 @@ export interface AdminUser {
   /** Loại danh tính: người học hay nhân sự. Quyền nằm ở `roles` (vai trò động), không ở đây. */
   account_type: "student" | "staff";
   roles?: { id: string; name: string }[];
-  status: "Active" | "Inactive" | "Pending" | string;
+  status: "Active" | "Inactive" | string;
   lastActive: string;
   joined: string;
   detail: string;
@@ -17,7 +17,6 @@ export interface AdminUser {
 export interface RoleOption {
   id: string;
   name: string;
-  isSuper: boolean;
 }
 
 export const ACCOUNT_TYPE_LABELS: Record<AdminUser["account_type"], string> = {
@@ -51,6 +50,16 @@ export function lecturerOptionsFor(
   if (!id || id === "Unassigned" || eligible.some((option) => option.id === id)) return eligible;
   return [{ id, name: current?.lecturer || id }, ...eligible];
 }
+
+export type ServiceHealth = { key: "mysql" | "sqlserver" | "redis"; ok: boolean; ms: number; detail: string | null };
+export type NamedCount = { count: number; names: string[] };
+export type OverviewAttention = { usersWithoutRole: NamedCount; accessManagers: NamedCount; unassignedClasses: number | null };
+export type UpcomingExam = { id: string; title: string; opens: string | null; closes: string | null; status: "Live" | "Upcoming"; students: number };
+export type SandboxSummary = {
+  totals: { student: number; orphan: number; temporary: number };
+  classes: { id: string; course: string; term: string; schemas: number; openActivities: string[] }[];
+  openActivities: string[];
+};
 
 export const adminService = {
   async getUsers(): Promise<AdminUser[]> {
@@ -109,31 +118,27 @@ export const adminService = {
     });
   },
 
-  async getLecturerRequests(): Promise<any[]> {
-    return apiFetch("/api/admin/users/lecturer-requests");
+  async getHealth(): Promise<ServiceHealth[]> {
+    return apiFetch("/api/admin/overview/health");
   },
 
-  async approveLecturerRequest(id: string): Promise<any> {
-    return apiFetch(`/api/admin/users/lecturer-requests/${encodeURIComponent(id)}/approve`, {
-      method: "POST"
-    });
+  async getAttention(): Promise<OverviewAttention> {
+    return apiFetch("/api/admin/overview/attention");
   },
 
-  async rejectLecturerRequest(id: string): Promise<any> {
-    return apiFetch(`/api/admin/users/lecturer-requests/${encodeURIComponent(id)}/reject`, {
-      method: "POST"
-    });
-  },
-
-  async getOverviewStats(): Promise<any> {
-    return apiFetch("/api/admin/overview/stats");
+  async getUpcomingExams(): Promise<UpcomingExam[]> {
+    return apiFetch("/api/admin/overview/exams");
   },
 
   async getActivities(): Promise<any[]> {
     return apiFetch("/api/admin/overview/activities");
   },
 
-  async getErrors(): Promise<any[]> {
-    return apiFetch("/api/admin/overview/errors");
+  async getSandbox(): Promise<SandboxSummary> {
+    return apiFetch("/api/admin/sandbox");
+  },
+
+  async cleanSandbox(input: { target: "class"; classId: string; confirm: string } | { target: "orphans"; confirm: string }): Promise<{ deleted: number; failed: number; remaining: number }> {
+    return apiFetch("/api/admin/sandbox/cleanup", { method: "POST", body: JSON.stringify(input) });
   }
 };

@@ -6,17 +6,19 @@ export type TeacherSqlSolution = {
   expectedOutputs?: DataTable[];
   expectedOutputVisible?: boolean;
   id: string;
-  name: string;
   query: string;
   enabled: boolean;
   timeLimitMs: number;
   difficulty?: string;
   category?: string;
+  /** Chấm có tính thứ tự dòng không. null/undefined = tự động (tính khi đáp án có ORDER BY ngoài cùng). */
+  checkRowOrder?: boolean | null;
+  /** Chỉ so số cột và giá trị theo vị trí, bỏ qua tên cột. */
+  ignoreColumnNames?: boolean;
 };
 
 export type TeacherStageQuestion = {
   id: string;
-  name: string;
   description: string;
   answer: string;
   enabled: boolean;
@@ -25,8 +27,10 @@ export type TeacherStageQuestion = {
   setupDml: string;
   difficulty?: string;
   category?: string;
-  /** TRIGGER only: hidden test scenarios. With at least one, the trigger is graded by behaviour instead of exact code. */
+  /** TRIGGER only: hidden test scenarios (bắt buộc ít nhất một; chấm theo dữ liệu sau mỗi kịch bản). */
   probes?: string[];
+  /** DDL only: chấm có tính thứ tự cột không (mặc định không). */
+  checkColumnOrder?: boolean;
 };
 
 export type TeacherStageExercise = { questions: TeacherStageQuestion[] };

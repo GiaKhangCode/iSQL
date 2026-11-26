@@ -19,8 +19,9 @@ import { TeacherListPagination } from "@/shared/components/TeacherListPagination
 import { TeacherListLoading } from "@/shared/components/TeacherListLoading";
 
 import { Field, Notice, BulkImportMembersDialog } from "@/features/admin/AdminShared";
+import { notify } from "@/shared/ui/notify";
 
-function CourseDialog({ onClose, onCreate, error, busy }: { onClose: () => void; onCreate: (id: string, course: string, term: string) => void; error: string; busy: boolean }) {
+function CourseDialog({ onClose, onCreate, busy }: { onClose: () => void; onCreate: (id: string, course: string, term: string) => void; busy: boolean }) {
   const { t: tr } = useLanguage("admin");
   const [newClassForm, setNewClassForm] = useState({
     id: "",
@@ -57,7 +58,6 @@ function CourseDialog({ onClose, onCreate, error, busy }: { onClose: () => void;
           <button type="button" className="button" onClick={onClose}><TranslatedText>{tr("Cancel")}</TranslatedText></button>
           <button className="button primary" disabled={busy} type="submit"><TranslatedText>{busy ? tr("Creating…") : tr("Create class")}</TranslatedText></button>
         </div>
-        {error && <p className="admin-notice" role="alert"><TranslatedText>{tr(error)}</TranslatedText></p>}
       </form>
     </Dialog>
   );
@@ -76,8 +76,6 @@ export function AdminCoursesPage() {
   const pageSize = 15;
   const [semester, setSemester] = useState("All semesters");
   const [dialog, setDialog] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [createError, setCreateError] = useState("");
   const [creating, setCreating] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -118,7 +116,6 @@ export function AdminCoursesPage() {
       const index = visible.findIndex(item => item.id === state.selectedId);
       if (index >= 0) setPage(Math.floor(index / pageSize) + 1);
     }
-    if (state?.notice) setNotice(state.notice);
     if (state) window.history.replaceState({}, document.title);
   }, [location.state, loading]);
 
@@ -146,7 +143,7 @@ export function AdminCoursesPage() {
         <TeacherListLoading
           label={tr("Loading courses and classes…")}
           createLabel={tr("Add class")}
-          onCreate={() => { setCreateError(""); setDialog(true); }}
+          onCreate={() => setDialog(true)}
           columns={5}
         />
       </section>
@@ -169,7 +166,6 @@ export function AdminCoursesPage() {
   return (
     <section className="teacher-page teacher-list-page compact-teacher-exam-sessions admin-courses-page">
       <h1 className="sr-only"><TranslatedText>{tr("Courses & classes")}</TranslatedText></h1>
-      {notice && <p className="teacher-form-message" role="status"><TranslatedText>{tr(notice)}</TranslatedText></p>}
       <div className="teacher-list-detail-layout teacher-filter-layout">
         <div className="teacher-list-detail-main">
           <TeacherListFilters
@@ -186,7 +182,7 @@ export function AdminCoursesPage() {
             searchLabel={tr("Search course or class...")}
             actionsTarget={actionsTarget}
             createLabel={tr("Add class")}
-            onCreate={() => { setCreateError(""); setDialog(true); }}
+            onCreate={() => setDialog(true)}
             filters={[
               {
                 key: "semester",
@@ -304,9 +300,9 @@ export function AdminCoursesPage() {
                           try {
                             const res = await adminService.updateClass(selected.id, { semester: newSemester });
                             setClasses(all => all.map(c => c.id === selected.id ? res : c));
-                            setNotice(`${selected.id} semester updated.`);
+                            notify.success(tr(`${selected.id} semester updated.`));
                           } catch (error) {
-                            setNotice(error instanceof Error ? error.message : "Could not update semester.");
+                            notify.fail(tr("Could not update semester."), error, tr);
                           }
                         }}
                         className="admin-class-semester-select"
@@ -350,16 +346,14 @@ export function AdminCoursesPage() {
       </div>
       {dialog && (
         <CourseDialog
-          error={createError}
           busy={creating}
           onClose={() => setDialog(false)}
           onCreate={async (id, course, term) => {
             if (classes.some((item) => item.id.toLowerCase() === id.toLowerCase())) {
-              setCreateError(`A class with ID ${id} already exists.`);
+              notify.error(tr(`A class with ID ${id} already exists.`));
               return;
             }
             setCreating(true);
-            setCreateError("");
             try {
               const item = await adminService.createClass({ id, course, semester: term, lecturerId: "Unassigned" });
               setClasses((all) => [item, ...all]);
@@ -368,9 +362,9 @@ export function AdminCoursesPage() {
               setSemester("All semesters");
               setPage(1);
               setDialog(false);
-              setNotice(`${id} was added.`);
+              notify.success(tr(`${id} was added.`));
             } catch (err) {
-              setCreateError(err instanceof Error ? err.message : "Could not create class.");
+              notify.fail(tr("Could not create class."), err, tr);
             } finally {
               setCreating(false);
             }
@@ -395,14 +389,12 @@ export function AdminEditClassPage() {
   const [endDate, setEndDate] = useState("");
   const [lecturer, setLecturer] = useState("Unassigned");
   const [status, setStatus] = useState<AdminClass["status"]>("Draft");
-  const [notice, setNotice] = useState("");
   const [lecturers, setLecturers] = useState<InstructorOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [members, setMembers] = useState<TeacherClassMember[]>([]);
   const [students, setStudents] = useState<TeacherClassMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
   const [membersError, setMembersError] = useState("");
-  const [membersNotice, setMembersNotice] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [memberTab, setMemberTab] = useState<"remove" | "add">("remove");
   const [bulkImportDialog, setBulkImportDialog] = useState(false);
@@ -466,20 +458,19 @@ export function AdminEditClassPage() {
     if (!student.id || memberBusyId) return;
     setMemberBusyId(student.id);
     setMembersError("");
-    setMembersNotice("");
     try {
       if (action === "add") {
         const added = await teacherService.addClassMember(classId, { student_id: student.id });
         setMembers((current) => [added, ...current]);
-        setMembersNotice(`${student.name} added to this class.`);
+        notify.success(tr(`${student.name} added to this class.`));
       } else {
         await teacherService.removeClassMember(classId, student.id);
         setMembers((current) => current.filter((member) => member.id !== student.id));
-        setMembersNotice(`${student.name} removed from this class.`);
+        notify.success(tr(`${student.name} removed from this class.`));
       }
       setRecord((current) => current ? { ...current, students: Math.max(0, current.students + (action === "add" ? 1 : -1)) } : current);
     } catch (error) {
-      setMembersError(error instanceof Error ? error.message : `Could not ${action} this student.`);
+      notify.fail(tr(`Could not ${action} this student.`), error, tr);
     } finally {
       setMemberBusyId("");
     }
@@ -488,15 +479,15 @@ export function AdminEditClassPage() {
   async function save(event: FormEvent) {
     event.preventDefault();
     if (saving) return;
-    if (!startDate.trim() || !endDate.trim()) { setNotice("Class dates are required."); return; }
-    if (endDate < startDate) { setNotice("End date must be after the start date."); return; }
+    if (!startDate.trim() || !endDate.trim()) { notify.error(tr("Class dates are required.")); return; }
+    if (endDate < startDate) { notify.error(tr("End date must be after the start date.")); return; }
     setSaving(true);
-    setNotice("");
     try {
       await adminService.updateClass(currentRecord.id, { course, semester, lecturerId: lecturer, status, startDate, endDate });
-      navigate("/admin/courses", { state: { selectedId: currentRecord.id, notice: `${currentRecord.id} class details saved.` } });
+      notify.success(tr(`${currentRecord.id} class details saved.`));
+      navigate("/admin/courses", { state: { selectedId: currentRecord.id } });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not save class details.");
+      notify.fail(tr("Could not save class details."), err, tr);
     } finally {
       setSaving(false);
     }
@@ -515,7 +506,6 @@ export function AdminEditClassPage() {
       </Select></Field>
       <Field label={tr("LECTURER")}><Select value={lecturer} onChange={(event) => setLecturer(event.target.value)}><option value="Unassigned">{tr("Unassigned")}</option>{lecturers.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</Select></Field>
       <Field label={tr("CLASS STATUS")}><Select value={status} onChange={(event) => setStatus(event.target.value as AdminClass["status"])}><option value="Draft">{tr("Draft")}</option><option value="Active">{tr("Active")}</option><option value="Archived">{tr("Archived")}</option></Select></Field>
-      {notice && <Notice><TranslatedText>{tr(notice)}</TranslatedText></Notice>}
       <div className="admin-class-form-bottom">
         <div className="admin-class-date-row">
           <Field label={tr("START DATE")}><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required /></Field>
@@ -529,7 +519,6 @@ export function AdminEditClassPage() {
         <div><h2 id="admin-class-members-title"><TranslatedText>{tr("Manage members")}</TranslatedText></h2><p className="admin-muted"><TranslatedText>{tr("Add students to or remove them from this class.")}</TranslatedText></p></div>
       </div>
       {membersError && <Notice><TranslatedText>{tr(membersError)}</TranslatedText></Notice>}
-      {membersNotice && <p className="admin-member-notice" role="status"><TranslatedText>{tr(membersNotice)}</TranslatedText></p>}
       {membersLoading ? <Loading variant="table" columns={4} label={tr("Loading class members…")} /> : <>
         <Field label={tr("SEARCH STUDENTS")}><input value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder={tr("Search by name, ID, or email...")} /></Field>
         <div className="admin-member-tabs" role="tablist" aria-label={tr("Manage class members")}>
@@ -553,6 +542,6 @@ export function AdminEditClassPage() {
       </>}
     </aside>
     </div>
-    {bulkImportDialog && <BulkImportMembersDialog classId={classId} onClose={() => setBulkImportDialog(false)} onSuccess={(msg) => { setBulkImportDialog(false); setMembersNotice(msg); teacherService.getClassMembers(classId).then((data) => setMembers(data)).catch(() => {}); }} />}
+    {bulkImportDialog && <BulkImportMembersDialog classId={classId} onClose={() => setBulkImportDialog(false)} onSuccess={() => { setBulkImportDialog(false); teacherService.getClassMembers(classId).then((data) => setMembers(data)).catch(() => {}); }} />}
   </div>;
 }

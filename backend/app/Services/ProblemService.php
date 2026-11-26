@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ContentShare;
 use App\Models\Problem;
 use App\Models\ProblemSqlSolution;
 use App\Models\ProblemStageExercise;
@@ -14,6 +13,7 @@ use App\Services\Access\AccessControlService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ProblemService
 {
@@ -23,19 +23,14 @@ class ProblemService
     ) {
     }
 
-    /** Siêu quản trị (vai trò Admin): thấy và quản lý mọi bài toán. */
-    private function isSuper(User $user): bool
-    {
-        return $this->access->isSuperAdmin($user);
-    }
-
     /**
      * Góc nhìn giảng viên (thấy đáp án, bài của mình và bài được chia sẻ): người soạn bài toán hoặc người giao bài tập.
      * Không đọc users.role.
      */
     private function hasStaffView(User $user): bool
     {
-        return $this->access->canAny($user, ['problem.create', 'assignment.create']);
+        // examination.manage: người lập kỳ thi chọn câu hỏi từ bài toán nên cần danh mục câu hỏi đầy đủ.
+        return $this->access->canAny($user, ['problem.create', 'assignment.create', 'examination.manage']);
     }
 
     /**
@@ -43,22 +38,15 @@ class ProblemService
      */
     public function getAllProblems(User $user): Collection
     {
-        $isAdmin = $this->isSuper($user);
-        $isInstructor = !$isAdmin && $this->hasStaffView($user);
+        $isInstructor = $this->hasStaffView($user);
 
-        if ($isAdmin) {
-            $problems = Problem::orderByDesc('created_at')->orderByDesc('id')->get();
+        if ($this->access->can($user, 'examination.manage')) {
+            // Người lập kỳ thi chọn đề từ thư viện chung, không chỉ đề do mình soạn.
+            $problems = Problem::orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->get();
         } elseif ($isInstructor) {
-            $sharedProblemIds = ContentShare::where('kind', 'problem')
-                ->where('recipient_id', $user->id)
-                ->pluck('resource_id');
-
-            $problems = Problem::where(function ($q) use ($user, $sharedProblemIds) {
-                $q->where('creator_id', $user->id);
-                if ($sharedProblemIds->isNotEmpty()) {
-                    $q->orWhereIn('id', $sharedProblemIds);
-                }
-            })
+            $problems = Problem::where('creator_id', $user->id)
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
                 ->get();
@@ -199,7 +187,6 @@ class ProblemService
 
         $this->assertProblemAccess($problem, $user, $context);
 
-        $isAdmin = $this->isSuper($user);
         $isTeacher = $this->hasStaffView($user);
 
         // Submissions progress
@@ -257,7 +244,7 @@ class ProblemService
             $script = $tc->scripts->first();
             $dsKey = (string) ($idx + 1);
             $isHidden = (bool) $tc->is_hidden;
-            if (!$isTeacher && !$isAdmin && array_key_exists($dsKey, $datasetVis)) {
+            if (!$isTeacher && array_key_exists($dsKey, $datasetVis)) {
                 $isHidden = !$datasetVis[$dsKey];
             }
             $mappedTestCases[] = [
@@ -270,7 +257,7 @@ class ProblemService
         if (!empty($mappedTestCases)) {
             $schemaSql = $mappedTestCases[0]['schema'];
             $seedData = $mappedTestCases[0]['seedData'];
-            $referenceSolution = $isTeacher || $isAdmin
+            $referenceSolution = $isTeacher
                 ? ($rawTestCases->first()?->expected_query ?? '')
                 : '';
         }
@@ -305,24 +292,24 @@ class ProblemService
                 }
                 $sqlChecks[] = [
                     'id'              => $sol->id,
-                    'name'            => $sol->name,
                     'description'     => $sol->description ?? '',
                     'timeLimitMs'     => $sol->time_limit_ms,
                     'hasSetup'        => trim($setupSql) !== '',
                     'expectedSamples' => $samples,
+                    // false = giảng viên tắt hiện kết quả mong đợi; true mà samples rỗng = chưa lưu sẵn, giao diện xin tính khi cần.
+                    'expectedVisible' => $solVisible,
                 ];
             }
         }
 
         // Filter checks by student selection when in an assignment/examination session
-        $selection = ($activity && $activityProblem && !$isTeacher && !$isAdmin)
+        $selection = ($activity && $activityProblem && !$isTeacher)
             ? app(ExaminationService::class)->studentSelectionForProblem($user, $activity, $activityProblem)
             : null;
 
         if (trim($schemaSql) !== '' && (empty($ddlChecks) || (is_array($selection) && in_array('__base_ddl__', $selection['DDL']['questionIds'] ?? [], true)))) {
             array_unshift($ddlChecks, [
                 'id'          => '__base_ddl__',
-                'name'        => 'create_tables.sql',
                 'description' => 'Create all tables and declare their primary and foreign keys.',
                 'startFrom'   => 'empty',
                 'hasSetup'    => false,
@@ -332,7 +319,6 @@ class ProblemService
         if (trim($schemaSql) !== '' && trim($seedData) !== '' && (empty($dmlChecks) || (is_array($selection) && in_array('__base_dml__', $selection['DML']['questionIds'] ?? [], true)))) {
             array_unshift($dmlChecks, [
                 'id'          => '__base_dml__',
-                'name'        => 'insert_data.sql',
                 'description' => 'Insert the original sample data into all tables.',
                 'startFrom'   => 'structure',
                 'hasSetup'    => false,
@@ -344,7 +330,6 @@ class ProblemService
             if (trim((string) $legacyQuery) !== '') {
                 $sqlChecks[] = [
                     'id'              => '__base_sql__',
-                    'name'            => 'query.sql',
                     'description'     => '',
                     'timeLimitMs'     => 5000,
                     'hasSetup'        => false,
@@ -353,7 +338,7 @@ class ProblemService
             }
         }
 
-        if ($activity && $activityProblem && !$isTeacher && !$isAdmin) {
+        if ($activity && $activityProblem && !$isTeacher) {
             if (is_array($selection)) {
                 if (isset($selection['DDL']['questionIds'])) {
                     $allowed = array_flip($selection['DDL']['questionIds']);
@@ -374,7 +359,7 @@ class ProblemService
             }
         }
 
-        if (!$isTeacher && !$isAdmin) {
+        if (!$isTeacher) {
             if (!in_array('DDL', $workspaceParts, true)) $ddlChecks = [];
             if (!in_array('DML', $workspaceParts, true)) $dmlChecks = [];
             if (!in_array('TRIGGER', $workspaceParts, true)) $triggerChecks = [];
@@ -382,16 +367,18 @@ class ProblemService
         }
 
         $sqlSolutionsResponse = null;
-        if ($isTeacher || $isAdmin) {
+        if ($isTeacher) {
             $sqlSolutionsResponse = $solutions->map(function ($sol) {
                 [$solOutputs, $solVisible] = $this->readExpectedOutputs($sol->expected);
                 $rawExpected = is_array($sol->expected) ? $sol->expected : [];
                 return [
                     'id'                    => $sol->id,
-                    'name'                  => $sol->name,
                     'query'                 => $sol->query,
                     'description'           => $sol->description ?? '',
                     'setupSql'              => (string) ($rawExpected['_setupSql'] ?? ''),
+                    // null = tự động (tính thứ tự dòng khi đáp án có ORDER BY ngoài cùng).
+                    'checkRowOrder'         => is_bool($rawExpected['_checkRowOrder'] ?? null) ? $rawExpected['_checkRowOrder'] : null,
+                    'ignoreColumnNames'     => (bool) ($rawExpected['_ignoreColumnNames'] ?? false),
                     'difficulty'            => $rawExpected['_difficulty'] ?? null,
                     'category'              => $rawExpected['_category'] ?? null,
                     'expectedOutputs'       => $solOutputs,
@@ -403,7 +390,7 @@ class ProblemService
         }
 
         // Question catalog (for Assignment / Exam Builder)
-        $questionCatalog = $isTeacher || $isAdmin
+        $questionCatalog = $isTeacher
             ? $this->buildQuestionCatalog($problem, $workspaceParts, $schemaSql, $seedData, $ddlExercise, $dmlExercise, $triggerExercise, $solutions)
             : null;
 
@@ -412,7 +399,7 @@ class ProblemService
         $expectedOutputsResponse = $expectedOutputs;
         $expectedSamplesResponse = [];
 
-        if (!$isTeacher && !$isAdmin) {
+        if (!$isTeacher) {
             $testCasesResponse = array_values(array_filter($mappedTestCases, fn ($tc) => !$tc['isHidden']));
 
             if (!$expectedOutputVisible) {
@@ -467,8 +454,8 @@ class ProblemService
             'schemaFileName'               => $problem->schema_file_name ?: 'database.sql',
             'workspace_parts'              => $workspaceParts,
             'workspaceParts'               => $workspaceParts,
-            'database_description'         => (!$isTeacher && !$isAdmin && !$dbDescVisible) ? [] : ($problem->database_description ?: []),
-            'databaseDescription'          => (!$isTeacher && !$isAdmin && !$dbDescVisible) ? [] : ($problem->database_description ?: []),
+            'database_description'         => (!$isTeacher && !$dbDescVisible) ? [] : ($problem->database_description ?: []),
+            'databaseDescription'          => (!$isTeacher && !$dbDescVisible) ? [] : ($problem->database_description ?: []),
             'database_description_visible' => $dbDescVisible,
             'databaseDescriptionVisible'   => $dbDescVisible,
             'database_structure_visible'   => $dbStructVisible,
@@ -493,9 +480,9 @@ class ProblemService
             'expectedOutputVisible'       => $expectedOutputVisible,
             'testCases'                    => $testCasesResponse,
             'test_cases'                   => $testCasesResponse,
-            'ddlExercise'                  => ($isTeacher || $isAdmin) ? $ddlExercise : null,
-            'dmlExercise'                  => ($isTeacher || $isAdmin) ? $dmlExercise : null,
-            'triggerExercise'              => ($isTeacher || $isAdmin) ? $triggerExercise : null,
+            'ddlExercise'                  => ($isTeacher) ? $ddlExercise : null,
+            'dmlExercise'                  => ($isTeacher) ? $dmlExercise : null,
+            'triggerExercise'              => ($isTeacher) ? $triggerExercise : null,
             'ddlChecks'                    => $ddlChecks,
             'dmlChecks'                    => $dmlChecks,
             'triggerChecks'                => $triggerChecks,
@@ -745,14 +732,11 @@ class ProblemService
             $subIds = DB::table('submissions')->where('problem_id', $id)->pluck('id');
             if ($subIds->isNotEmpty()) {
                 DB::table('workspace_submission_results')->whereIn('submission_id', $subIds)->delete();
-                DB::table('submission_appeals')->whereIn('submission_id', $subIds)->delete();
-                DB::table('submission_regrade_assignments')->whereIn('submission_id', $subIds)->delete();
             }
             DB::table('submissions')->where('problem_id', $id)->delete();
             DB::table('problem_drafts')->where('problem_id', $id)->delete();
             DB::table('favorites')->where('problem_id', $id)->delete();
             DB::table('problem_list_items')->where('problem_id', $id)->delete();
-            DB::table('content_shares')->where('kind', 'problem')->where('resource_id', $id)->delete();
 
             // AI chat messages & sessions
             $sessionIds = DB::table('ai_chat_sessions')->where('problem_id', $id)->pluck('id');
@@ -836,6 +820,49 @@ class ProblemService
     }
 
     /**
+     * Bảng "Kết quả mong đợi" của một câu DQL, tính khi cần (xem ProblemWorkspaceService::expectedOutputSamples).
+     * Trong bài tập / ca thi, sinh viên chỉ xem được câu thuộc đề của mình.
+     */
+    public function getExpectedOutput(string $id, array $data, User $user): array
+    {
+        $problem = Problem::findOrFail($id);
+        $context = $data['context'] ?? null;
+        $this->assertProblemAccess($problem, $user, $context);
+        $questionId = (string) ($data['questionId'] ?? $data['solutionId'] ?? '');
+
+        if ($context && $context !== 'Practice' && !$this->hasStaffView($user)) {
+            $activity = \App\Models\Assignment::find($context);
+            $activityProblem = \App\Models\AssignmentProblem::where('assignment_id', $context)->where('problem_id', $problem->id)->first();
+            $selection = app(ExaminationService::class)->studentSelectionForProblem($user, $activity, $activityProblem);
+            if (is_array($selection) && isset($selection['SQL']['questionIds']) && !in_array($questionId, $selection['SQL']['questionIds'], true)) {
+                abort(403, 'Câu hỏi này không thuộc đề của bạn.');
+            }
+        }
+
+        return $this->workspaceService->expectedOutputSamples($problem, $questionId);
+    }
+
+    /**
+     * Cơ sở dữ liệu đang có trong schema của chính sinh viên (đọc lại, không chạy script).
+     */
+    public function getStudentDatabase(string $id, array $data, User $user): array
+    {
+        $problem = Problem::findOrFail($id);
+        $this->assertProblemAccess($problem, $user, $data['context'] ?? null);
+        return $this->workspaceService->readStudentDatabase($problem, $data, $user);
+    }
+
+    /**
+     * Làm lại từ đầu schema của sinh viên cho bài này (xóa mọi bảng đang có).
+     */
+    public function resetStudentDatabase(string $id, array $data, User $user): array
+    {
+        $problem = Problem::findOrFail($id);
+        $this->assertProblemAccess($problem, $user, $data['context'] ?? null);
+        return $this->workspaceService->resetStudentDatabase($problem, $data, $user);
+    }
+
+    /**
      * Submit workspace or individual workspace question.
      */
     public function submitWorkspace(string $id, array $data, User $user): array
@@ -885,13 +912,14 @@ class ProblemService
             }
             $normalized[] = [
                 'id'          => $q['id'] ?? ('q' . ($idx + 1)),
-                'name'        => $q['name'] ?? ("{$part}" . ($idx + 1) . '.sql'),
                 'description' => $q['description'] ?? '',
                 'answer'      => $q['answer'] ?? '',
                 'startFrom'   => $q['startFrom'] ?? $q['start_from'] ?? $defaultStart,
                 'setupDdl'    => $q['setupDdl'] ?? $q['setup_ddl'] ?? '',
                 'setupDml'    => $q['setupDml'] ?? $q['setup_dml'] ?? '',
                 'probes'      => is_array($q['probes'] ?? null) ? array_values($q['probes']) : [],
+                // DDL: có tính thứ tự cột khi chấm hay không (mặc định không).
+                'checkColumnOrder' => (bool) ($q['checkColumnOrder'] ?? $q['check_column_order'] ?? false),
                 'difficulty'  => $q['difficulty'] ?? null,
                 'category'    => $q['category'] ?? null,
             ];
@@ -912,7 +940,6 @@ class ProblemService
             $probes = array_filter(array_map('trim', (array) ($q['probes'] ?? [])));
             $checks[] = [
                 'id'          => $q['id'] ?? ('q' . ($idx + 1)),
-                'name'        => $q['name'] ?? ("{$part}" . ($idx + 1) . '.sql'),
                 'description' => $q['description'] ?? '',
                 'startFrom'   => $q['startFrom'] ?? ($part === 'DDL' ? 'empty' : 'provided'),
                 'hasSetup'    => trim((string) ($q['setupDdl'] ?? '')) !== '' || trim((string) ($q['setupDml'] ?? '')) !== '',
@@ -945,7 +972,6 @@ class ProblemService
         if (trim($schemaSql) !== '') {
             $ddlQuestions[] = [
                 'id'          => '__base_ddl__',
-                'name'        => 'create_tables.sql',
                 'kind'        => 'schema',
                 'description' => 'Create all tables and declare their primary and foreign keys.',
                 'startFrom'   => 'empty',
@@ -959,7 +985,6 @@ class ProblemService
             }
             $item = [
                 'id'          => $q['id'],
-                'name'        => $q['name'] ?? 'DDL.sql',
                 'description' => $q['description'] ?? '',
                 'difficulty'  => $q['difficulty'] ?? ($q['_difficulty'] ?? null),
                 'category'    => $q['category'] ?? ($q['_category'] ?? null),
@@ -976,7 +1001,6 @@ class ProblemService
         if (trim($schemaSql) !== '' && trim($seedData) !== '') {
             $dmlQuestions[] = [
                 'id'          => '__base_dml__',
-                'name'        => 'insert_data.sql',
                 'kind'        => 'seed',
                 'description' => 'Insert the original sample data into all tables.',
                 'startFrom'   => 'structure',
@@ -990,7 +1014,6 @@ class ProblemService
             }
             $item = [
                 'id'          => $q['id'],
-                'name'        => $q['name'] ?? 'DML.sql',
                 'description' => $q['description'] ?? '',
                 'difficulty'  => $q['difficulty'] ?? ($q['_difficulty'] ?? null),
                 'category'    => $q['category'] ?? ($q['_category'] ?? null),
@@ -1010,7 +1033,6 @@ class ProblemService
             }
             $item = [
                 'id'          => $q['id'],
-                'name'        => $q['name'] ?? 'TRIGGER.sql',
                 'description' => $q['description'] ?? '',
                 'difficulty'  => $q['difficulty'] ?? ($q['_difficulty'] ?? null),
                 'category'    => $q['category'] ?? ($q['_category'] ?? null),
@@ -1031,7 +1053,6 @@ class ProblemService
             $rawExpected = is_array($sol->expected) ? $sol->expected : [];
             $sqlQuestions[] = [
                 'id'          => $sol->id,
-                'name'        => $sol->name ?: ('DQL' . ($idx + 1) . '.sql'),
                 'description' => $sol->description ?? '',
                 'timeLimitMs' => $sol->time_limit_ms ?: 5000,
                 'difficulty'  => $rawExpected['_difficulty'] ?? ($sol->difficulty ?? null),
@@ -1043,7 +1064,6 @@ class ProblemService
             if (trim((string) $legacyQuery) !== '') {
                 $sqlQuestions[] = [
                     'id'          => '__base_sql__',
-                    'name'        => 'query.sql',
                     'description' => '',
                     'timeLimitMs' => 5000,
                     'difficulty'  => $fallbackDifficulty,
@@ -1059,6 +1079,17 @@ class ProblemService
     private function saveStageExercise(string $problemId, string $part, mixed $exercise): void
     {
         $normalized = $this->normalizeStageExercise($part, $exercise);
+        if ($part === 'TRIGGER' && $normalized) {
+            // Câu trigger phải có ít nhất một kịch bản kiểm tra để chấm được hành vi (không chỉ "tạo được trigger").
+            foreach ($normalized['questions'] as $position => $q) {
+                $hasProbe = (bool) array_filter(array_map(fn ($probe) => trim((string) $probe), $q['probes'] ?? []));
+                if (trim((string) ($q['answer'] ?? '')) !== '' && !$hasProbe) {
+                    throw ValidationException::withMessages([
+                        'triggerExercise' => ['Câu trigger số ' . ($position + 1) . ' cần ít nhất một kịch bản kiểm tra.'],
+                    ]);
+                }
+            }
+        }
         if (!$normalized || empty($normalized['questions'])) {
             ProblemStageExercise::where('problem_id', $problemId)->where('part', $part)->delete();
             return;
@@ -1143,7 +1174,8 @@ class ProblemService
                 $row->problem_id = $problemId;
             }
 
-            $row->name = mb_substr((string) ($solData['name'] ?? ('DQL' . ($index + 1) . '.sql')), 0, 120);
+            // Câu hỏi không còn tên riêng; cột name vẫn bắt buộc nên ghi nhãn nội bộ, không trả ra API.
+            $row->name = 'DQL' . ($index + 1);
             $row->query = $solData['query'] ?? '';
             $row->description = $solData['description'] ?? '';
             $row->enabled = $solData['enabled'] ?? true;
@@ -1161,6 +1193,9 @@ class ProblemService
                 '_expectedOutputVisible' => (bool) $visible,
             ];
             $expectedPayload['_setupSql'] = $setupSql;
+            $rowOrder = $solData['checkRowOrder'] ?? $solData['check_row_order'] ?? null;
+            $expectedPayload['_checkRowOrder'] = is_bool($rowOrder) ? $rowOrder : null;
+            $expectedPayload['_ignoreColumnNames'] = (bool) ($solData['ignoreColumnNames'] ?? $solData['ignore_column_names'] ?? false);
             $expectedPayload['_difficulty'] = $difficulty;
             $expectedPayload['_category'] = $category;
 
@@ -1238,27 +1273,15 @@ class ProblemService
 
     private function assertProblemAccess(Problem $p, User $user, ?string $context): void
     {
+        $this->assertExamStarted($p, $user, $context);
+
         if ($p->practice_listed) {
             return;
         }
 
-        if ($this->isSuper($user)) {
-            return;
-        }
-
         $isCreator = $p->creator_id === $user->id;
-        if ($isCreator) {
+        if ($isCreator || $this->access->can($user, 'examination.manage')) {
             return;
-        }
-
-        if ($this->hasStaffView($user)) {
-            $isShared = ContentShare::where('kind', 'problem')
-                ->where('resource_id', $p->id)
-                ->where('recipient_id', $user->id)
-                ->exists();
-            if ($isShared) {
-                return;
-            }
         }
 
         $hasSubmitted = DB::table('submissions')
@@ -1276,6 +1299,16 @@ class ProblemService
             ->join('assignments', 'assignments.id', '=', 'assignment_problems.assignment_id')
             ->where('assignment_problems.problem_id', $p->id)
             ->where('assignments.published', true)
+            // Ca thi của kỳ thi chỉ mở đề cho sinh viên đã bấm bắt đầu (kể cả khi gọi không kèm context).
+            ->where(function ($started) use ($user) {
+                $started->whereNull('assignments.examination_id')
+                    ->orWhereExists(function ($ex) use ($user) {
+                        $ex->select(DB::raw(1))
+                            ->from('activity_attempts')
+                            ->whereColumn('activity_attempts.assignment_id', 'assignments.id')
+                            ->where('activity_attempts.user_id', $user->id);
+                    });
+            })
             ->where(function ($oq) use ($now) {
                 $oq->whereNull('assignments.opens')
                     ->orWhere('assignments.opens', '<=', $now);
@@ -1316,6 +1349,27 @@ class ProblemService
         abort(403, "You don't have permission to view this problem.");
     }
 
+    /**
+     * Đề của ca thi (assignment thuộc kỳ thi) chỉ trả cho sinh viên sau khi đã bắt đầu làm bài (có lượt làm hoặc đã
+     * nộp bài trong ca đó). Người soạn bài và nhân sự không bị chặn.
+     */
+    private function assertExamStarted(Problem $p, User $user, ?string $context): void
+    {
+        if (!$context || $context === 'Practice' || $p->creator_id === $user->id || $this->hasStaffView($user)) {
+            return;
+        }
+
+        $isExamSession = \App\Models\Assignment::where('id', $context)->whereNotNull('examination_id')->exists();
+        if (!$isExamSession) {
+            return;
+        }
+
+        $started = \App\Models\ActivityAttempt::where('assignment_id', $context)->where('user_id', $user->id)->exists()
+            || DB::table('submissions')->where('context', $context)->where('user_id', $user->id)->exists();
+
+        abort_unless($started, 403, 'Đề thi chỉ hiển thị sau khi bạn bấm bắt đầu làm bài.');
+    }
+
     /** Tạo bài toán: quyền problem.create. */
     private function assertCanAuthorProblems(User $user): void
     {
@@ -1330,28 +1384,14 @@ class ProblemService
 
     private function canEditProblem(Problem $p, User $user): bool
     {
-        if ($this->isSuper($user)) {
-            return true;
-        }
-
         $hasEditPerm = $this->access->can($user, 'problem.create');
 
         $isCreator = $p->creator_id === $user->id;
-        $isSharedEditor = ContentShare::where('kind', 'problem')
-            ->where('resource_id', $p->id)
-            ->where('recipient_id', $user->id)
-            ->where('can_edit', true)
-            ->exists();
-
-        return $hasEditPerm && ($isCreator || $isSharedEditor);
+        return $hasEditPerm && $isCreator;
     }
 
     private function canDeleteProblem(Problem $p, User $user): bool
     {
-        if ($this->isSuper($user)) {
-            return true;
-        }
-
         $hasDeletePerm = $this->access->can($user, 'problem.create');
 
         $isCreator = $p->creator_id === $user->id;

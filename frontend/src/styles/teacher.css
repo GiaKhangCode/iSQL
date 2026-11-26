@@ -934,6 +934,10 @@
 .teacher-exam-mode-setting .teacher-violation-limit label { color:var(--muted); font-weight:400; }
 .teacher-exam-mode-setting input[type=number] { width:72px; min-height:32px; height:32px; padding:5px 9px; font-size:12px; line-height:20px; }
 .teacher-exam-mode-setting .teacher-limit-value,.teacher-exam-mode-setting .teacher-limit-label { font-size:12px; }
+/* Khung cấu hình chung của kỳ thi: padding đều 16px, mọi dòng cao bằng nhau, không dính viền (workspace-exam.css đặt padding ngang = 0 nên cần selector cụ thể hơn). */
+.examination-common-settings .teacher-exam-mode-setting { margin:12px 0 0; padding:4px 16px; border:1px solid var(--border); border-radius:8px; }
+.examination-common-settings .teacher-exam-mode-setting .teacher-option-row { min-height:52px; padding:10px 0; gap:16px; }
+.examination-common-settings .teacher-exam-mode-setting .teacher-option-row.teacher-violation-limit { padding:10px 0; }
 .examination-planner + .teacher-section-title { margin-top:24px; }
 
 .teacher-builder-setup .teacher-session-switch { width:auto; max-width:min(420px,55%); min-height:36px; padding:0; font-size:12px; }

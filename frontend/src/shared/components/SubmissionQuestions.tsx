@@ -10,6 +10,7 @@ import { sqlEditorExtensions } from "@/shared/components/sqlEditorExtensions";
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { DataGrid, Status } from "@/shared/ui/ui";
 import { SqlErrorMessage } from "@/shared/components/SqlErrorMessage";
+import { formatPoints } from "@/shared/lib/sql/formatPoints";
 import "@/shared/components/SubmissionQuestions.css";
 
 /** Read this attempt's immutable snapshot; never combine it with live drafts. */
@@ -98,6 +99,10 @@ export function SubmissionQuestions({ submission }: { submission: Submission }) 
     {visible && question.result && <div className="submission-question-verdict">
       <strong><TranslatedText>{tr("Result")}</TranslatedText> <span>{Math.round(question.result.ratio * 100)}%</span></strong>
       {question.result.datasets?.map(dataset => <div key={dataset.dataset}><small><TranslatedText>{tr("Dataset")}</TranslatedText> {dataset.dataset}</small>{dataset.runtimeError?<SqlErrorMessage message={dataset.message}/>:<p><TranslatedText>{tr(dataset.message)}</TranslatedText></p>}</div>)}
+    </div>}
+    {visible && question.result?.manualScore != null && <div className="submission-question-grade">
+      <strong>Điểm giảng viên chấm: {formatPoints(question.result.manualScore)}{question.result.manualMaxScore != null ? ` / ${formatPoints(question.result.manualMaxScore)}` : ""}</strong>
+      <p>{question.result.manualFeedback || "Không có nhận xét cho câu này."}</p>
     </div>}
     {visible && comparisons.map((comparison,index) => comparison.actualTable && <details className="submission-question-output" key={index}><summary><TranslatedText>{tr("Dataset")}</TranslatedText> {comparison.dataset} · <TranslatedText>{tr("Your result")}</TranslatedText></summary><DataGrid table={comparison.actualTable}/></details>)}
   </section>;

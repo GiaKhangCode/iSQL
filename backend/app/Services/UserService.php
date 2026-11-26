@@ -21,45 +21,12 @@ class UserService
     {
     }
 
-    /** Không được để hệ thống không còn siêu quản trị Active nào. */
-    private function assertNotLastSuperAdmin(User $user, string $field, string $message): void
+    /** Không được để hệ thống không còn tài khoản Active nào giữ quyền access.manage. */
+    private function assertNotLastAccessManager(User $user, string $field, string $message): void
     {
-        if ($this->access->isLastActiveSuperAdmin($user)) {
+        if ($this->access->isLastActiveAccessManager($user)) {
             throw ValidationException::withMessages([$field => [$message]]);
         }
-    }
-
-    public function registerStudent(array $data): User
-    {
-        $hashedPassword = Hash::make($data['password']);
-        $initials = mb_strtoupper(mb_substr(trim($data['name']), 0, 2, 'UTF-8'), 'UTF-8');
-
-        // Vai trò "Sinh viên" mặc định được gán bởi hook User::created (AccessRoleAssigner).
-        return User::create([
-            'name'            => $data['name'],
-            'email'           => $data['email'],
-            'hashed_password' => $hashedPassword,
-            'initials'        => $initials,
-            'account_type'    => User::ACCOUNT_STUDENT,
-            'status'          => 'Active',
-        ]);
-    }
-
-    public function registerLecturer(array $data): User
-    {
-        $hashedPassword = Hash::make($data['password']);
-        $initials = mb_strtoupper(mb_substr(trim($data['name']), 0, 2, 'UTF-8'), 'UTF-8');
-
-        return User::create([
-            'name'            => $data['name'],
-            'email'           => $data['email'],
-            'hashed_password' => $hashedPassword,
-            'initials'        => $initials,
-            'account_type'    => User::ACCOUNT_STAFF,
-            'initial_role'    => 'instructor',
-            'status'          => 'Pending',
-            'department'      => $data['department'],
-        ]);
     }
 
     public function authenticate(string $email, string $password): User
@@ -68,10 +35,6 @@ class UserService
 
         if (!$user || !Hash::check($password, $user->hashed_password)) {
             throw new \Exception('Email hoặc mật khẩu không chính xác.', 401);
-        }
-
-        if ($user->status === 'Pending') {
-            throw new \Exception('Tài khoản của bạn đang chờ quản trị viên phê duyệt.', 403);
         }
 
         if ($user->status === 'Inactive') {
@@ -145,12 +108,12 @@ class UserService
     /**
      * Vai trò chọn được khi tạo tài khoản (danh sách vai trò động), sắp theo tên.
      *
-     * @return array<int, array{id: string, name: string, isSuper: bool}>
+     * @return array<int, array{id: string, name: string}>
      */
     public function assignableRoles(): array
     {
-        return AccessRole::orderBy('name')->get(['id', 'name', 'is_super'])
-            ->map(fn (AccessRole $role) => ['id' => (string) $role->id, 'name' => $role->name, 'isSuper' => (bool) $role->is_super])
+        return AccessRole::orderBy('name')->get(['id', 'name'])
+            ->map(fn (AccessRole $role) => ['id' => (string) $role->id, 'name' => $role->name])
             ->all();
     }
 
@@ -205,14 +168,14 @@ class UserService
         return $role;
     }
 
-    /** Vai trò siêu quản trị hoặc có access.manage chỉ người có access.manage mới được cấp. */
+    /** Vai trò có access.manage chỉ người có access.manage mới được cấp. */
     private function assertMayGrantRole(AccessRole $role, ?User $actor): void
     {
         if ($actor === null) {
             return;
         }
 
-        $sensitive = $role->is_super || in_array('access.manage', $role->permissionCodes(), true);
+        $sensitive = in_array('access.manage', $role->permissionCodes(), true);
         if ($sensitive && ! $this->access->can($actor, 'access.manage')) {
             throw new HttpException(403, 'Chỉ người có quyền quản lý vai trò mới được cấp vai trò này.');
         }
@@ -235,7 +198,7 @@ class UserService
         $credentialsChanged = false;
 
         if (isset($data['status']) && $data['status'] !== 'Active') {
-            $this->assertNotLastSuperAdmin($user, 'status', 'Không thể khóa quản trị viên đang hoạt động cuối cùng.');
+            $this->assertNotLastAccessManager($user, 'status', 'Không thể khóa quản trị viên đang hoạt động cuối cùng.');
         }
 
         if (array_key_exists('initials', $data) && $data['initials'] === null) {
@@ -283,13 +246,13 @@ class UserService
     }
 
     /**
-     * Update user account status (Active, Inactive, Pending)
+     * Update user account status (Active, Inactive)
      */
     public function updateStatus(string $id, string $status): User
     {
         $user = User::findOrFail($id);
         if ($status !== 'Active') {
-            $this->assertNotLastSuperAdmin($user, 'status', 'Không thể khóa quản trị viên đang hoạt động cuối cùng.');
+            $this->assertNotLastAccessManager($user, 'status', 'Không thể khóa quản trị viên đang hoạt động cuối cùng.');
         }
         $user->status = $status;
         $user->save();
@@ -309,7 +272,7 @@ class UserService
     public function deleteUser(string $id): void
     {
         $user = User::findOrFail($id);
-        $this->assertNotLastSuperAdmin($user, 'user_id', 'Không thể xóa quản trị viên đang hoạt động cuối cùng.');
+        $this->assertNotLastAccessManager($user, 'user_id', 'Không thể xóa quản trị viên đang hoạt động cuối cùng.');
         $user->delete();
     }
 

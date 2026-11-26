@@ -95,13 +95,13 @@ class ProblemCrudTest extends TestCase
             'creator_id'      => $this->instructor1->id,
         ]);
 
-        // 1. Admin sees all problems
+        // 1. Admin không có quyền soạn bài nên chỉ có góc nhìn người học: thấy bài công khai, không thấy bài riêng tư
         Sanctum::actingAs($this->adminUser);
         $adminResp = $this->getJson('/api/problems');
         $adminResp->assertStatus(200);
         $adminIds = collect($adminResp->json())->pluck('id');
         $this->assertTrue($adminIds->contains($pub->id));
-        $this->assertTrue($adminIds->contains($priv1->id));
+        $this->assertFalse($adminIds->contains($priv1->id));
 
         // 2. Instructor 1 sees public and their own private
         Sanctum::actingAs($this->instructor1);
@@ -220,7 +220,9 @@ class ProblemCrudTest extends TestCase
         $problemId = $data['id'];
         $this->assertDatabaseHas('problems', ['id' => $problemId, 'number' => 'SQL-TEST-01']);
         $this->assertDatabaseHas('test_cases_rel', ['problem_id' => $problemId, 'is_hidden' => 1]);
-        $this->assertDatabaseHas('problem_sql_solutions', ['problem_id' => $problemId, 'name' => 'Standard SELECT']);
+        // Câu hỏi không còn tên riêng: tên client gửi bị bỏ qua, chỉ còn nhãn nội bộ.
+        $this->assertDatabaseHas('problem_sql_solutions', ['problem_id' => $problemId, 'name' => 'DQL1']);
+        $this->assertDatabaseMissing('problem_sql_solutions', ['problem_id' => $problemId, 'name' => 'Standard SELECT']);
 
         $topicNames = DB::table('problem_topics')
             ->join('topics', 'topics.id', '=', 'problem_topics.topic_id')
@@ -322,7 +324,7 @@ class ProblemCrudTest extends TestCase
         $this->assertEquals('Hard', $updateResp->json('difficulty'));
         $this->assertFalse($updateResp->json('practiceListed'));
 
-        // Admin can also update any problem
+        // Admin không có problem.create nên không sửa được bài nào
         Sanctum::actingAs($this->adminUser);
         $adminResp = $this->putJson("/api/problems/{$probId}", [
             'number'            => 'SQL-UPDATE-01-V3',
@@ -331,8 +333,7 @@ class ProblemCrudTest extends TestCase
             'statement'         => 'Admin statement',
             'referenceSolution' => 'SELECT 3;',
         ]);
-        $adminResp->assertStatus(200);
-        $this->assertEquals('Admin Overwrite', $adminResp->json('title'));
+        $adminResp->assertStatus(403);
     }
 
     public function test_delete_problem_with_cascading_relations(): void
@@ -403,5 +404,44 @@ class ProblemCrudTest extends TestCase
         $this->assertEquals(['MANV', 'HOTEN'], $respWithData->json('table.columns'));
         $this->assertEquals([['NV01', 'Nguyen Van B']], $respWithData->json('table.rows'));
         $this->assertGreaterThan(0, $respWithData->json('executionTimeMs'));
+    }
+
+    public function test_grading_options_are_saved_and_returned(): void
+    {
+        Sanctum::actingAs($this->instructor1);
+        $create = $this->postJson('/api/problems', [
+            'number' => 'SQL-OPT-' . strtoupper(substr(uniqid(), -6)), 'title' => 'Grading options', 'difficulty' => 'Easy',
+            'visibility' => 'Public', 'statement' => 'Statement', 'referenceSolution' => 'SELECT * FROM Demo;',
+            'testCases' => [['schema' => 'CREATE TABLE Demo (x INT);', 'seedData' => 'INSERT INTO Demo VALUES (1);', 'isHidden' => false]],
+            'sqlSolutions' => [
+                ['id' => 'opt-a', 'name' => 'a.sql', 'query' => 'SELECT x FROM Demo ORDER BY x;', 'enabled' => true, 'checkRowOrder' => false, 'ignoreColumnNames' => true],
+                ['id' => 'opt-b', 'name' => 'b.sql', 'query' => 'SELECT x FROM Demo;', 'enabled' => true],
+            ],
+            'ddlExercise' => ['questions' => [['id' => 'ddl-1', 'name' => 'd.sql', 'answer' => 'CREATE TABLE T (a INT);', 'startFrom' => 'empty', 'checkColumnOrder' => true]]],
+        ])->assertStatus(201);
+
+        $view = $this->getJson('/api/problems/' . $create->json('id'))->assertOk();
+        $sols = collect($view->json('sqlSolutions'))->keyBy('id');
+        $this->assertSame('SELECT x FROM Demo ORDER BY x;', $sols['opt-a']['query'], 'đáp án SQL không bị lọc mất khi lưu qua API');
+        $this->assertFalse($sols['opt-a']['checkRowOrder']);
+        $this->assertTrue($sols['opt-a']['ignoreColumnNames']);
+        $this->assertNull($sols['opt-b']['checkRowOrder'], 'mặc định là tự động');
+        $this->assertFalse($sols['opt-b']['ignoreColumnNames']);
+        $this->assertTrue($view->json('ddlExercise.questions.0.checkColumnOrder'));
+    }
+
+    public function test_a_trigger_question_without_a_test_scenario_cannot_be_saved(): void
+    {
+        Sanctum::actingAs($this->instructor1);
+        $payload = [
+            'number' => 'SQL-TRG-' . strtoupper(substr(uniqid(), -6)), 'title' => 'Trigger probes', 'difficulty' => 'Easy',
+            'visibility' => 'Public', 'statement' => 'Statement', 'referenceSolution' => 'SELECT 1;',
+            'triggerExercise' => ['questions' => [['id' => 'trg-1', 'name' => 't.sql', 'answer' => 'CREATE TRIGGER trg ON Demo AFTER INSERT AS SELECT 1;', 'startFrom' => 'provided', 'probes' => ['  ']]]],
+        ];
+
+        $this->postJson('/api/problems', $payload)->assertStatus(422)->assertJsonValidationErrors(['triggerExercise']);
+
+        $payload['triggerExercise']['questions'][0]['probes'] = ['INSERT INTO Demo VALUES (5);'];
+        $this->postJson('/api/problems', $payload)->assertStatus(201);
     }
 }

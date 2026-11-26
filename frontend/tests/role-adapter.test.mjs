@@ -29,20 +29,20 @@ try {
       if (url === "/api/admin/access") {
         return {
           roles: [
-            { id: "role-admin", name: "Admin", areas: ["admin"], isSuper: true, userCount: 1, permissions: ["practice.solve", "problem.create", "brand.new"] },
-            { id: "role-student", name: "Sinh viên", areas: ["student"], isSuper: false, userCount: 9, permissions: ["practice.solve"] },
-            { id: "custom-1", name: "Trợ giảng", areas: ["teacher"], isSuper: false, userCount: 0, permissions: ["results.grade", "problem.create"] },
+            { id: "role-admin", name: "Admin", userCount: 1, permissions: ["system.overview", "access.manage"] },
+            { id: "role-student", name: "Sinh viên", userCount: 9, permissions: ["practice.solve"] },
+            { id: "custom-1", name: "Trợ giảng", userCount: 0, permissions: ["results.grade", "problem.create"] },
           ],
           permissions: serverPermissions,
         };
       }
       if (url === "/api/admin/access/roles" && options.method === "POST") {
         const body = JSON.parse(options.body);
-        return { id: "new-role-id", name: body.name, areas: ["teacher"], permissions: body.permissions };
+        return { id: "new-role-id", name: body.name, permissions: body.permissions };
       }
       if (url === "/api/admin/access/roles/custom-1" && options.method === "PUT") {
         const body = JSON.parse(options.body);
-        return { id: "custom-1", name: body.name, areas: ["teacher"], permissions: body.permissions };
+        return { id: "custom-1", name: body.name, permissions: body.permissions };
       }
       if (url === "/api/admin/access/users/user-1" && options.method === "PUT") {
         const body = JSON.parse(options.body);
@@ -58,18 +58,14 @@ try {
 
   const { roleService, buildPermissionGroups, permissionSources, permissionLabel, sameSet } = await import("./.role-adapter-bundle.mjs");
 
-  // Catalog: every role is editable except the super-admin role, which is read-only and listed separately.
+  // Catalog: no role holds everything automatically, so every role (Admin included) is an ordinary, editable role.
   const catalog = await roleService.getCatalog();
-  assert.deepStrictEqual(catalog.customRoles.map((role) => role.name), ["Sinh viên", "Trợ giảng"], "seeded roles are ordinary, editable roles");
-  assert.deepStrictEqual(catalog.customRoles[1].permissions, ["problem.create", "results.grade"]);
-  assert.deepStrictEqual(catalog.customRoles[0].areas, ["student"]);
-  assert.equal(catalog.customRoles[0].userCount, 9);
+  assert.deepStrictEqual(catalog.customRoles.map((role) => role.name), ["Admin", "Sinh viên", "Trợ giảng"]);
+  assert.deepStrictEqual(catalog.customRoles[2].permissions, ["problem.create", "results.grade"]);
+  assert.equal(catalog.customRoles[1].userCount, 9);
   assert.ok(catalog.customRoles.every((role) => !role.readOnly && !role.isSystem));
-  assert.deepStrictEqual(catalog.systemRoles.map((role) => role.id), ["role-admin"]);
-  const admin = catalog.systemRoles[0];
-  assert.equal(admin.readOnly, true);
-  assert.deepStrictEqual(admin.areas, ["admin"]);
-  assert.deepStrictEqual(admin.permissions, ["brand.new", "practice.solve", "problem.create"].sort(), "super-admin permissions come from the server");
+  assert.deepStrictEqual(catalog.systemRoles, []);
+  assert.deepStrictEqual(catalog.customRoles[0].permissions, ["access.manage", "system.overview"], "permissions come from the server");
 
   // The picker groups only what the server enforces, and any new server permission still shows up.
   const groups = buildPermissionGroups(serverPermissions);
@@ -87,8 +83,7 @@ try {
   assert.deepStrictEqual(JSON.parse(created.options.body), { name: "Giám thị", permissions: ["practice.solve", "results.grade"] });
   const updated = await roleService.updateRole("custom-1", { id: "custom-1", name: "Trợ giảng", permissions: ["practice.solve"] });
   assert.deepStrictEqual(updated.permissions, ["practice.solve"]);
-  assert.deepStrictEqual(updated.areas, ["teacher"]);
-  assert.deepStrictEqual(JSON.parse(calls.at(-1).options.body), { name: "Trợ giảng", permissions: ["practice.solve"] }, "no area is sent: the server derives it from permissions");
+  assert.deepStrictEqual(JSON.parse(calls.at(-1).options.body), { name: "Trợ giảng", permissions: ["practice.solve"] }, "only name and permissions are sent: the role itself is the area");
 
   // A user keeps several roles; effective permissions come straight from the server.
   const assignment = await roleService.getUserAssignment("user-1");

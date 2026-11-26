@@ -8,14 +8,15 @@ use Illuminate\Support\Facades\DB;
 /**
  * Trả lời "người này có quyền (capability) gì". Không bao giờ so sánh tên vai trò.
  *
- * Quyền hiệu lực = hợp của: quyền các vai trò được gán + quyền gán riêng cho tài khoản.
- * Vai trò siêu quản trị (is_super) tự cấp mọi quyền trừ PermissionCatalog::NEVER_FOR_SUPER; quyền đó chỉ có khi
- * một vai trò khác hoặc quyền gán riêng của chính tài khoản cấp (cộng gộp thật: không bao giờ bị trừ đi).
+ * Quyền hiệu lực = hợp của: quyền các vai trò được gán + quyền gán riêng cho tài khoản. Không có vai trò nào
+ * tự cấp mọi quyền: mỗi vai trò chỉ có đúng các mã quyền đã lưu cho nó.
+ * Mỗi vai trò là một khu vực giao diện (frontend lọc tab theo quyền của vai trò), nên ngoài danh sách quyền
+ * còn trả về từng vai trò kèm quyền của nó (rolesOf). Quyền gán riêng nằm ngoài các vai trò.
  * Tài khoản không Active không có quyền nào. Kết quả được nhớ theo từng request (scoped).
  */
 class AccessControlService
 {
-    /** @var array<string, array{permissions: string[], areas: string[], super: bool}> */
+    /** @var array<string, array{permissions: string[], direct: string[], roles: array<int, array{id: string, name: string, permissions: string[]}>}> */
     protected array $cache = [];
 
     /** @return string[] mã quyền hiệu lực, đã sắp xếp */
@@ -35,28 +36,31 @@ class AccessControlService
         return (bool) array_intersect($permissions, $this->permissionsOf($user));
     }
 
-    /** Khu vực giao diện mà người dùng được vào, suy ra từ quyền hiệu lực (xem PermissionCatalog::areasFor). */
-    public function areasOf(User $user): array
+    /**
+     * Các vai trò người dùng đang giữ, mỗi vai trò kèm mã quyền của nó (sắp theo tên vai trò).
+     * Mỗi vai trò là một khu vực giao diện.
+     *
+     * @return array<int, array{id: string, name: string, permissions: string[]}>
+     */
+    public function rolesOf(User $user): array
     {
-        return $this->resolve($user)['areas'];
+        return $this->resolve($user)['roles'];
     }
 
-    public function isSuperAdmin(User $user): bool
+    /** Quyền gán riêng cho tài khoản (user_permissions), ngoài vai trò. */
+    public function directPermissionsOf(User $user): array
     {
-        return $this->resolve($user)['super'];
+        return $this->resolve($user)['direct'];
     }
 
     /**
-     * Truy vấn con: id người dùng được cấp một quyền qua vai trò (không phải siêu quản trị) hoặc quyền gán riêng.
+     * Truy vấn con: id người dùng được cấp một quyền qua vai trò hoặc quyền gán riêng.
      * Dùng cho `whereIn('users.id', ...)`. Không lọc trạng thái tài khoản; người gọi tự thêm `status = Active`.
-     * Siêu quản trị không nằm trong kết quả (họ tự có mọi quyền, xem superAdminIds()).
      */
     public function holdersOf(string $permission): \Illuminate\Database\Query\Builder
     {
         $viaRole = DB::table('user_access_roles as uar')
             ->join('access_role_permissions as arp', 'arp.access_role_id', '=', 'uar.access_role_id')
-            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
-            ->where('ar.is_super', false)
             ->where('arp.permission', $permission)
             ->select('uar.user_id');
 
@@ -66,35 +70,26 @@ class AccessControlService
             ->union($viaRole);
     }
 
-    /** Người này là siêu quản trị Active duy nhất còn lại? (không được xóa, khóa hay bỏ vai trò của họ). */
-    public function isLastActiveSuperAdmin(User $user): bool
+    /** Còn tài khoản Active nào (khác $exceptUserId, nếu có) đang giữ quyền này không? */
+    public function hasActiveHolder(string $permission, ?string $exceptUserId = null): bool
     {
-        if ($user->status !== 'Active') {
-            return false;
+        $query = DB::table('users')->where('status', 'Active')->whereIn('id', $this->holdersOf($permission));
+        if ($exceptUserId !== null) {
+            $query->where('id', '!=', $exceptUserId);
         }
 
-        $isSuper = DB::table('user_access_roles as uar')
-            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
-            ->where('uar.user_id', $user->id)->where('ar.is_super', true)
-            ->exists();
-        if (! $isSuper) {
-            return false;
-        }
-
-        return ! DB::table('user_access_roles as uar')
-            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
-            ->join('users as u', 'u.id', '=', 'uar.user_id')
-            ->where('ar.is_super', true)->where('u.status', 'Active')->where('u.id', '!=', $user->id)
-            ->exists();
+        return $query->exists();
     }
 
-    /** Truy vấn con: id người dùng đang giữ một vai trò siêu quản trị. */
-    public function superAdminIds(): \Illuminate\Database\Query\Builder
+    /**
+     * Người này là người Active duy nhất còn giữ quyền access.manage? Khi đó không được xóa, khóa hay bỏ vai trò
+     * của họ, vì sẽ không còn ai vào được trang Vai trò.
+     */
+    public function isLastActiveAccessManager(User $user): bool
     {
-        return DB::table('user_access_roles as uar')
-            ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
-            ->where('ar.is_super', true)
-            ->select('uar.user_id');
+        return $user->status === 'Active'
+            && $this->can($user, 'access.manage')
+            && ! $this->hasActiveHolder('access.manage', $user->id);
     }
 
     public function forget(?string $userId = null): void
@@ -113,43 +108,40 @@ class AccessControlService
         }
 
         if ($user->status !== 'Active') {
-            return $this->cache[$user->id] = ['permissions' => [], 'areas' => [], 'super' => false];
+            return $this->cache[$user->id] = ['permissions' => [], 'direct' => [], 'roles' => []];
         }
 
-        $roles = DB::table('user_access_roles as uar')
+        $valid = fn (array $codes) => array_values(array_unique(array_filter($codes, [PermissionCatalog::class, 'isValid'])));
+
+        $roleRows = DB::table('user_access_roles as uar')
             ->join('access_roles as ar', 'ar.id', '=', 'uar.access_role_id')
             ->where('uar.user_id', $user->id)
-            ->get(['ar.id', 'ar.is_super']);
+            ->orderBy('ar.name')
+            ->get(['ar.id', 'ar.name']);
 
-        $permissions = [];
-        $super = false;
-
-        foreach ($roles as $role) {
-            if ($role->is_super) {
-                $super = true;
+        $byRole = [];
+        if ($roleRows->isNotEmpty()) {
+            foreach (DB::table('access_role_permissions')->whereIn('access_role_id', $roleRows->pluck('id')->all())->get(['access_role_id', 'permission']) as $row) {
+                $byRole[$row->access_role_id][] = $row->permission;
             }
         }
 
-        $roleIds = $roles->where('is_super', false)->pluck('id')->all();
-        if ($roleIds) {
-            $permissions = DB::table('access_role_permissions')
-                ->whereIn('access_role_id', $roleIds)
-                ->pluck('permission')
-                ->all();
+        $roles = [];
+        $rolePermissions = [];
+        foreach ($roleRows as $role) {
+            $codes = $valid($byRole[$role->id] ?? []);
+            sort($codes);
+            $roles[] = ['id' => (string) $role->id, 'name' => $role->name, 'permissions' => $codes];
+            $rolePermissions = array_merge($rolePermissions, $codes);
         }
 
-        $direct = DB::table('user_permissions')->where('user_id', $user->id)->pluck('permission')->all();
-        $permissions = array_merge($permissions, $direct);
+        $direct = $valid(DB::table('user_permissions')->where('user_id', $user->id)->pluck('permission')->all());
+        sort($direct);
 
-        if ($super) {
-            $permissions = array_merge($permissions, PermissionCatalog::superCodes());
-        }
-
-        // Chỉ giữ mã còn nằm trong danh mục.
-        $permissions = array_values(array_unique(array_filter($permissions, [PermissionCatalog::class, 'isValid'])));
+        // Quyền hiệu lực = quyền từ vai trò + quyền gán riêng (chỉ giữ mã còn nằm trong danh mục).
+        $permissions = $valid(array_merge($rolePermissions, $direct));
         sort($permissions);
 
-        // Khu vực suy ra từ quyền hiệu lực (gồm cả quyền gán riêng), không phải thuộc tính do admin đặt.
-        return $this->cache[$user->id] = ['permissions' => $permissions, 'areas' => PermissionCatalog::areasFor($permissions), 'super' => $super];
+        return $this->cache[$user->id] = ['permissions' => $permissions, 'direct' => $direct, 'roles' => $roles];
     }
 }

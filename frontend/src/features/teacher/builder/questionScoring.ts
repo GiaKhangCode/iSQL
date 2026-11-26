@@ -99,18 +99,52 @@ export function paperScore(paper: ExamPaper, points: QuestionPoints): { total: n
   return { total: cents / 100, missing };
 }
 
-export type ScoredProblem = { title: string; papers: ExamPaper[]; points: QuestionPoints };
+/**
+ * Điểm của kỳ thi nhập theo nhóm câu hỏi: `_autoRules[phần][i].points` là điểm MỖI CÂU của nhóm, nên mỗi mã đề được
+ * `count × points` từ nhóm; câu chung có `points` riêng ở `_sharedRules[phần][i]`. Mọi mã đề có cùng số câu mỗi nhóm
+ * nên cùng tổng điểm. Trả về null khi cấu hình không có nhóm / câu chung (bài tập chọn tay dùng điểm từng câu).
+ */
+export function groupScore(selection: SelectionLike): { total: number; missing: number } | null {
+  let cents = 0;
+  let missing = 0;
+  let any = false;
+  for (const part of PARTS) {
+    for (const rule of (selection?._autoRules?.[part] as { count?: number; points?: unknown }[] | undefined) || []) {
+      any = true;
+      const points = toPoints(rule.points);
+      if (points === null) missing++;
+      else cents += Math.round(points * 100) * Math.max(0, Number(rule.count) || 0);
+    }
+    for (const rule of (selection?._sharedRules?.[part] as { questionId?: string; points?: unknown }[] | undefined) || []) {
+      if (!rule.questionId) continue;
+      any = true;
+      const points = toPoints(rule.points);
+      if (points === null) missing++;
+      else cents += Math.round(points * 100);
+    }
+  }
+  return any ? { total: cents / 100, missing } : null;
+}
+
+export type ScoredProblem = { title: string; papers: ExamPaper[]; points: QuestionPoints; groups?: { total: number; missing: number } | null };
 
 /**
  * Tổng hợp điểm của một hoạt động (bài tập / ca thi) ở chế độ tùy chỉnh.
- * Điểm của bài = tổng điểm đề đầu tiên; mọi mã đề của một bài phải cùng tổng; tổng các bài phải bằng `target`.
+ * Điểm của bài = tổng điểm đề đầu tiên (hoặc tổng điểm theo nhóm với kỳ thi); mọi mã đề của một bài phải cùng tổng;
+ * tổng các bài phải bằng `target`.
  */
 export function customScoringSummary(problems: ScoredProblem[], target = 10) {
   const problemPoints: number[] = [];
   const missing: { problem: number; code: string | null; part: WorkspacePart; id: string }[] = [];
   let unevenVariants = false;
+  let missingGroups = 0;
 
   problems.forEach((problem, index) => {
+    if (problem.groups) {
+      missingGroups += problem.groups.missing;
+      problemPoints.push(problem.groups.total);
+      return;
+    }
     const scores = problem.papers.map(paper => paperScore(paper, problem.points));
     scores.forEach((score, i) => score.missing.forEach(item => missing.push({ problem: index, code: problem.papers[i].code, ...item })));
     const totals = scores.map(score => score.total);
@@ -121,9 +155,10 @@ export function customScoringSummary(problems: ScoredProblem[], target = 10) {
   const total = Math.round(problemPoints.reduce((sum, value) => sum + Math.round(value * 100), 0)) / 100;
   const issues: string[] = [];
   if (missing.length) issues.push("Enter points for every selected question.");
+  if (missingGroups) issues.push("Enter points for every question group and shared question.");
   if (unevenVariants) issues.push("Every exam variant must have the same total points.");
   // Còn câu chưa có điểm thì tổng chắc chắn sai; chỉ báo lỗi tổng khi mọi câu đã nhập điểm.
-  if (problems.length && !missing.length && Math.abs(total - target) > 0.001) issues.push(`Question points must add up to ${target}.`);
+  if (problems.length && !missing.length && !missingGroups && Math.abs(total - target) > 0.001) issues.push(`Question points must add up to ${target}.`);
 
   return { problemPoints, total, missing, issues };
 }
@@ -141,8 +176,12 @@ export function plainSelection<T extends Record<string, any>>(selection: T | und
  * bản nháp vẫn giữ điểm để bật lại "Tùy chỉnh điểm" không mất công nhập.
  */
 export function problemForSave<T extends { questionSelection?: Record<string, any> }>(problem: T, mode: ScoringMode): T {
-  if (mode === SCORING_CUSTOM || !problem.questionSelection || !("_questionPoints" in problem.questionSelection)) return problem;
-  const { _questionPoints: _dropped, ...rest } = problem.questionSelection;
+  const selection = problem.questionSelection;
+  if (mode === SCORING_CUSTOM || !selection) return problem;
+  const stripPoints = (rules: unknown) => Object.fromEntries(Object.entries((rules as Record<string, any[]>) || {}).map(([part, list]) => [part, (list || []).map(({ points: _p, ...rule }) => rule)]));
+  const { _questionPoints: _dropped, ...rest } = selection;
+  if (rest._autoRules) rest._autoRules = stripPoints(rest._autoRules);
+  if (rest._sharedRules) rest._sharedRules = stripPoints(rest._sharedRules);
   return { ...problem, questionSelection: rest };
 }
 

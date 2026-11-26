@@ -27,9 +27,11 @@ export function SubmissionDetails({
   // Read the immutable attempt snapshot, never the current draft.
   const query = submission.query;
   const maximumScore = submission.maxScore ?? 100;
-  const finalScore = submission.evaluatedScore ?? submission.score;
-  const scoreLabel = (score: number | null) => {
-    if (submission.scoreVisible === false || score == null) return tr("Score hidden by instructor");
+  // Điểm cuối cùng là điểm giảng viên đã chấm (evaluated_score); chưa ai chấm thì không lấy điểm tự động thay.
+  const finalScore = submission.evaluatedScore ?? null;
+  const scoreLabel = (score: number | null, ungradedLabel?: string) => {
+    if (submission.scoreVisible === false) return tr("Score hidden by instructor");
+    if (score == null) return ungradedLabel ?? tr("Score hidden by instructor");
     if (submission.result === "Pending review" || submission.result === "Not answered") return tr("Awaiting grading");
     return `${formatPoints(score)} / ${formatPoints(maximumScore)}`;
   };
@@ -63,7 +65,7 @@ export function SubmissionDetails({
             </div>
             <div>
               <small><TranslatedText>{tr("Final score")}</TranslatedText></small>
-              <strong>{scoreLabel(finalScore)}</strong>
+              <strong>{scoreLabel(finalScore, "_")}</strong>
             </div>
           </div>
         </section>
@@ -108,18 +110,16 @@ export function SubmissionDetails({
             <TranslatedText>{tr(copy)}</TranslatedText>
           </p>
         </details>
-        <section className="instructor-evaluation">
+        {/* Bài thi chấm theo câu: nhận xét nằm ở từng câu phía trên, không có nhận xét chung. */}
+        {(submission.feedback || !submission.sections?.some(section => section.questions?.some(question => question.manualScore != null))) && <section className="instructor-evaluation">
           <h3><TranslatedText>{tr("Instructor comments")}</TranslatedText></h3>
           <p className="tiny muted">
             <TranslatedText>{submission.feedback || tr("No instructor comments yet.")}</TranslatedText>
           </p>
-        </section>
-        {(submission.appealReason || submission.appealStatus === "Awaiting regrade" || submission.appealStatus === "Regraded") && (
+        </section>}
+        {(submission.appealStatus === "Awaiting regrade" || submission.appealStatus === "Regraded") && (
           <section className="instructor-evaluation">
             <h3><TranslatedText>{tr("Regrade")}</TranslatedText></h3>
-            {submission.appealReason && (
-              <p className="tiny muted">{submission.appealReason}</p>
-            )}
             {submission.appealCreatedAt && (
               <p className="tiny muted">
                 <TranslatedText>{tr(submissionTimeLabel(submission.appealCreatedAt, uiLocale))}</TranslatedText>

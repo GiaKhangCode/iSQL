@@ -1,14 +1,11 @@
 import {formatPoints} from "@/shared/lib/sql/formatPoints";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
 import { useLanguage } from "@/shared/context/LanguageContext";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
-import { Empty, Loading, Status } from "@/shared/ui/ui";
-import { useLoad } from "@/shared/hooks/useLoad";
-import type { ExamSession, Problem, Submission } from "@/data/models";
+import type { ExamSession } from "@/data/models";
 import { parseServerDateTime } from "@/shared/lib/datetime/serverDateTime";
-import { ExamSessionSwipeTabs } from "@/shared/components/ExamSessionSwipeTabs";
 import { LayeredExamSessionBanner } from "@/shared/components/LayeredExamSessionBanner";
 import { ShieldAlert, RefreshCw, CheckCircle2 } from "lucide-react";
 import { examSessionOverview } from "@/shared/lib/exam-session/examSessionOverview";
@@ -24,7 +21,7 @@ function timeRemaining(milliseconds: number) {
   return `${days ? `${days}d ` : ""}${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`;
 }
 
-export function ExamSessionDetailView({ examSession, phase, now, preview = false, isExamination: propIsExamination, bannerActions, onUnlocked = () => window.location.reload(), getSubmissions, getProblem, AdmissionForm }: {
+export function ExamSessionDetailView({ examSession, phase, now, preview = false, isExamination: propIsExamination, bannerActions, onUnlocked = () => window.location.reload(), AdmissionForm }: {
   examSession: ExamSession;
   phase: ExamSessionPhase;
   now: number;
@@ -32,23 +29,13 @@ export function ExamSessionDetailView({ examSession, phase, now, preview = false
   isExamination?: boolean;
   bannerActions?: ReactNode;
   onUnlocked?: () => void;
-  getSubmissions?: (filters: { source?: string }) => Promise<Submission[]>;
-  getProblem?: (id: string, context?: string) => Promise<Problem>;
   AdmissionForm?: ComponentType<{ examSession: ExamSession; closed: boolean; onUnlocked: () => void }>;
 }) {
   const { t: tr, locale: uiLocale } = useLanguage("student");
   const isExamination = propIsExamination ?? Boolean(examSession.examinationId);
   const isComprehensive = examSession.examType === "comprehensive";
   const examUrl = `/examinations/${encodeURIComponent(examSession.id)}/exam`;
-  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
-  const { data: attempts, loading: attemptsLoading, error: attemptsError } = useLoad<Submission[]>(
-    () => preview || phase === "Upcoming" || (examSession.admissionRequired && !examSession.admissionUnlocked) || !getSubmissions ? Promise.resolve([]) : getSubmissions({ source: "ExamSession" }).then((items: Submission[]) => items.filter((item) => item.context === examSession.id)),
-    [examSession.id, preview, phase === "Upcoming", examSession.admissionUnlocked],
-  );
-  useEffect(() => { setSelectedProblemId(null); }, [examSession.id]);
   const starts = parseServerDateTime(examSession.opensAt).getTime();
-  const selectedId = phase === "Upcoming" ? null : selectedProblemId && examSession.problemIds.includes(selectedProblemId) ? selectedProblemId : examSession.problemIds[0] || null;
-  const selectedProblem = examSession.problemDetails.find((item) => item.id === selectedId);
   const ends = parseServerDateTime(examSession.closesAt).getTime();
   const overview = examSessionOverview(examSession.description, examSession.title, examSession.shortDescription);
   const topLeaderboard = [...examSession.leaderboard].sort((a, b) => a.rank - b.rank).slice(0, 50);
@@ -58,29 +45,43 @@ export function ExamSessionDetailView({ examSession, phase, now, preview = false
     `&contextTitle=${encodeURIComponent(examSession.title)}&examSession=${encodeURIComponent(examSession.id)}` +
     (phase === "Closed" ? "&closed=1" : "");
 
-  function problemContent(id: string, active = true) {
-    const summary = examSession.problemDetails.find((item) => item.id === id);
-    if (preview) return <div className="exam-session-problem-slide exam-session-preview-problem">
-      <div className="exam-session-selected-heading"><span><TranslatedText>{summary?.topic || tr("SQL problem")}</TranslatedText></span><span>{formatPoints(summary?.points ?? 100)} <TranslatedText>{tr("points")}</TranslatedText></span></div>
-      {summary?.description && <ProblemMarkdown className="exam-session-markdown">{summary.description}</ProblemMarkdown>}
-    </div>;
-    return <ExamSessionSelectedProblem problemId={id} examSessionId={examSession.id} summary={summary} getProblem={getProblem}
-      attempts={(attempts || []).filter((item) => item.problemId === id)} attemptsLoading={attemptsLoading}
-      attemptsError={attemptsError} enabled={active} showScores={examSession.showScoresAfterSubmit !== false} />;
-  }
-  const selectedAttempts = (attempts || []).filter((item) => item.problemId === selectedId);
   const isViolationLocked = examSession.finishReason === "violations";
+  // Đề bài không hiện ở trang này: sinh viên chỉ đọc đề trong màn làm bài, sau khi bấm bắt đầu.
+  const started = Boolean(examSession.attemptStatus);
+  const closedWithoutWork = phase === "Closed" && !started;
   const actionLabel = isViolationLocked
     ? "Bài thi đã bị khóa"
     : finished
     ? tr("Exam submitted")
+    : closedWithoutWork
+    ? tr("Exam session ended")
     : phase === "Closed"
     ? tr("Review problem")
-    : isComprehensive
-    ? tr("Enter exam →")
-    : problemAttemptStatus(selectedAttempts) === "In progress"
-    ? tr("Continue solving")
-    : tr("Open problem");
+    : phase === "Upcoming"
+    ? tr("Enter when the examination starts")
+    : examSession.attemptStatus === "active"
+    ? tr("Continue the exam →")
+    : tr("Enter the exam →");
+  const actionDisabled = preview || finished || closedWithoutWork || phase === "Upcoming" || !(examSession.problemIds[0] || isComprehensive);
+  const violationLimit = examSession.examViolationLimit || 2;
+  const minutes = Number.isFinite(starts) && Number.isFinite(ends) && ends > starts ? Math.round((ends - starts) / 60000) : null;
+  const duration = minutes == null ? tr("Not scheduled")
+    : minutes >= 60 ? tr("{hours} h {minutes} min", { hours: Math.floor(minutes / 60), minutes: minutes % 60 })
+    : tr("{minutes} min", { minutes });
+  const isExam = isExamination || Boolean(examSession.examMode);
+  const notes: string[] = [
+    tr("The questions appear only inside the exam screen, after you start."),
+    tr("The exam follows the session schedule: starting late does not add time. Your work is saved automatically and submitted when time runs out."),
+    ...(examSession.examMode ? [
+      tr("The exam opens in full screen. Leaving full screen asks you to submit your exam."),
+      tr("Switching to another tab or window counts as a violation. At {count} violations your work is submitted automatically and locked; ask the proctor to unlock it.", { count: violationLimit }),
+      tr("Pasting content from outside is blocked and counts as a violation. Copying inside the exam screen is allowed."),
+      tr("Do not close or reload the page during the exam. Choosing to leave the exam submits all your work after confirmation."),
+    ] : []),
+    ...(isExam ? [tr("You can submit a single question to check whether it is correct, as many times as you like. This does not submit the exam, and the best result of each question counts.")] : []),
+    tr("“Submit & Exit” submits the whole exam. You cannot change your answers afterwards."),
+    examSession.showScoresAfterSubmit !== false ? tr("Your score is shown after you submit.") : tr("Your instructor hides scores for this exam."),
+  ];
 
   if (!preview && examSession.admissionRequired && !examSession.admissionUnlocked) return AdmissionForm ? <AdmissionForm examSession={examSession} closed={phase==="Closed"} onUnlocked={onUnlocked}/> : null;
   return <div className="exam-session-detail-shell exam-session-detail-workflow">
@@ -103,7 +104,7 @@ export function ExamSessionDetailView({ examSession, phase, now, preview = false
         {examSession.shortDescription && <div className="u049-reveal"><div className="u049-reveal-inner"><p className="u049-sum">{examSession.shortDescription}</p></div></div>}
       </div>
     </LayeredExamSessionBanner>
-    <div className="exam-session-detail-content-grid">
+    <div className={`exam-session-detail-content-grid${isExamination ? " is-single" : ""}`}>
     <section className="exam-session-problem-workbench" aria-label={tr("Exam session problems")}>
       {isViolationLocked && (
         <div className="exam-violation-locked-banner" style={{
@@ -150,92 +151,31 @@ export function ExamSessionDetailView({ examSession, phase, now, preview = false
         </div>
       )}
       <header className="exam-session-problem-stage-header">
-        {examSession.admissionRequired && phase === "Upcoming" && <button className="button primary" disabled><TranslatedText>{tr("Enter when the examination starts")}</TranslatedText></button>}
-        <h2><TranslatedText>{examSession.problemIds.length === 1 && selectedProblem ? selectedProblem.title : tr("Problems")}</TranslatedText></h2>
-        {phase !== "Upcoming" && (selectedId || isComprehensive) && (preview
-          ? isComprehensive && <button className="button primary" type="button" disabled><TranslatedText>{actionLabel}</TranslatedText></button>
-          : finished ? (
-            <button className="button primary" type="button" disabled style={{ opacity: 0.65, cursor: "not-allowed" }}>
-              <TranslatedText>{isViolationLocked ? "Bài thi đã bị khóa" : tr("Exam submitted")}</TranslatedText>
-            </button>
-          ) : (
-            <Link className="button primary" to={selectedId ? workspace(selectedId) : examUrl}>
-              <TranslatedText>{actionLabel}</TranslatedText>{!isComprehensive && " →"}
-            </Link>
-          ))}
+        <h2><TranslatedText>{tr("Read before you start")}</TranslatedText></h2>
+        {actionDisabled
+          ? <button className="button primary" type="button" disabled><TranslatedText>{actionLabel}</TranslatedText></button>
+          : <Link className="button primary" to={examSession.problemIds[0] ? workspace(examSession.problemIds[0]) : examUrl}><TranslatedText>{actionLabel}</TranslatedText></Link>}
       </header>
-      {phase === "Upcoming" ? <p className="exam-session-problem-notice muted"><TranslatedText>{tr("Problems become available when the exam session starts.")}</TranslatedText></p>
-        : selectedId ? examSession.problemIds.length === 1
-          ? problemContent(selectedId)
-          : <ExamSessionSwipeTabs key={examSession.id} className="exam-session-problem-slider"
-              label={tr("Exam session problems")} value={selectedId} onChange={setSelectedProblemId}
-              tabs={examSession.problemIds.map((id, index) => ({ id, label: <span className="exam-session-problem-tab-label">
-                <span>{String.fromCharCode(65 + index)}. <TranslatedText>{examSession.problemDetails.find((item) => item.id === id)?.title || tr("Problem {value0}", { value0: index + 1 })}</TranslatedText></span>
-                {!preview && <Status value={attemptsLoading ? "Loading…" : attemptsError ? "Unavailable" : problemAttemptStatus((attempts || []).filter((item) => item.problemId === id))} />}
-              </span> }))}
-            >{(id, active) => problemContent(id, active)}</ExamSessionSwipeTabs>
-        : <Empty title={tr("No problems selected yet.")} />}
+      <div className="exam-session-briefing">
+        <dl className="exam-session-briefing-facts">
+          <div><dt><TranslatedText>{tr("Starts")}</TranslatedText></dt><dd>{examSession.date} {examSession.time}</dd></div>
+          <div><dt><TranslatedText>{tr("Ends")}</TranslatedText></dt><dd>{examSession.endDate || examSession.date} {examSession.endTime}</dd></div>
+          <div><dt><TranslatedText>{tr("Duration")}</TranslatedText></dt><dd>{duration}</dd></div>
+          {examSession.examMode && <div><dt><TranslatedText>{tr("Violation limit")}</TranslatedText></dt><dd>{tr("{count} times", { count: violationLimit })}</dd></div>}
+          <div><dt><TranslatedText>{tr("Problems")}</TranslatedText></dt><dd>{examSession.problemCount}</dd></div>
+          <div><dt><TranslatedText>{tr("Total points")}</TranslatedText></dt><dd>{formatPoints(examSession.totalPoints || 10)}</dd></div>
+          {examSession.room && <div><dt><TranslatedText>{tr("Exam room")}</TranslatedText></dt><dd>{examSession.room}</dd></div>}
+          {Boolean(examSession.proctors?.length) && <div><dt><TranslatedText>{tr("Proctor")}</TranslatedText></dt><dd>{examSession.proctors!.join(", ")}</dd></div>}
+          {isExamination && (finished || phase === "Closed") && <div><dt><TranslatedText>{tr("Your score")}</TranslatedText></dt><dd><TranslatedText>{examSession.score == null ? tr("Score hidden by instructor") : `${formatPoints(examSession.score)}/${formatPoints(examSession.totalPoints)}`}</TranslatedText></dd></div>}
+        </dl>
+        <ul className="exam-session-briefing-notes">{notes.map((note) => <li key={note}>{note}</li>)}</ul>
+        {overview && <section className="exam-session-briefing-overview" aria-label={tr("Exam notes")}>
+          <h3><TranslatedText>{tr("Exam notes")}</TranslatedText></h3>
+          <ProblemMarkdown className="exam-session-markdown">{overview}</ProblemMarkdown>
+        </section>}
+      </div>
     </section>
-    <aside className="exam-session-detail-sidebar">
-      <section className="exam-session-context-section" aria-label={tr("Description")}>
-        <header><h2><TranslatedText>{tr("Description")}</TranslatedText></h2></header>
-        <ProblemMarkdown className="exam-session-markdown">{overview || tr("No description yet.")}</ProblemMarkdown>
-      </section>
-      {isExamination ? (
-        <section className="exam-session-participation examination-session-info" aria-label={tr("Examination information")}>
-          <h2><TranslatedText>{tr("Examination information")}</TranslatedText></h2>
-          <dl>
-            <div>
-              <dt><TranslatedText>Trạng thái</TranslatedText></dt>
-              <dd>
-                {isViolationLocked ? (
-                  <span className="status danger" style={{ background: "rgba(239, 68, 68, 0.15)", color: "#b91c1c", fontWeight: 700, padding: "2px 8px", borderRadius: "6px" }}>
-                    Bị khóa (Vi phạm)
-                  </span>
-                ) : finished ? (
-                  <span className="status neutral">Đã nộp bài</span>
-                ) : phase === "Live" ? (
-                  <span className="status success" style={{ background: "rgba(34, 197, 94, 0.15)", color: "#15803d", fontWeight: 700, padding: "2px 8px", borderRadius: "6px" }}>
-                    Đang thi
-                  </span>
-                ) : (
-                  <span className="status warning">Sắp diễn ra</span>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt><TranslatedText>Số câu hỏi</TranslatedText></dt>
-              <dd>{examSession.problemCount} bài ({examSession.totalPoints || 10} điểm)</dd>
-            </div>
-            {examSession.room && (
-              <div>
-                <dt><TranslatedText>{tr("Exam room")}</TranslatedText></dt>
-                <dd><strong>{examSession.room}</strong></dd>
-              </div>
-            )}
-            <div>
-              <dt><TranslatedText>{tr("Time")}</TranslatedText></dt>
-              <dd>{examSession.date} {examSession.time} – {examSession.endTime || examSession.time}</dd>
-            </div>
-            {examSession.proctors && examSession.proctors.length > 0 && (
-              <div>
-                <dt><TranslatedText>{tr("Proctor")}</TranslatedText></dt>
-                <dd>{examSession.proctors.join(", ")}</dd>
-              </div>
-            )}
-            <div>
-              <dt><TranslatedText>{tr("Mode")}</TranslatedText></dt>
-              <dd><TranslatedText>{tr("Strict exam mode")}</TranslatedText> ({tr("Max violations: {count}", { count: examSession.examViolationLimit || 2 })})</dd>
-            </div>
-            {(phase === "Live" || phase === "Closed") && (
-              <div>
-                <dt><TranslatedText>{tr("Your score")}</TranslatedText></dt>
-                <dd><TranslatedText>{examSession.score == null ? tr("Score hidden by instructor") : `${formatPoints(examSession.score)}/${formatPoints(examSession.totalPoints)}`}</TranslatedText></dd>
-              </div>
-            )}
-          </dl>
-        </section>
-      ) : (
+    {!isExamination && <aside className="exam-session-detail-sidebar">
         <section className="exam-session-participation"><h2><TranslatedText>{tr("Participation")}</TranslatedText></h2><dl>
           <div><dt><TranslatedText>{tr("Participants")}</TranslatedText></dt><dd>{examSession.submitters ?? 0}</dd></div>
           {phase === "Live" && <div><dt><TranslatedText>{tr("Your score")}</TranslatedText></dt><dd><TranslatedText>{examSession.score == null ? tr("Score hidden by instructor") : `${formatPoints(examSession.score)}/${formatPoints(examSession.totalPoints)}`}</TranslatedText></dd></div>}
@@ -245,42 +185,7 @@ export function ExamSessionDetailView({ examSession, phase, now, preview = false
             {topLeaderboard.length ? <ol className="exam-session-leaderboard-scroll" tabIndex={0} aria-label={tr("Top 50 exam session participants")}>{topLeaderboard.map((entry, index) => <li key={`${entry.rank}-${entry.student}-${index}`}><span>#{entry.rank} {entry.student}</span><b>{formatPoints(entry.score)}</b></li>)}</ol> : <p className="tiny muted"><TranslatedText>{tr("No submissions yet.")}</TranslatedText></p>}
           </div>}
         </section>
-      )}
-    </aside>
-    </div>
-  </div>;
-}
-
-function problemAttemptStatus(attempts: Submission[]) {
-  return attempts.some((item) => item.result === "Accepted") ? "Solved" : attempts.length ? "In progress" : "Not submitted";
-}
-
-function ExamSessionSelectedProblem({ problemId, examSessionId, summary, attempts, attemptsLoading, attemptsError, enabled, showScores, getProblem }: {
-  problemId: string; examSessionId: string; summary?: ExamSession["problemDetails"][number]; attempts: Submission[];
-  attemptsLoading: boolean; attemptsError: string; enabled: boolean; showScores: boolean;
-  getProblem?: (id: string, context?: string) => Promise<Problem>;
-}) {
-  const { t: tr } = useLanguage("student");
-  const { data: problem, loading, error } = useLoad<Problem | null>(() => enabled && getProblem ? getProblem(problemId, examSessionId) : Promise.resolve(null), [problemId, examSessionId, enabled]);
-  const maximum = summary?.points ?? 100;
-  const score = Math.round(Math.max(0, ...attempts.map((item) => {
-    const max = item.maxScore ?? 100;
-    return max > 0 ? ((item.evaluatedScore ?? item.score ?? 0) / max) * maximum : 0;
-  })) * 100) / 100;
-  const status = problem?.draft && !attempts.length ? "In progress" : problemAttemptStatus(attempts);
-  return <div className="exam-session-problem-slide">
-    <div className="exam-session-selected-heading">
-      <Status value={attemptsLoading ? "Loading…" : attemptsError ? "Unavailable" : status} />
-    </div>
-    <div className="exam-session-selected-body">
-    <dl className="exam-session-selected-facts">
-      <div><dt><TranslatedText>{tr("Your best score")}</TranslatedText></dt><dd><TranslatedText>{attemptsLoading ? tr("Loading…") : attemptsError ? tr("Unavailable") : !showScores ? tr("Score hidden by instructor") : `${formatPoints(score)}/${formatPoints(maximum)}`}</TranslatedText></dd></div>
-      <div><dt><TranslatedText>{tr("Submissions")}</TranslatedText></dt><dd><TranslatedText>{attemptsLoading ? "…" : attemptsError ? tr("Unavailable") : attempts.length}</TranslatedText></dd></div>
-      <div><dt><TranslatedText>{tr("Topics")}</TranslatedText></dt><dd>{summary?.topic || problem?.topic || "—"}</dd></div>
-    </dl>
-    {enabled && (loading ? <Loading variant="inline" rows={5} label={tr("Loading problem…")} /> : error ? <p className="tiny muted"><TranslatedText>{tr("Problem details could not be loaded. Use Open problem to try again.")}</TranslatedText></p> : problem && <>
-      <section className="exam-session-problem-statement"><h4><TranslatedText>{tr("Problem")}</TranslatedText></h4><ProblemMarkdown className="exam-session-markdown">{problem.description || tr("No description available.")}</ProblemMarkdown></section>
-    </>)}
+    </aside>}
     </div>
   </div>;
 }

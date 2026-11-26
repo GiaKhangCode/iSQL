@@ -10,7 +10,7 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
 for (const name of ["window", "document", "navigator", "HTMLElement", "Element", "MutationObserver", "localStorage"]) Object.defineProperty(globalThis, name, { configurable: true, value: dom.window[name] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
-globalThis.__workspaceApi = { getDraft: () => "", saveDraft() {}, getPreferences: async () => ({ favorites: [] }), getExamSessionOrExam: async () => undefined };
+globalThis.__workspaceApi = { getDraft: () => "", saveDraft() {}, getPreferences: async () => ({ favorites: [] }), getExamSessionOrExam: async () => undefined, getCurrentDatabase: async () => ({ tables: [] }) };
 
 const output = await build({
   stdin: { contents: `
@@ -46,7 +46,7 @@ try {
   const click = async button => { assert.ok(button, "Button must exist"); assert.equal(button.disabled,false); await act(async()=>{ if(button.tagName==='OPTION'){button.parentElement.value=button.value;button.parentElement.dispatchEvent(new dom.window.Event('change',{bubbles:true}));}else button.click(); }); };
   const edit = async value => { await act(async()=>{ const input=stage().querySelector('textarea'); input.value=value; input.dispatchEvent(new dom.window.Event('input',{bubbles:true})); }); };
   const select = async (from,to) => { await act(async()=>{const input=stage().querySelector('textarea');input.setSelectionRange(from,to);input.dispatchEvent(new dom.window.MouseEvent('mouseup',{bubbles:true}));}); };
-  const run = () => click(stage().querySelector('.stage-run-actions .primary'));
+  const run = () => click(document.querySelector('.stage-run-actions .primary'));
   await act(async()=>root.render(h(MemoryRouter, null, h(ProblemWorkspace,{problem}))));
   assert.deepEqual([...document.querySelectorAll('header nav button')].map(button=>button.textContent), ['DDL','DML','DQL']);
   assert.equal(document.querySelector('header .workspace-solution-switcher, .layout-trigger, .workspace-timer'),null,'The removed layout chooser and timer stay absent');
@@ -62,7 +62,7 @@ try {
   assert.equal(document.activeElement,paneTabs()[0],'Arrow keys must move keyboard focus with the selected pill');
   assert.equal(stage().querySelector('[role="tabpanel"]').getAttribute('aria-labelledby'),paneTabs()[0].id);
   await paneKey('End');
-  assert.equal(paneTabs()[3].getAttribute('aria-selected'),'true');
+  assert.equal(paneTabs()[2].getAttribute('aria-selected'),'true');
   await paneKey('ArrowRight');
   assert.equal(paneTabs()[0].getAttribute('aria-selected'),'true','Arrow keys wrap at the last tab');
   await paneKey('ArrowRight');
@@ -81,21 +81,22 @@ try {
   await click(nav('DDL'));
   assert.equal(document.querySelectorAll('header .workspace-tools').length,0,'The top bar no longer contains layout tools or the self-tracking timer');
   assert.equal(document.querySelector('.editor-toolbar .workspace-tools'),null);
-  assert.equal(document.querySelectorAll('.cursor-position').length,3,'All three editors need cursor status');
+  assert.equal(document.querySelectorAll('.cursor-position').length,0,'The editor no longer shows the cursor position');
   assert.equal(stage().querySelector('.problem-scroll > .tiny'),null,'Remove the redundant PROBLEM number');
   const chosenDdl='CREATE TABLE Customers(id INT PRIMARY KEY)';
   await edit(chosenDdl+';\nCREATE TABLE Ignored(id INT)');
   await select(0,chosenDdl.length);
-  await click(stage().querySelector('.stage-run-actions button:first-child'));
+  await click(document.querySelector('.stage-run-actions button:first-child'));
   assert.equal(lastRun.ddl,chosenDdl,'Run selected must send only the highlighted DDL');
   assert.ok(stage().querySelector('textarea').value.includes('Ignored'),'Running a selection must preserve the complete draft');
   await act(async()=>complete({...success,tables:[]}));
   await edit(chosenDdl);
   await run();
   await act(async()=>complete({...success,tables:[]}));
-  assert.ok(stage().querySelector('.workspace-submission-content'), 'Run opens the comparison in Submission');
-  assert.ok(stage().querySelector('.workspace-schema-result').textContent.includes('Customers'));
-  assert.ok(!stage().querySelector('.workspace-submission-content').textContent.includes('314'), 'DDL output contains schema, not the DQL answer');
+  assert.ok(stage().querySelector('.workspace-output.is-open'), 'Running opens the output panel under the editor');
+  assert.deepEqual([...stage().querySelectorAll('.workspace-output [role="tab"]')].map(node=>node.textContent),['Thông báo'],'DDL output has only the Messages tab, like SSMS');
+  assert.ok(stage().querySelector('.workspace-output-messages').textContent.includes('Lệnh đã chạy thành công.'),'A DDL run without row counts reports success like SSMS');
+  assert.ok(!stage().querySelector('.workspace-output').textContent.includes('314'), 'DDL output never shows the DQL answer');
   assert.equal(document.querySelector('.stage-output'),null,"There must be no bottom result pane");
   await edit('CREATE TABLE Customers(id INT PRIMARY KEY, name NVARCHAR(50))');
   assert.equal(nav('DML').disabled,false,"Editing DDL must keep other sections available");
@@ -107,14 +108,15 @@ try {
   const chosenDml='INSERT INTO Customers(id) VALUES(1)';
   await edit(chosenDml+';\nDELETE FROM Customers');
   await select(0,chosenDml.length);
-  await click(stage().querySelector('.stage-run-actions button:first-child'));
+  await click(document.querySelector('.stage-run-actions button:first-child'));
   assert.equal(lastRun.dml,chosenDml,'Run selected must send only the highlighted DML');
   await act(async()=>complete({...success,tables:[]}));
   await edit(chosenDml);
   await run();
   await act(async()=>complete({...success,tables:[{name:'Customers',columns:['id'],rows:[[1]]}]}));
-  assert.ok(!stage().querySelector('.workspace-result-comparison').textContent.includes('91'), 'Submission only displays the student rows, not the target dataset');
-  assert.ok(stage().querySelector('.workspace-result-comparison').textContent.includes('1'), 'Student DML output remains visible');
+  assert.ok(!stage().querySelector('.workspace-output').textContent.includes('91'), 'The output never displays the target dataset');
+  assert.equal(stage().querySelector('.workspace-output-grid'), null, 'DML output shows messages only, like SSMS');
+  assert.ok(stage().querySelector('.workspace-output-messages'), 'DML run messages remain visible');
   assert.equal(lastRun.ddl, '', 'DML does not send the DDL draft');
   await click(stage().querySelectorAll('.pane-tabs button')[1]);
   const database=stage().querySelector('.workspace-database-content');
@@ -123,7 +125,9 @@ try {
   assert.ok(database.querySelector('.workspace-database-table'));
   assert.equal(database.querySelector('.workspace-execution-feedback'), null, "Successful execution must not add a banner above the diagram");
   assert.equal(database.querySelectorAll('.teacher-schema-diagram-action').length, 1, "The workspace diagram must offer fullscreen only");
-  assert.ok(stage().querySelector('.stage-editor-actions').textContent.includes('4.25 ms'));
+  assert.ok(stage().querySelector('.workspace-output-time').textContent.includes('4'),'The run time is shown on the output bar, not under the editor');
+  assert.equal(stage().querySelector('.stage-editor-actions'),null,'Run buttons live in the top bar, not under the editor');
+  assert.ok(document.querySelector('.workspace-run-slot .stage-run-actions'),'Run buttons sit left of the timer in the top bar');
   await click(nav('DDL'));
   await edit('CREATE TABLE Customers(id INT)');
   assert.equal(nav('DML').disabled,false,"Editing DDL must not lock DML");
@@ -134,9 +138,8 @@ try {
   assert.ok(!stage().querySelector('[role="alert"]').textContent.includes('w_aaaaaaaa'));
 
   await click(nav('DML'));
-  await click(stage().querySelectorAll('.pane-tabs button')[2]);
-  assert.equal(stage().querySelectorAll('.workspace-attempt').length, 1, 'DML shows its latest run after failed DDL');
-  assert.ok(!stage().querySelector('.workspace-submission-content').textContent.includes('Authors'), 'DDL errors never appear in DML history');
+  assert.ok(stage().querySelector('.workspace-output-messages'), 'DML shows its latest run after failed DDL');
+  assert.ok(!stage().querySelector('.workspace-output').textContent.includes('Authors'), 'DDL errors never appear in the DML output');
   await click(nav('SQL'));
   await act(async()=>root.render(h(MemoryRouter,null,h(SqlWorkspace,{problem:{...problem,workspaceParts:['SQL']}}))));
   assert.ok(document.querySelector('.problem-question-content'), 'DQL starts with the problem description');
@@ -151,15 +154,14 @@ try {
   globalThis.__workspaceApi.runQuery = async()=>({...success,table:{name:'Result',columns:['id'],rows:[[1]]}});
   globalThis.__workspaceApi.submitSolution = async()=>({...success,status:'Accepted',message:'All tests passed',score:25,maxScore:25,scoreVisible:true,submissionsUsed:1,maxSubmissions:1});
   await act(async()=>{const input=document.querySelector('.sql-editor textarea');input.value='SELECT 1';input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
-  await click(document.querySelectorAll('.editor-actions button')[1]);
+  await click(document.querySelectorAll('.stage-run-actions button')[1]);
   assert.equal(document.querySelector('#workspace-result-pane'),null,"SQL must not mount a bottom result panel");
-  assert.ok(document.querySelector('.workspace-submission-content'));
-  assert.equal(document.querySelector('.workspace-submission-content a'),null,"Submission must not include a history link");
-  assert.equal(document.querySelectorAll('.workspace-attempt').length,1);
-  assert.ok(document.querySelector('.workspace-attempt').textContent.includes('4.25 ms'));
+  assert.ok(document.querySelector('.workspace-output-grid'),'A DQL run shows its rows in the Results tab');
+  assert.equal(document.querySelector('.workspace-output a'),null,"The output panel must not include a history link");
+  assert.ok(document.querySelector('.workspace-output-time').textContent.includes('4'),'The run time is shown on the output bar');
   await click(document.querySelector('.workspace-submit-current'));
-  assert.equal(document.querySelectorAll('.workspace-attempt').length,1,"Submitted work is separate from the latest run");
-  assert.ok(document.querySelector('.workspace-attempt').textContent.includes('25/25'), 'A graded submission must show its released score');
+  assert.equal(document.querySelectorAll('.workspace-reading-pane .workspace-attempt').length,1,"Submitted work is separate from the latest run (which stays in the output panel)");
+  assert.ok(document.querySelector('.workspace-reading-pane .workspace-attempt').textContent.includes('25/25'), 'A graded submission must show its released score');
   assert.equal(document.querySelector('.workspace-submit-current').disabled, false, 'A submitted workspace should offer an explicit return to editing');
   assert.equal(document.querySelector('.workspace-submit-current').textContent.trim(), 'Sửa lại');
   const combined = {status:'Partial',message:'All combined feedback must not leak across tabs',scoreVisible:true,score:67,maxScore:100,sections:[
@@ -176,8 +178,8 @@ try {
     assert.equal(Boolean(document.querySelector('.workspace-schema-result')),part==='DDL');
     assert.equal(Boolean(document.querySelector('.workspace-query-comparison')),part==='SQL');
     assert.ok(document.querySelector('.workspace-result-comparison'),'Each section must show its own actual result');
-    assert.ok(!document.querySelector('.workspace-submission-content').textContent.includes('Kết quả mong đợi'),'Submission must not display the instructor expected result');
-    assert.equal(document.querySelector('.workspace-result-comparison').children.length,1,'Only the student result column is rendered');
+    assert.equal(document.querySelector('.workspace-submission-content').textContent.includes('Kết quả mong đợi'),part==='SQL','Only DQL submissions show the expected result queried from the reference answer');
+    assert.equal(document.querySelector('.workspace-result-comparison').children.length,part==='SQL'?2:1,'DQL shows the student result and the expected result; DDL/DML show the student result only');
   }
   const dqlQuestion={id:'q-message',name:'q.sql',ratio:0,status:'Runtime Error',message:"SQL execution error: Invalid column name 'unknown'.",datasets:[]};
   const dqlSaved={status:'Runtime Error',message:'Summary',questionId:'q-message',sections:[{part:'SQL',status:'Wrong Answer',message:'Aggregate summary',questions:[dqlQuestion]}]};
@@ -188,8 +190,7 @@ try {
   await act(async()=>root.render(h(WorkspaceSubmissionPanel,{...dqlPanel,attempts:[{id:11,kind:'submit',result:{...dqlSaved,status:'Accepted',sections:[{part:'SQL',status:'Accepted',message:'Summary',questions:[matchedQuestion]}]}}]})));
   assert.ok(document.body.textContent.includes('Query matched.'));
   assert.ok(document.querySelector('.workspace-query-comparison').textContent.includes('75'),'Saved DQL renders its own comparison table');
-  assert.ok(!document.body.textContent.includes('PRIVATE EXPECTED'));
-  assert.ok(!document.querySelector('.workspace-query-comparison').textContent.includes('999'));
+  assert.ok(document.querySelector('.workspace-expected-result').textContent.includes('999'),'Saved DQL also shows the expected result returned by the server');
   await act(async()=>root.render(h(WorkspaceSubmissionPanel,{...dqlPanel,attempts:[{id:12,kind:'submit',result:{...dqlSaved,scoreVisible:false}}]})));
   assert.ok(!document.body.textContent.includes('unknown'),'Hidden grading does not leak question messages');
   await act(async()=>root.render(h(WorkspaceSubmissionPanel,{part:'SQL',busy:false,notice:'',attempts:[{id:1,kind:'submit',result:{...combined,scoreVisible:false}}]})));
@@ -233,7 +234,7 @@ try {
   let runArgs, submitted;
   globalThis.__workspaceApi.runQuery = async (...args) => {runArgs=args;return {...success,table:{name:'First',columns:['id'],rows:[[11]]}};};
   globalThis.__workspaceApi.submitSolution = async (...args) => {submitted=args;return {...success,status:'Accepted',passed:2,total:2};};
-  await click(document.querySelectorAll('.editor-actions button')[1]);
+  await click(document.querySelectorAll('.stage-run-actions button')[1]);
   assert.equal(runArgs[5],'q1');
   assert.equal(runArgs[1],'SELECT 11 AS id');
   await click(document.querySelector('.workspace-submit-current'));

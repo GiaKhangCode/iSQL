@@ -9,8 +9,7 @@ use App\Models\Problem;
 use App\Models\ProblemSqlSolution;
 use App\Models\ProblemStageExercise;
 use App\Models\Submission;
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\ExamRegrade;
 use App\Models\TestCase as ProblemTestCase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -89,8 +88,8 @@ class SubmissionDetailTest extends TestCase
             'evaluatedScore', 'finalScore', 'feedback', 'submittedAt', 'database', 'source', 'context', 'activityId',
             'activityTitle', 'isExam', 'examinationId', 'canEditReview', 'regradeAssignment', 'workspaceParts',
             'sections', 'reviewSections', 'attemptHistory', 'examEvents', 'departureCount', 'schemaName',
-            'questionMaxScores', 'appealStatus', 'appealReason', 'appealCreatedAt', 'appealResolvedAt',
-            'previousEvaluatedScore',
+            'questionMaxScores', 'appealStatus', 'appealCreatedAt', 'appealResolvedAt',
+            'previousEvaluatedScore', 'grades', 'gradeHistory', 'questionSubmissions', 'questionGrades',
         ], array_keys($json));
         $this->assertSame($this->sub->id, $json['id']);
         $this->assertSame($this->student->id, $json['studentId']);
@@ -182,7 +181,7 @@ class SubmissionDetailTest extends TestCase
 
     public function test_scores_are_masked_for_the_student_but_not_for_staff_while_hidden(): void
     {
-        $this->activity->update(['show_scores_after_submit' => false]);
+        $this->activity->update(['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         $this->sub->update(['evaluated_score' => 6, 'feedback' => 'Riêng tư', 'score' => 4]);
 
         $student = $this->show($this->student)->assertOk()->json();
@@ -193,7 +192,8 @@ class SubmissionDetailTest extends TestCase
         $this->assertNull($student['evaluatedScore']);
         $this->assertNull($student['feedback']);
 
-        $staff = $this->show($this->teacher)->assertOk()->json();
+        // Ca thi: nhân sự cần xem được mọi kết quả (hoặc dạy lớp của ca).
+        $staff = $this->show($this->makeAccount('instructor', ['results.view_all']))->assertOk()->json();
         $this->assertSame('Graded', $staff['status']);
         $this->assertEquals(4, $staff['autoScore']);
         $this->assertEquals(6, $staff['finalScore']);
@@ -202,14 +202,14 @@ class SubmissionDetailTest extends TestCase
 
     public function test_hidden_scores_do_not_leak_per_question_results_to_the_student(): void
     {
-        $this->activity->update(['show_scores_after_submit' => false]);
+        $this->activity->update(['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         $this->withSections($this->sub, [[
             'part' => 'SQL', 'status' => 'Accepted', 'message' => '1/1 câu đúng.',
             'questions' => [['id' => 'q1', 'status' => 'Accepted', 'comparisons' => [['expectedTable' => ['rows' => [[1]]]]]]],
         ]]);
 
         $student = $this->show($this->student)->assertOk()->json();
-        $staff = $this->show($this->teacher)->assertOk()->json();
+        $staff = $this->show($this->makeAccount('instructor', ['results.view_all']))->assertOk()->json();
 
         $this->assertSame([], $student['sections']);
         $this->assertSame('Accepted', $staff['sections'][0]['status']);
@@ -229,7 +229,7 @@ class SubmissionDetailTest extends TestCase
         $this->sub->update(['evaluated_score' => 5]);
         $this->assertSame('Graded', $this->show($this->teacher)->json('status'));
 
-        $regrade = SubmissionRegradeAssignment::create(['submission_id' => $this->sub->id, 'assigned_instructor_id' => $this->teacher->id, 'assigned_at' => now()]);
+        $regrade = ExamRegrade::create(['activity_id' => $this->sub->context, 'student_id' => $this->sub->user_id, 'assigned_instructor_id' => $this->teacher->id, 'assigned_at' => now()]);
         $this->assertSame('Awaiting regrade', $this->show($this->teacher)->json('status'));
 
         $regrade->update(['completed_at' => now()]);
@@ -288,7 +288,7 @@ class SubmissionDetailTest extends TestCase
         $this->solution($this->problem, 'tắt', 'SELECT 3', 2, false);
         $this->solution($this->problem, 'rỗng', '   ', 3);
 
-        $this->assertSame("-- [SQL] đầu tiên\nSELECT 1\n\n-- [SQL] tuyển chọn\nSELECT 2", $this->show($this->teacher)->json('referenceSolution'));
+        $this->assertSame("-- [SQL] Câu 1\nSELECT 1\n\n-- [SQL] Câu 2\nSELECT 2", $this->show($this->teacher)->json('referenceSolution'));
     }
 
     public function test_the_reference_solution_falls_back_to_the_first_test_cases_expected_query(): void
@@ -314,7 +314,7 @@ class SubmissionDetailTest extends TestCase
 
         $text = $this->show($this->teacher, $sub)->json('referenceSolution');
 
-        $this->assertSame("-- [DDL] tao_bang.sql\nCREATE TABLE a(x INT)\n\n-- [DDL] DDL.sql\nCREATE TABLE b(y INT)\n\n-- [SQL] truy vấn\nSELECT 1", $text);
+        $this->assertSame("-- [DDL] Câu 1\nCREATE TABLE a(x INT)\n\n-- [DDL] Câu 2\nCREATE TABLE b(y INT)\n\n-- [SQL] Câu 1\nSELECT 1", $text);
     }
 
     public function test_the_member_workspace_parts_override_the_problems(): void
@@ -327,27 +327,24 @@ class SubmissionDetailTest extends TestCase
         $this->assertSame(['DML'], $this->show($this->teacher, $sub)->json('workspaceParts'));
     }
 
-    public function test_regrade_and_appeal_details_are_reported(): void
+    public function test_regrade_details_are_reported(): void
     {
         $reviewer = $this->makeAccount('instructor', ['results.grade']);
         $this->sub->update(['evaluated_score' => 6]);
-        SubmissionAppeal::create([
-            'submission_id' => $this->sub->id, 'student_id' => $this->student->id, 'reason' => 'Xin xem lại', 'status' => 'pending',
-            'previous_evaluated_score' => 6, 'created_at' => now()->subHour(),
-        ]);
 
         $json = $this->show($this->teacher)->assertOk()->json();
-        $this->assertSame('pending', $json['appealStatus']);
-        $this->assertSame('Xin xem lại', $json['appealReason']);
+        $this->assertNull($json['appealStatus']);
+        $this->assertNull($json['regradeAssignment']);
+
+        ExamRegrade::create([
+            'activity_id' => $this->sub->context, 'student_id' => $this->sub->user_id, 'assigned_instructor_id' => $reviewer->id,
+            'assigned_by_id' => $this->teacher->id, 'note' => 'Xem kỹ câu 2', 'previous_evaluated_score' => 5,
+            'previous_feedback' => 'cũ', 'assigned_at' => now(),
+        ]);
+        $json = $this->show($this->teacher)->assertOk()->json();
+        $this->assertSame('Awaiting regrade', $json['appealStatus']);
         $this->assertNotNull($json['appealCreatedAt']);
         $this->assertNull($json['appealResolvedAt']);
-        $this->assertEquals(6, $json['previousEvaluatedScore']);
-
-        SubmissionRegradeAssignment::create([
-            'submission_id' => $this->sub->id, 'assigned_instructor_id' => $reviewer->id, 'assigned_by_id' => $this->teacher->id,
-            'note' => 'Xem kỹ câu 2', 'previous_evaluated_score' => 5, 'previous_feedback' => 'cũ', 'assigned_at' => now(),
-        ]);
-        $json = $this->show($this->teacher)->assertOk()->json();
         $this->assertSame($reviewer->id, $json['regradeAssignment']['reviewerId']);
         $this->assertSame($reviewer->name, $json['regradeAssignment']['reviewerName']);
         $this->assertSame('Xem kỹ câu 2', $json['regradeAssignment']['note']);
@@ -355,7 +352,6 @@ class SubmissionDetailTest extends TestCase
         $this->assertSame('cũ', $json['regradeAssignment']['previousFeedback']);
         $this->assertNotNull($json['regradeAssignment']['assignedAt']);
         $this->assertNull($json['regradeAssignment']['completedAt']);
-        // Điểm trước của đợt chấm lại được ưu tiên hơn điểm trước của đơn phúc khảo.
         $this->assertEquals(5, $json['previousEvaluatedScore']);
     }
 
@@ -365,7 +361,7 @@ class SubmissionDetailTest extends TestCase
         $this->assertFalse($this->show($this->makeAccount('instructor', ['results.view_all']))->json('canEditReview'));
 
         $reviewer = $this->makeAccount('instructor', ['results.grade']);
-        SubmissionRegradeAssignment::create(['submission_id' => $this->sub->id, 'assigned_instructor_id' => $reviewer->id, 'assigned_at' => now()]);
+        ExamRegrade::create(['activity_id' => $this->sub->context, 'student_id' => $this->sub->user_id, 'assigned_instructor_id' => $reviewer->id, 'assigned_at' => now()]);
 
         // Đã giao cho người khác chấm lại thì chủ hoạt động không còn sửa được; người được giao thì sửa được.
         $this->assertFalse($this->show($this->teacher)->json('canEditReview'));
@@ -515,17 +511,18 @@ class SubmissionDetailTest extends TestCase
         $this->show($this->student, $sub)->assertOk();
     }
 
-    public function test_a_regrade_reviewer_may_read_sibling_attempts_but_not_grade_them(): void
+    public function test_a_regrade_reviewer_may_read_and_grade_every_submission_of_the_exam(): void
     {
         $reviewer = $this->makeAccount('instructor', ['results.grade']);
         $first = $this->sub;
         $second = $this->makeSubmission($this->student, $this->problem, $this->activity, ['submitted_at' => now()->addMinute()]);
-        SubmissionRegradeAssignment::create(['submission_id' => $second->id, 'assigned_instructor_id' => $reviewer->id, 'assigned_at' => now()]);
+        ExamRegrade::create(['activity_id' => $this->activity->id, 'student_id' => $this->student->id, 'assigned_instructor_id' => $reviewer->id, 'assigned_at' => now()]);
 
-        $this->show($reviewer, $first)->assertOk()->assertJsonPath('canEditReview', false);
+        // Phúc khảo gắn với cả bài thi nên người được giao xem và chấm được mọi bài nộp của sinh viên đó trong ca thi.
+        $this->show($reviewer, $first)->assertOk()->assertJsonPath('canEditReview', true);
+        $this->show($reviewer, $second)->assertOk()->assertJsonPath('canEditReview', true);
         Sanctum::actingAs($reviewer);
-        $this->putJson("/api/submissions/{$first->id}/review", ['finalScore' => 1])->assertStatus(403);
-        // Bài của chính đợt chấm lại thì chấm được.
+        $this->putJson("/api/submissions/{$first->id}/review", ['finalScore' => 1])->assertOk();
         $this->putJson("/api/submissions/{$second->id}/review", ['finalScore' => 1])->assertOk();
     }
 
@@ -573,7 +570,7 @@ class SubmissionDetailTest extends TestCase
         $this->assertSame($this->problem->id, $none['problemId']);
         $this->assertSame('Bài chi tiết', $none['problem']);
         $this->assertSame('Đề bài', $none['statement']);
-        $this->assertSame('-- [SQL] q1' . "\n" . 'SELECT ref', $none['referenceSolution']);
+        $this->assertSame('-- [SQL] Câu 1' . "\n" . 'SELECT ref', $none['referenceSolution']);
         $this->assertSame('', $none['studentQuery']);
         $this->assertSame('Not submitted', $none['status']);
         $this->assertFalse($none['isSubmitted']);

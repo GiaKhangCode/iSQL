@@ -89,10 +89,10 @@
 .u216-login .u267-trigger { min-height: 38px; border-radius: 11px; font-family: inherit; font-size: 12px; }
 .u216-login .u216-mobile-brand { display: none; }
 .u216-login .u216-form-content { width: min(100%, 380px); margin: auto; padding: 28px 0; }
-.u216-login .u216-form-icon { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 28px; border: 1px solid var(--u216-line); border-radius: 18px; background: var(--u216-surface); box-shadow: 0 5px 16px -8px #4f46c833; }
+.u216-login .u216-form-icon { display: grid; place-items: center; flex: none; width: 54px; height: 54px; border: 1px solid var(--u216-line); border-radius: 15px; background: var(--u216-surface); box-shadow: 0 5px 16px -8px #4f46c833; }
 .u216-login .u216-form-heading { margin-bottom: 32px; }
-.u216-login .u216-form-heading > span { color: var(--u216-accent); font: 10px var(--font-mono); letter-spacing: .1em; }
-.u216-login .u216-form-heading h1 { margin: 10px 0 10px; font: 650 36px/1.25 "Segoe UI", sans-serif; letter-spacing: -.045em; }
+.u216-login .u216-form-title { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.u216-login .u216-form-heading h1 { min-width: 0; margin: 0; font: 650 36px/1.25 "Segoe UI", sans-serif; letter-spacing: -.045em; }
 .u216-login .u216-heading-dot { color: var(--u216-accent); }
 .u216-login .u216-form-heading p { color: var(--u216-muted); font-size: 14px; line-height: 1.6; margin: 0; }
 .u216-login .u216-form-content form { display: flex; flex-direction: column; gap: 20px; }
@@ -112,6 +112,18 @@
 .u216-login .button.primary.full:disabled { box-shadow: none; filter: none; }
 .u216-login .form-message { margin: 0; color: var(--danger); font-size: 13px; }
 .u216-login .field-error { color: var(--danger); font-size: 12px; }
+.u216-login .u216-form-heading p { overflow-wrap: anywhere; }
+.u216-login a.button.primary.full { display: grid; place-items: center; text-decoration: none; }
+.u216-login .auth-switch { margin: 18px 0 0; font-size: 12px; text-align: center; }
+.u216-login .auth-switch a { color: var(--u216-accent); font-weight: 500; text-decoration: none; }
+.u216-login .auth-switch a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.u216-login .password-requirements { margin: -8px 0 0; color: var(--u216-muted); font-size: 12px; }
+.u216-login .otp-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.u216-login .otp-cells { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.u216-login .otp-cells input { width: 100%; min-width: 0; height: 56px; padding: 0; border: 1px solid var(--u216-line); border-radius: 10px; background: var(--u216-surface); color: var(--u216-ink); font: 20px var(--font-mono); text-align: center; }
+.u216-login .otp-cells input:focus { outline: none; border-color: var(--u216-accent); box-shadow: 0 0 0 3px var(--u216-soft); }
+.u216-login .u216-form-content form > .tiny { margin: -6px 0 0; color: var(--u216-muted); font-size: 12px; text-align: center; }
+.u216-login .u216-form-content form > .tiny .forgot-link { align-self: center; margin: 0; }
 .u216-login .u216-form-footer { display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--u216-muted); font-size: 10px; text-align: center; }
 .u216-login .u216-enter { opacity: 0; transform: translateY(14px); transition: opacity .55s var(--u216-ease) var(--u216-delay), transform .7s var(--u216-ease) var(--u216-delay); }
 .u216-login .u216-nav { transform: translateY(-12px); }
@@ -156,10 +168,10 @@
   .u216-login .u216-editor-status { padding-block: 6px; }
   .u216-login .u216-form-panel { padding-block: 22px 18px; }
   .u216-login .u216-form-content { padding-block: 22px; }
-  .u216-login .u216-form-icon { width: 50px; height: 50px; border-radius: 14px; margin-bottom: 20px; }
+  .u216-login .u216-form-icon { width: 48px; height: 48px; border-radius: 13px; }
   .u216-login .u216-form-icon img { width: 34px; height: 34px; }
   .u216-login .u216-form-heading { margin-bottom: 24px; }
-  .u216-login .u216-form-heading h1 { font-size: 30px; margin-block: 8px; }
+  .u216-login .u216-form-heading h1 { font-size: 30px; }
   .u216-login .u216-form-content form { gap: 16px; }
   .u216-login .field { gap: 7px; }
   .u216-login .field input { height: 46px; min-height: 46px; }
@@ -181,7 +193,7 @@
   .u216-login .u216-hero-footer { font-size: 9px; }
   .u216-login .u216-form-panel { padding-block: 16px 14px; }
   .u216-login .u216-form-content { padding-block: 18px; }
-  .u216-login .u216-form-icon { width: 44px; height: 44px; margin-bottom: 14px; border-radius: 12px; }
+  .u216-login .u216-form-icon { width: 44px; height: 44px; border-radius: 12px; }
   .u216-login .u216-form-icon img { width: 30px; height: 30px; }
   .u216-login .u216-form-heading { margin-bottom: 20px; }
   .u216-login .u216-form-heading h1 { font-size: 28px; }

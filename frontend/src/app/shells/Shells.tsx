@@ -1,8 +1,6 @@
 import { useLocation, Outlet } from "react-router-dom";
 import { RoleHeader } from "@/app/shells/RoleHeader";
 import { AppHeader } from "@/app/shells/AppHeader";
-import { TeacherHeader } from "@/app/shells/TeacherHeader";
-import { AdminHeader } from "@/app/shells/AdminHeader";
 
 export function Shell() {
   return (
@@ -18,7 +16,7 @@ export function Shell() {
 export function TeacherShell() {
   return (
     <>
-      <TeacherHeader />
+      <RoleHeader />
       <main id="main-content" className="teacher-main">
         <RouteContent />
       </main>
@@ -27,13 +25,13 @@ export function TeacherShell() {
 }
 
 export function OfficeShell() {
-  return <><RoleHeader role="office"/><main id="main-content" className="teacher-main"><RouteContent/></main></>;
+  return <><RoleHeader /><main id="main-content" className="teacher-main"><RouteContent/></main></>;
 }
 
 export function AdminShell() {
   return (
     <>
-      <AdminHeader />
+      <RoleHeader />
       <main id="main-content" className="admin-main">
         <RouteContent />
       </main>

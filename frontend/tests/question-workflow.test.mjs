@@ -20,7 +20,7 @@ const problem={id:'question-workflow',number:'1',title:'Sales',description:'Shar
   dmlChecks:[{id:'price',name:'secret-price.sql',description:'Raise the price',startFrom:'provided',hasSetup:true}],sqlChecks:[{id:'select',name:'secret-select.sql',description:'List products',timeLimitMs:5000,hasSetup:true}]};
 let history=[],preparations=[],submissions=[],lastRun,finalInput;
 globalThis.__questionProblem=problem;
-globalThis.__questionApi={submitWorkspace:async(_id,input)=>{finalInput=input;return {status:'Accepted',message:'Saved',submissionsUsed:1,maxScore:10,score:10,scoreVisible:true};},getDraft:()=>'',saveDraft(){},getExamSessionOrExam:async()=>undefined,getPreferences:async()=>({favorites:[]}),getSubmissions:async()=>structuredClone(history),
+globalThis.__questionApi={getCurrentDatabase:async()=>({tables:[]}),submitWorkspace:async(_id,input)=>{finalInput=input;return {status:'Accepted',message:'Saved',submissionsUsed:1,maxScore:10,score:10,scoreVisible:true};},getDraft:()=>'',saveDraft(){},getExamSessionOrExam:async()=>undefined,getPreferences:async()=>({favorites:[]}),getSubmissions:async()=>structuredClone(history),
   getQuestionDatabase:async(_id,input)=>{preparations.push(input);return {schemaTables:[table(20)],tables:[{name:'SANPHAM',columns:['MASP','GHICHU'],rows:[['SP01',null]]}]};},
   runWorkspace:async(_id,input)=>{lastRun=input;return input.part==='TRIGGER'?{status:'Success',message:'Trigger created successfully.',triggers:[{name:'trg_product',table:'SANPHAM',isDisabled:false}],tables:[{name:'SANPHAM',columns:['MASP'],rows:[['SP01']]}]}:input.part==='DDL'?{status:'Success',message:'DDL executed successfully.',schemaTables:[table(20),{...table(),name:'CTHD'}],schemaChanges:[{name:'SANPHAM',change:'modified',before:table(),table:table(20)}]}:{status:'Success',message:'DML executed successfully.',tables:[{name:'SANPHAM1',columns:['GIA'],rows:[[105]]},{name:'KHACHHANG',columns:['MAKH'],rows:[['KH01']]}],dataChanges:[{name:'SANPHAM1',change:'modified',before:{name:'SANPHAM1',columns:['GIA'],rows:[[100]]},table:{name:'SANPHAM1',columns:['GIA'],rows:[[105]]}}]};},
   submitWorkspaceQuestion:async(_id,input)=>{
@@ -52,10 +52,11 @@ try{
   const tab=text=>tabs().find(node=>node.textContent===text);
   const picker=()=>document.querySelector('header .workspace-question-picker select');
   const code=()=>stage().querySelector('.stage-code textarea');
-  const panel=()=>stage().querySelector('.workspace-submission-content');
+  const panel=()=>stage().querySelector('.workspace-reading-pane .workspace-submission-content');
+  const output=()=>stage().querySelector('.workspace-output');
   const edit=value=>api.act(async()=>{code().value=value;code().dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
   await api.act(async()=>{root=api.mount(document.getElementById('root'));});
-  assert.deepEqual(tabs().map(node=>node.textContent),['Mô tả','Cơ sở dữ liệu','Vừa chạy','Bài nộp']);
+  assert.deepEqual(tabs().map(node=>node.textContent),['Mô tả','Cơ sở dữ liệu','Bài nộp']);
   assert.equal(stage().querySelector('.workspace-question-picker'),null,'Reading pane has no duplicate question selector');
   assert.deepEqual([...picker().options].map(node=>node.textContent),['Câu 1 DDL','Câu 2 DDL','Câu 3 DDL']);
   await change(picker(),'resize');await click(tab('Cơ sở dữ liệu'));
@@ -67,41 +68,39 @@ try{
   assert.equal(preparations[1].solutionId,'drop');assert.match(stage().textContent,/GHICHU/);
   await click(tab('Mô tả'));await change(picker(),'add');
   const original='ALTER TABLE SANPHAM ADD GHICHU VARCHAR(20);';
-  await edit(original);await click(stage().querySelector('.stage-run-actions .primary'));
-  assert.equal(stage().querySelector('.workspace-pane-tabs [aria-selected="true"]').textContent,'Vừa chạy');
-  assert.deepEqual([...panel().querySelectorAll('.workspace-result-kind-tabs button')].map(node=>node.textContent),['DDL','DML','DQL','Trigger']);
-  assert.equal(panel().querySelectorAll('.workspace-question-result-toggle[aria-expanded="true"]').length,1);
-  assert.equal(panel().querySelectorAll('.workspace-attempt .status').length,0,'The successful state is displayed once, in the question header');
-  assert.ok(!panel().textContent.includes('CTHD'),'Unchanged tables never enter the run result');
-  assert.ok(!panel().textContent.includes('Modified table'));assert.ok(!panel().textContent.includes('.sql'));
+  await edit(original);await click(document.querySelector('.stage-run-actions .primary'));
+  assert.ok(stage().querySelector('.workspace-output.is-open'),'Running opens the output panel under the editor');
+  assert.equal(output().querySelectorAll('.workspace-result-kind-tabs').length,0,'The output panel shows only the current question');
+  assert.deepEqual([...output().querySelectorAll('[role="tab"]')].map(node=>node.textContent),['Thông báo'],'DDL output has only the Messages tab');
+  assert.equal(output().querySelectorAll('.status').length,0,'A successful DDL run has no verdict label (only errors are labelled)');
+  assert.ok(!output().textContent.includes('CTHD'),'Unchanged tables never enter the run result');
+  assert.ok(!output().textContent.includes('Modified table'));assert.ok(!output().textContent.includes('.sql'));
   await edit('ALTER TABLE SANPHAM ADD GHICHU VARCHAR(100);');
-  assert.equal(panel().querySelector('.workspace-question-submit').disabled,true,'Edited SQL must be run from the editor before submission');
-  await click(stage().querySelector('.stage-run-actions .primary'));
-  assert.equal(panel().querySelector('.workspace-question-submit').disabled,false,'Running the updated SQL enables submission');
-  await click(panel().querySelector('.workspace-question-submit'));
+  assert.equal(output().querySelector('.workspace-question-submit').disabled,true,'Edited SQL must be run from the editor before submission');
+  await click(document.querySelector('.stage-run-actions .primary'));
+  assert.equal(output().querySelector('.workspace-question-submit').disabled,false,'Running the updated SQL enables submission');
+  await click(output().querySelector('.workspace-question-submit'));
   assert.equal(submissions.length,1);assert.equal(submissions[0].script,'ALTER TABLE SANPHAM ADD GHICHU VARCHAR(100);','Submit uses the updated run snapshot');
   assert.equal(stage().querySelector('.workspace-pane-tabs [aria-selected="true"]').textContent,'Bài nộp');
   const codeDetails=panel().querySelector('.workspace-submission-code');
   await api.act(async()=>{codeDetails.open=true;codeDetails.dispatchEvent(new dom.window.Event('toggle',{bubbles:true}));});
-  assert.equal(panel().querySelector('[aria-label="Mã SQL đã nộp"]').textContent,'ALTER TABLE SANPHAM ADD GHICHU VARCHAR(100);');
+  assert.equal(panel().querySelector('[aria-label="Script đã nộp"]').textContent,'ALTER TABLE SANPHAM ADD GHICHU VARCHAR(100);');
   assert.equal(code().value,'ALTER TABLE SANPHAM ADD GHICHU VARCHAR(100);');
   assert.equal(code().readOnly,false,'A question submission does not lock unrelated drafts');
-  await click(tab('Vừa chạy'));await click(panel().querySelector('.workspace-question-submit'));
+  await click(output().querySelector('.workspace-question-submit'));
   assert.equal(submissions.length,1,'Clicking an already submitted snapshot does not consume another attempt');
-  assert.equal(panel().querySelector('.workspace-already-submitted').textContent,'Đã lưu câu này');
+  assert.equal(output().querySelector('.workspace-already-submitted').textContent,'Đã lưu câu này');
   await api.act(async()=>root.unmount());
   await api.act(async()=>{root=api.mount(document.getElementById('root'));});
-  assert.equal(stage().querySelector('.workspace-pane-tabs [aria-selected="true"]').textContent,'Vừa chạy');
-  assert.match(panel().textContent,/SANPHAM/,'The latest run survives a full remount');
+  if(!stage().querySelector('.workspace-output.is-open'))await click(stage().querySelector('.workspace-output-toggle'));
+  assert.ok(output().querySelector('.workspace-output-messages'),'The latest run survives a full remount');
   assert.equal(code().value,'ALTER TABLE SANPHAM ADD GHICHU VARCHAR(100);','The latest draft also survives a full remount');
   await click(tab('Bài nộp'));
   assert.match(panel().textContent,/100%/,'Saved question grades reload from the server');
   assert.equal(code().readOnly,false,'Reloaded question submissions do not become a full-workspace lock');
   await click(document.querySelector('header nav [aria-controls="workspace-stage-DML"]'));
-  await click(tab('Mô tả'));await edit('UPDATE SANPHAM1 SET GIA=GIA*1.05;');await click(stage().querySelector('.stage-run-actions .primary'));
-  assert.equal(lastRun.part,'DML');assert.ok(panel().textContent.includes('SANPHAM1'));assert.ok(!panel().textContent.includes('KHACHHANG'));
-  await click(panel().querySelector('.workspace-result-kind-tabs button'));
-  assert.ok(panel().querySelector('.workspace-question-result-toggle').textContent.includes('Câu 1 DDL'),'Results can be browsed across types in authored question order');
+  await click(tab('Mô tả'));await edit('UPDATE SANPHAM1 SET GIA=GIA*1.05;');await click(document.querySelector('.stage-run-actions .primary'));
+  assert.equal(lastRun.part,'DML');assert.ok(output().querySelector('.workspace-output-messages'));assert.ok(!output().textContent.includes('KHACHHANG'),'DML output shows messages only, no table data');
   await click(document.querySelector('header nav [aria-controls="workspace-stage-SQL"]'));
   await click(tab('Cơ sở dữ liệu'));
   assert.equal(preparations.at(-1).part,'SQL','DQL loads its question preparation when opening the database pane');
@@ -114,10 +113,10 @@ try{
   await edit(trigger);
   await change(picker(),'trigger-2');assert.equal(code().value,'','Trigger questions have separate drafts');
   await change(picker(),'trigger-1');assert.equal(code().value,trigger);
-  await click(stage().querySelector('.stage-run-actions .primary'));
+  await click(document.querySelector('.stage-run-actions .primary'));
   assert.equal(lastRun.part,'TRIGGER');assert.equal(lastRun.trigger,trigger);assert.equal(lastRun.ddl,'');assert.equal(lastRun.dml,'');
-  assert.ok(panel().textContent.includes('trg_product'));
-  await click(panel().querySelector('.workspace-question-submit'));
+  assert.ok(output().querySelector('.workspace-output-messages').textContent.includes('Lệnh đã chạy thành công.'));
+  await click(output().querySelector('.workspace-question-submit'));
   assert.equal(submissions.at(-1).part,'TRIGGER');assert.equal(submissions.at(-1).script,trigger);
   await api.act(async()=>root.unmount());await api.act(async()=>{root=api.mount(document.getElementById('root'));});
   assert.equal(document.querySelector('.problem-workspace-stage:not([hidden])').id,'workspace-stage-TRIGGER');
@@ -127,6 +126,6 @@ try{
   await click([...document.querySelectorAll('dialog button')].find(button=>button.textContent==='Nộp bài'));
   assert.ok(finalInput.trigger.includes('-- solution:trigger-1'));
   assert.ok(finalInput.trigger.includes(trigger),'Final submission contains the independently saved trigger script');
-  console.log('PASS: prepared per-question baselines/cache, Vietnamese labels, separate run/submission tabs, affected tables only, exact submitted SQL, no duplicate badges/submissions, ordered accordions and reload persistence.');
+  console.log('PASS: prepared per-question baselines/cache, Vietnamese labels, run output panel under the editor, submission tab, affected tables only, exact submitted SQL, no duplicate badges/submissions, ordered accordions and reload persistence.');
 }finally{if(root)await api.act(async()=>root.unmount());await unlink(file).catch(()=>{});dom.window.close();}
 process.exit(0);

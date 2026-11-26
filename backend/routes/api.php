@@ -7,7 +7,6 @@ use App\Http\Controllers\ExamAdmissionController;
 use App\Http\Controllers\ExamLoginProctorController;
 use App\Http\Controllers\RegradeAssignmentController;
 use App\Http\Controllers\StatisticsController;
-use App\Http\Controllers\SubmissionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,7 +25,6 @@ Route::prefix('assignments')->group(base_path('routes/assignments.php'));
 Route::prefix('exam-sessions')->group(base_path('routes/exam_sessions.php'));
 Route::prefix('submissions')->group(base_path('routes/submissions.php'));
 Route::prefix('notifications')->group(base_path('routes/notifications.php'));
-Route::prefix('sharing')->group(base_path('routes/sharing.php'));
 
 // Exercise Tags (Public / All roles)
 Route::get('/exercise-tags', [\App\Http\Controllers\Admin\ExerciseTagController::class, 'index']);
@@ -38,9 +36,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Role-based Analytics Dashboards (Lecturer & Faculty Office only)
     Route::get('/teacher/statistics', [StatisticsController::class, 'teacher'])
-        ->middleware('capability:results.grade,results.view_all,examination.manage,exam.proctor,assignment.create');
+        ->middleware('capability:statistics.view');
     Route::get('/office/statistics', [StatisticsController::class, 'office'])
-        ->middleware('capability:results.view_all,examination.manage');
+        ->middleware('capability:statistics.faculty');
 
     // Examinations Management & Credentials
     Route::prefix('examinations')->middleware('capability:examination.manage,exam.credentials')->group(function () {
@@ -83,17 +81,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/credentials/{admissionId}/approve', [ExamLoginProctorController::class, 'approveBrowser']);
     });
 
-    // Publish Results
-    Route::post('/results/{activityId}/publish', [SubmissionController::class, 'publishResults']);
-
     // Regrade Assignments
     Route::prefix('regrade-assignments')->group(function () {
-        Route::get('/mine', [RegradeAssignmentController::class, 'mine'])->middleware('capability:results.grade');
+        Route::get('/mine', [RegradeAssignmentController::class, 'mine'])->middleware('capability:results.regrade');
         Route::middleware('capability:examination.manage')->group(function () {
-            Route::get('/candidates', [RegradeAssignmentController::class, 'candidates']);
             Route::get('/reviewers', [RegradeAssignmentController::class, 'reviewers']);
-            Route::put('/{submissionId}', [RegradeAssignmentController::class, 'assign']);
-            Route::delete('/{submissionId}', [RegradeAssignmentController::class, 'unassign']);
+            Route::put('/{activityId}/{studentId}', [RegradeAssignmentController::class, 'assign']);
+            Route::delete('/{activityId}/{studentId}', [RegradeAssignmentController::class, 'unassign']);
         });
     });
 });

@@ -3,6 +3,7 @@ import { useLanguage } from "@/shared/context/LanguageContext";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@/shared/ui/ui";
 import { resolveExamSessionBannerUrl } from "@/shared/lib/exam-session/examSessionBanner";
+import { notify } from "@/shared/ui/notify";
 
 export type BannerCrop = { x: number; y: number; zoom: number };
 export const defaultBannerCrop: BannerCrop = { x: 0.5, y: 0.5, zoom: 1 };
@@ -112,7 +113,7 @@ export function ExamSessionBannerCrop({ sourceUrl, initialCrop, onClose, onApply
       const source = await toWebP(sourceCanvas, 0.82);
       await onApply(banner, source, bounded);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not apply banner crop.");
+      notify.fail(tr("Could not apply banner crop."), cause, tr);
     } finally {
       setBusy(false);
     }

@@ -7,10 +7,8 @@ export interface RoleGroup {
   name: string;
   /** Built-in role tied to an account type (student, instructor, ...). Its permissions apply to every account of that type. */
   isSystem?: boolean;
-  /** The administrator role always holds everything and cannot be edited. */
+  /** The role cannot be edited. */
   readOnly?: boolean;
-  /** Interface areas the role opens (student | teacher | office | admin). Derived by the server from the permissions. */
-  areas?: string[];
   /** Number of accounts holding the role. */
   userCount?: number;
   permissions: string[];

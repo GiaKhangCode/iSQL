@@ -57,24 +57,8 @@ class UserController extends Controller
 
     public function updateStatus(Request $request, string $id): JsonResponse
     {
-        $request->validate(['status' => 'required|in:Active,Inactive,Pending']);
+        $request->validate(['status' => 'required|in:Active,Inactive']);
         $user = $this->userService->updateStatus($id, $request->status);
-
-        return response()->json($user);
-    }
-
-    public function approve(string $id): JsonResponse
-    {
-        $user = $this->userService->getUser($id);
-        if ($user->account_type !== User::ACCOUNT_STAFF) {
-            throw ValidationException::withMessages(['user_id' => ['Only staff accounts can be approved.']]);
-        }
-        if ($user->status !== 'Pending') {
-            throw ValidationException::withMessages(['status' => ['Only pending accounts can be approved.']]);
-        }
-
-        // updateStatus(..., 'Active') đã tự gán nhóm quyền Giảng viên cho tài khoản giảng viên.
-        $user = $this->userService->updateStatus($id, 'Active');
 
         return response()->json($user);
     }
@@ -146,7 +130,7 @@ class UserController extends Controller
                     'initials' => ['nullable', 'string', 'max:10'],
                     'account_type' => ['required', Rule::in(User::ACCOUNT_TYPES)],
                     'role' => ['nullable', 'string', 'max:100'],
-                    'status' => ['nullable', Rule::in(['Active', 'Inactive', 'Pending'])],
+                    'status' => ['nullable', Rule::in(['Active', 'Inactive'])],
                     'department' => ['nullable', 'string', 'max:255'],
                 ]);
 

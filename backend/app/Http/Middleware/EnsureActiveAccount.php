@@ -19,7 +19,7 @@ class EnsureActiveAccount
 
         if ($user && $user->status !== 'Active') {
             return response()->json([
-                'detail' => 'Your account is pending approval or currently inactive.'
+                'detail' => 'Your account is currently inactive.'
             ], 403);
         }
 

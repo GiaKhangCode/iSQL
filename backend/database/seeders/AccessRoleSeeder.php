@@ -17,22 +17,25 @@ use Illuminate\Support\Facades\DB;
  */
 class AccessRoleSeeder extends Seeder
 {
-    /** slug => [tên, siêu quản trị, quyền mặc định] */
+    /** slug => [tên, quyền mặc định]. Mỗi vai trò là một khu vực giao diện; không vai trò nào tự có mọi quyền. */
     public const DEFAULT_ROLES = [
-        'student' => ['Sinh viên', false, [
-            'practice.solve',
+        'student' => ['Sinh viên', [
+            'practice.solve', 'assignment.do', 'submission.view',
         ]],
-        'instructor' => ['Giảng viên', false, [
-            'practice.solve', 'problem.create', 'problem.share', 'library.manage', 'library.share',
-            'assignment.create', 'exam.proctor', 'results.grade', 'student.reset_password', 'class.teach',
+        'instructor' => ['Giảng viên', [
+            'practice.solve', 'assignment.do', 'submission.view', 'problem.create', 'library.manage',
+            'assignment.create', 'exam.proctor', 'results.grade', 'statistics.view', 'results.regrade',
+            'student.reset_password', 'class.teach',
         ]],
-        'faculty_office' => ['Giáo vụ khoa', false, [
-            'assignment.create', 'examination.manage', 'exam.credentials',
+        'faculty_office' => ['Giáo vụ khoa', [
+            'assignment.create', 'examination.manage', 'exam.credentials', 'exam.results', 'statistics.faculty',
         ]],
-        'admin' => ['Admin', true, []],
-        'department_head' => ['Trưởng bộ môn', false, [
-            'practice.solve', 'problem.create', 'problem.share', 'library.manage', 'library.share',
-            'examination.manage', 'exam.proctor', 'results.view_all',
+        'admin' => ['Admin', [
+            'system.overview', 'user.manage', 'class.manage', 'access.manage',
+        ]],
+        'department_head' => ['Trưởng bộ môn', [
+            'practice.solve', 'assignment.do', 'submission.view', 'problem.create', 'tag.manage', 'library.manage',
+            'examination.manage', 'exam.results', 'statistics.faculty', 'exam.proctor', 'results.view_all',
         ]],
     ];
 
@@ -46,11 +49,11 @@ class AccessRoleSeeder extends Seeder
 
     private function seedRoles(): void
     {
-        foreach (self::DEFAULT_ROLES as $slug => [$name, $isSuper, $permissions]) {
+        foreach (self::DEFAULT_ROLES as $slug => [$name, $permissions]) {
             if (AccessRole::where('slug', $slug)->exists()) {
                 continue;
             }
-            $role = AccessRole::create(['slug' => $slug, 'name' => $name, 'is_super' => $isSuper]);
+            $role = AccessRole::create(['slug' => $slug, 'name' => $name]);
             $role->syncPermissions($permissions);
         }
     }

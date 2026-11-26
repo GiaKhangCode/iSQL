@@ -273,12 +273,13 @@ export function ActivityPreview({ draft, examSession, classes, problems, bannerA
         endTime: draft.closes ? draft.closes.slice(11, 16) : "",
         problemCount: draft.problems.length, problemIds: draft.problems.map((item) => item.id),
         problemDetails: draft.problems.map((item) => { const problem = problems.find((row) => row.id === item.id); return {
-          id: item.id, title: problem?.title || item.id, difficulty: problem?.difficulty || "SQL problem",
-          topic: problem?.topic || "SQL", points: item.points,
+          id: item.id, title: problem?.title || item.id, difficulty: problem?.difficulty || tr("Not classified"),
+          topic: problem?.topic || tr("Not classified"), points: item.points,
         }; }),
         totalPoints, score: draft.studentOptions.showScoresAfterSubmit ? 0 : null, rank: null, leaderboardEnabled: draft.studentOptions.leaderboard && draft.studentOptions.showScoresAfterSubmit,
         showScoresAfterSubmit: draft.studentOptions.showScoresAfterSubmit, maxSubmissions: draft.studentOptions.maxSubmissions,
         aiAllowed: false, leaderboard: [], submitters: 0,
+        examMode: draft.studentOptions.examMode, examViolationLimit: draft.studentOptions.examViolationLimit ?? 2,
       } satisfies ExamSession} />
     </> : <>
       <header className="assignment-work-heading"><h1>{title}</h1><p><TranslatedText>{tr(audience)}</TranslatedText></p></header>

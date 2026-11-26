@@ -1118,12 +1118,37 @@ input.has-error {
 .examination-proctor-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 4px 2px 10px;
-  border-radius: 999px;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 4px 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   background: var(--accent-subtle);
-  color: var(--text);
-  font-size: 0.875rem;
+  color: var(--accent);
+  font-size: 10px;
+}
+
+/* Nút xóa giống nút xóa của chip chọn lớp (.teacher-class-chip-remove). */
+.examination-proctor-chip .icon-button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+}
+
+.examination-proctor-chip .icon-button:hover:not(:disabled) {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.examination-proctor-chip .icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .examination-proctor-empty {

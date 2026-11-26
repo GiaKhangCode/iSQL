@@ -163,7 +163,7 @@ class StudentProfileTest extends TestCase
 
     public function test_hidden_scores_are_not_reported_and_the_status_says_so(): void
     {
-        $activity = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false]);
+        $activity = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         $problem = $this->makeProblem();
         $this->attachProblem($activity, $problem, 10);
         $this->makeSubmission($this->student, $problem, $activity, ['evaluated_score' => 8]);

@@ -13,7 +13,7 @@ export function WorkspaceNavigation({
   parts: WorkspacePart[];
   active: WorkspacePart;
   onChange: (part: WorkspacePart) => void;
-  questionGroups?: Record<string, { id: string; name: string; description?: string }[]>;
+  questionGroups?: Record<string, { id: string; description?: string }[]>;
   selectedQuestionIds?: Record<string, string>;
   onQuestionChange?: (part: WorkspacePart, id: string) => void;
   isQuestionDone?: (part: WorkspacePart, id: string) => boolean;
@@ -127,7 +127,7 @@ export function WorkspaceNavigation({
                       aria-haspopup={selected ? "listbox" : undefined}
                       aria-controls={isActive && selected && shown ? menuId : undefined}
                       aria-activedescendant={isActive && selected && shown ? `${menuId}-${cursor}` : undefined}
-                      disabled={disabled} title={q.description || q.name || label}
+                      disabled={disabled} title={q.description || label}
                       onBlur={() => { if (isActive && selected) setDropdownOpen(false); }}
                       onClick={() => {
                         if (selected) { setCursor(index); setDropdownOpen(open => !open); }
@@ -173,7 +173,7 @@ export function WorkspaceNavigation({
               className={`workspace-question-dropdown-item ${idx === currentIndex ? "active" : ""} ${idx === cursor ? "focused" : ""} ${isQuestionDone?.(active, item.id) ? "done" : ""}`}
               onPointerMove={() => setCursor(idx)} onClick={() => choose(item.id)}>
               <span className="dropdown-item-num">{questionLabel(idx)}</span>
-              <span className="dropdown-item-desc" title={item.description || item.name}>{item.description || item.name}</span>
+              <span className="dropdown-item-desc" title={item.description}>{item.description}</span>
               {isQuestionDone?.(active, item.id) && <span className="dropdown-item-done-badge">{tr("Done")}</span>}
             </button>)}
           </div>

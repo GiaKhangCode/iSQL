@@ -378,6 +378,13 @@
 .builder-auto-gen-field.builder-auto-gen-field-count {
   flex: 0 0 75px;
 }
+.builder-auto-gen-field.builder-auto-gen-field-points {
+  flex: 0 0 auto;
+  min-width: 96px;
+}
+.builder-auto-gen-field-points .builder-question-points input {
+  width: 60px !important;
+}
 .builder-auto-gen-field label {
   font-size: 10px;
   font-weight: 600;
@@ -1009,9 +1016,10 @@
   font-size: 11.5px;
   font-weight: 600;
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Tiêu đề là toàn bộ mô tả câu hỏi nên cho xuống dòng thay vì cắt bằng "…". */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 .builder-q-menu-container {
   position: relative;
@@ -1978,6 +1986,13 @@
   overflow: hidden;
 }
 
+.examination-account-export-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .examination-account-table-toolbar {
   display: flex;
   align-items: center;
@@ -2095,3 +2110,11 @@
   color: #64748b;
   font-size: 11.5px;
 }
+/* Khối CSDL gộp: dòng tóm tắt, hàng "Hiển thị với sinh viên" thay cho hai nút Ẩn/Hiện. */
+.builder-database-summary { color:var(--muted); font-size:11px; font-weight:400; }
+.builder-database-heading > svg:last-child { margin-left:auto; }
+.builder-database-student-visibility { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin:2px 0 0; font-size:11px; color:var(--muted); }
+.builder-database-student-visibility > label { display:inline-flex; align-items:center; gap:6px; color:var(--text); cursor:pointer; }
+.builder-database-student-visibility input[type="checkbox"] { flex:none; width:15px; height:15px; min-width:0; min-height:0; margin:0; padding:0; accent-color:var(--accent); }
+.builder-settings-inline-content > .builder-database-reference { margin-bottom:8px; padding:4px 16px 12px; }
+.builder-database-reference > #builder-database-body:not([hidden]) { margin-top:12px; }

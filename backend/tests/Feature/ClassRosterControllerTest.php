@@ -165,8 +165,18 @@ class ClassRosterControllerTest extends TestCase
         $this->assertContains($s->id, array_column($this->getJson(self::A . '/students')->assertOk()->json(), 'id'));
     }
 
+    /** Admin chỉ có class.manage; đặt lại mật khẩu cần thêm student.reset_password (vai trò khác hoặc gán riêng). */
+    private function grantPasswordResetToAdmin(): void
+    {
+        $role = \App\Models\AccessRole::create(['name' => 'Reset MK ' . uniqid()]);
+        $role->syncPermissions(['student.reset_password']);
+        $this->admin->accessRoles()->attach($role->id);
+        app(\App\Services\Access\AccessControlService::class)->forget();
+    }
+
     public function test_unknown_class_is_404_on_every_roster_route(): void
     {
+        $this->grantPasswordResetToAdmin();
         $s = $this->makeUser('student');
         $x = 'khong-co-lop';
 
@@ -207,7 +217,7 @@ class ClassRosterControllerTest extends TestCase
     {
         $manager = $this->makeUser('student');
         DB::table('user_access_roles')->where('user_id', $manager->id)->delete();
-        $role = \App\Models\AccessRole::create(['name' => 'QL lớp ' . uniqid(), 'is_super' => false]);
+        $role = \App\Models\AccessRole::create(['name' => 'QL lớp ' . uniqid()]);
         $role->syncPermissions(['class.manage']);
         $manager->accessRoles()->attach($role->id);
         app(\App\Services\Access\AccessControlService::class)->forget();
@@ -794,8 +804,9 @@ class ClassRosterControllerTest extends TestCase
 
     // ───────────────────────── reset-password ─────────────────────────
 
-    public function test_admin_resets_enrolled_student_password_and_revokes_tokens(): void
+    public function test_an_account_with_class_manage_and_the_reset_permission_resets_any_class_and_revokes_tokens(): void
     {
+        $this->grantPasswordResetToAdmin();
         $s = $this->makeUser('student');
         $this->enroll($s);
         $s->createToken('t');
@@ -840,8 +851,18 @@ class ClassRosterControllerTest extends TestCase
         $this->assertTrue(Hash::check('password123', $s->refresh()->hashed_password));
     }
 
+    public function test_the_admin_role_alone_cannot_reset_passwords(): void
+    {
+        $s = $this->makeUser('student');
+        $this->enroll($s);
+
+        $this->postJson(self::T . "/{$this->class->id}/students/{$s->id}/reset-password", ['password' => 'MatKhauMoi1'])->assertStatus(403);
+        $this->assertTrue(Hash::check('password123', $s->refresh()->hashed_password));
+    }
+
     public function test_reset_password_validation_and_enrollment_check(): void
     {
+        $this->grantPasswordResetToAdmin();
         $s = $this->makeUser('student');
         $stranger = $this->makeUser('student');
         $this->enroll($s);

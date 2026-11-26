@@ -14,8 +14,8 @@ class ExerciseTagService
      */
     protected function assertAdmin(User $user): void
     {
-        if (! app(\App\Services\Access\AccessControlService::class)->can($user, 'class.manage')) {
-            throw new HttpException(403, 'Bạn không có quyền quản lý thẻ bài tập.');
+        if (! app(\App\Services\Access\AccessControlService::class)->can($user, 'tag.manage')) {
+            throw new HttpException(403, 'Bạn không có quyền quản lý thẻ câu hỏi.');
         }
     }
 

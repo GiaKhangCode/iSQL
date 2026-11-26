@@ -359,3 +359,11 @@
 :is(.admin-user-filters,.admin-course-filter-row,.admin-practice-filters) { display:flex; flex-wrap:nowrap; align-items:end; gap:8px; }
 :is(.admin-user-filters,.admin-course-filter-row,.admin-practice-filters) > .list-date-filters { flex:0 1 130px; padding:0; min-width:85px; }
 .admin-user-filters > :not(.list-date-filters) { min-width:0; flex:1; }
+.admin-overview-list { margin: 0 0 12px; padding: 0; list-style: none; }
+.admin-overview-list > li { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); font-size: 12px; line-height: 18px; }
+.admin-overview-list > li > div { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.admin-overview-list > li > div > span { color: var(--muted); font-size: 11px; }
+.admin-overview-list > li > div > span.admin-warning { color: var(--warning); }
+.admin-overview-list > li > .button, .admin-overview-list > li > .status { flex: none; }
+.admin-overview-confirm { display: grid; gap: 6px; margin: 12px 0; }
+.admin-overview-confirm-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 14px; }

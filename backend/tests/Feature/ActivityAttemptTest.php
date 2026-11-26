@@ -891,7 +891,7 @@ class ActivityAttemptTest extends TestCase
     public function test_submit_hides_scores_when_not_shown_after_submit(): void
     {
         $student = $this->makeStudent();
-        $activity = $this->makeActivity($student, ['show_scores_after_submit' => false]);
+        $activity = $this->makeActivity($student, ['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         $problem = $this->makeProblem();
         $this->addSolution($problem);
         $this->addMember($activity, $problem, 0, 7);
@@ -1161,7 +1161,7 @@ class ActivityAttemptTest extends TestCase
     public function test_hidden_scores_still_store_the_real_score_on_the_submission(): void
     {
         $student = $this->makeStudent();
-        [$activity, $problem, $solution] = $this->gradedSqlActivity($student, ['show_scores_after_submit' => false]);
+        [$activity, $problem, $solution] = $this->gradedSqlActivity($student, ['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         Sanctum::actingAs($student);
         $this->postJson($this->url($activity, '/start'), [])->assertOk();
         $this->postJson($this->url($activity, '/save'), [
@@ -1527,6 +1527,110 @@ class ActivityAttemptTest extends TestCase
         ])->assertOk();
 
         $this->assertEquals(7, $res->json('score'), 'đúng câu 7đ, sai câu 3đ');
+    }
+
+    // ───────────── nộp từng câu trong kỳ thi ─────────────
+
+    /** Kỳ thi ẩn điểm có 2 câu SQL (đáp án đều là "SELECT 1 AS x"), SV đã bắt đầu làm. */
+    private function startExamWithTwoQuestions(bool $showScores = false): array
+    {
+        $student = $this->makeStudent();
+        // Ca thi thật luôn có examination_id (cờ ẩn điểm chỉ có tác dụng với ca thi) và chỉ một lượt nộp toàn bài.
+        $activity = $this->makeActivity($student, ['show_scores_after_submit' => $showScores, 'examination_id' => 'EXAM-' . uniqid(), 'max_submissions' => 1]);
+        $problem = $this->makeProblem();
+        $s = [$this->addSolution($problem, 'q1', 0), $this->addSolution($problem, 'q2', 1)];
+        $this->addMember($activity, $problem, 0, 10);
+        Sanctum::actingAs($student);
+        $this->postJson($this->url($activity, '/start'), [])->assertOk();
+
+        return [$activity, $problem, $s];
+    }
+
+    private function submitExamQuestion(Assignment $activity, Problem $problem, $solution, string $script)
+    {
+        return $this->postJson("/api/problems/{$problem->id}/workspace/questions/submit", [
+            'part' => 'SQL', 'solutionId' => $solution->id, 'script' => $script, 'source' => 'ExamSession', 'context' => $activity->id,
+        ]);
+    }
+
+    public function test_exam_student_can_submit_one_question_and_sees_correct_or_wrong_without_the_score(): void
+    {
+        [$activity, $problem, $s] = $this->startExamWithTwoQuestions(false);
+
+        $right = $this->submitExamQuestion($activity, $problem, $s[0], 'SELECT 1 AS x')->assertOk();
+        $wrong = $this->submitExamQuestion($activity, $problem, $s[1], 'SELECT 2 AS x')->assertOk();
+
+        $this->assertSame('Accepted', $right->json('status'));
+        $this->assertSame('Wrong Answer', $wrong->json('status'));
+        $this->assertNull($right->json('score'), 'điểm vẫn ẩn khi kỳ thi ẩn điểm');
+        $this->assertFalse($right->json('scoreVisible'));
+        $this->assertArrayNotHasKey('_questionSubmission', $right->json('sections.0'), 'điểm ghi kèm không được lộ');
+        $this->assertTrue($right->json('questionOnly'));
+    }
+
+    public function test_question_submission_is_not_a_whole_exam_submission(): void
+    {
+        [$activity, $problem, $s] = $this->startExamWithTwoQuestions(true);
+
+        $this->submitExamQuestion($activity, $problem, $s[0], 'SELECT 1 AS x')->assertOk();
+        $this->submitExamQuestion($activity, $problem, $s[0], 'SELECT 1 AS x')->assertOk();
+
+        // Không giới hạn số lần nộp từng câu, và không dùng lượt nộp toàn bài (kỳ thi có tối đa 1).
+        $this->assertSame(2, Submission::where('context', $activity->id)->count());
+        $this->postJson($this->url($activity, '/submit'), [])->assertOk();
+    }
+
+    public function test_final_grade_keeps_the_best_question_submission_even_if_the_final_script_is_wrong(): void
+    {
+        [$activity, $problem, $s] = $this->startExamWithTwoQuestions(true);
+
+        $this->submitExamQuestion($activity, $problem, $s[0], 'SELECT 1 AS x')->assertOk();   // đúng câu 1
+        $this->submitExamQuestion($activity, $problem, $s[1], 'SELECT 2 AS x')->assertOk();   // sai câu 2
+        // Bài lúc nộp toàn bài: câu 1 bị sửa sai, câu 2 sửa đúng nhưng không nộp lại từng câu.
+        $this->postJson($this->url($activity, '/save'), [
+            'drafts' => [$problem->id => ['questions' => ['SQL' => [$s[0]->id => 'SELECT 2 AS x', $s[1]->id => 'SELECT 1 AS x']]]],
+        ])->assertOk();
+
+        $row = $this->postJson($this->url($activity, '/submit'), [])->assertOk()->json('submissions.0');
+
+        // Mỗi câu lấy kết quả tốt hơn: câu 1 đúng nhờ lần nộp từng câu, câu 2 đúng nhờ bài lúc nộp => 10/10.
+        $this->assertEquals(10, $row['score']);
+        $questions = Submission::find($row['submissionId'])->workspaceResult->sections[0]['questions'];
+        $this->assertSame(['Accepted', 'Accepted'], array_column($questions, 'status'));
+        $this->assertArrayHasKey('fromQuestionSubmission', $questions[0]);
+        $this->assertArrayNotHasKey('fromQuestionSubmission', $questions[1]);
+    }
+
+    public function test_a_wrong_question_submission_does_not_lower_the_final_grade(): void
+    {
+        [$activity, $problem, $s] = $this->startExamWithTwoQuestions(true);
+
+        $this->submitExamQuestion($activity, $problem, $s[0], 'SELECT 2 AS x')->assertOk();
+        $this->postJson($this->url($activity, '/save'), [
+            'drafts' => [$problem->id => ['questions' => ['SQL' => [$s[0]->id => 'SELECT 1 AS x']]]],
+        ])->assertOk();
+
+        $row = $this->postJson($this->url($activity, '/submit'), [])->assertOk()->json('submissions.0');
+
+        $this->assertEquals(5, $row['score'], 'câu 1 đúng ở bài lúc nộp, câu 2 chưa làm');
+    }
+
+    public function test_student_cannot_submit_a_question_outside_their_exam_paper(): void
+    {
+        [$activity, $problem, $s] = $this->startExamWithTwoQuestions(true);
+        $member = AssignmentProblem::where('assignment_id', $activity->id)->first();
+        $member->update(['question_selection' => ['SQL' => [$s[0]->id]]]);
+
+        $this->submitExamQuestion($activity, $problem, $s[1], 'SELECT 1 AS x')->assertForbidden();
+        $this->submitExamQuestion($activity, $problem, $s[0], 'SELECT 1 AS x')->assertOk();
+    }
+
+    public function test_question_submission_is_refused_after_the_whole_exam_was_submitted(): void
+    {
+        [$activity, $problem, $s] = $this->startExamWithTwoQuestions(true);
+        $this->postJson($this->url($activity, '/submit'), [])->assertOk();
+
+        $this->submitExamQuestion($activity, $problem, $s[0], 'SELECT 1 AS x')->assertForbidden();
     }
 
     public function test_activity_without_problems_submits_with_empty_results(): void

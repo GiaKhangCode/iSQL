@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\AccessRole;
-use App\Models\ContentShare;
 use App\Models\Problem;
 use App\Models\User;
 use App\Services\Access\AccessControlService;
@@ -43,7 +42,7 @@ class ProblemPermissionTest extends TestCase
 
         if ($permissions !== null) {
             DB::table('user_access_roles')->where('user_id', $user->id)->delete();
-            $role = AccessRole::create(['name' => 'Role ' . uniqid(), 'is_super' => false]);
+            $role = AccessRole::create(['name' => 'Role ' . uniqid()]);
             $role->syncPermissions($permissions);
             $user->accessRoles()->attach($role->id);
             app(AccessControlService::class)->forget();
@@ -111,58 +110,42 @@ class ProblemPermissionTest extends TestCase
         $this->assertNotNull(Problem::find($mine->id));
     }
 
-    public function test_only_the_creator_or_a_shared_editor_with_problem_create_may_edit(): void
+    public function test_only_the_creator_may_edit(): void
     {
         $owner = $this->makeUser('instructor');
         $problem = $this->makeProblem($owner);
         $stranger = $this->makeUser('student', ['problem.create']);
-        $editor = $this->makeUser('student', ['problem.create']);
-        $editorWithoutPerm = $this->makeUser('instructor', ['practice.solve']);
-        ContentShare::create(['kind' => 'problem', 'resource_id' => $problem->id, 'recipient_id' => $editor->id, 'can_edit' => true, 'created_at' => now()]);
-        ContentShare::create(['kind' => 'problem', 'resource_id' => $problem->id, 'recipient_id' => $editorWithoutPerm->id, 'can_edit' => true, 'created_at' => now()]);
 
         Sanctum::actingAs($stranger);
         $this->putJson("/api/problems/{$problem->id}", $this->payload())->assertStatus(403);
-
-        Sanctum::actingAs($editorWithoutPerm);
-        $this->putJson("/api/problems/{$problem->id}", $this->payload())->assertStatus(403);
-
-        Sanctum::actingAs($editor);
-        $this->putJson("/api/problems/{$problem->id}", $this->payload(['title' => "Edited {$this->tag}"]))->assertOk();
-        // Người được chia sẻ quyền sửa vẫn không được xóa.
         $this->deleteJson("/api/problems/{$problem->id}")->assertStatus(403);
 
         Sanctum::actingAs($owner);
+        $this->putJson("/api/problems/{$problem->id}", $this->payload(['title' => "Edited {$this->tag}"]))->assertOk();
         $this->deleteJson("/api/problems/{$problem->id}")->assertOk();
     }
 
-    public function test_super_admin_edits_and_deletes_any_problem_and_sees_all(): void
+    public function test_the_admin_role_cannot_edit_or_delete_problems(): void
     {
         $owner = $this->makeUser('instructor');
         $problem = $this->makeProblem($owner);
         $admin = $this->makeUser('admin');
 
         Sanctum::actingAs($admin);
-        $ids = collect($this->getJson('/api/problems')->assertOk()->json())->pluck('id');
-        $this->assertTrue($ids->contains($problem->id));
-        $this->putJson("/api/problems/{$problem->id}", $this->payload(['title' => "By admin {$this->tag}"]))->assertOk();
-        $this->deleteJson("/api/problems/{$problem->id}")->assertOk();
+        $this->putJson("/api/problems/{$problem->id}", $this->payload(['title' => "By admin {$this->tag}"]))->assertStatus(403);
+        $this->deleteJson("/api/problems/{$problem->id}")->assertStatus(403);
+        $this->assertNotNull($problem->fresh());
     }
 
     // ───────────────────────── góc nhìn giảng viên / sinh viên ─────────────────────────
 
     public function test_staff_view_comes_from_permissions_not_users_role(): void
     {
-        $owner = $this->makeUser('instructor');
-        $problem = $this->makeProblem($owner);
-
         $assignmentOnly = $this->makeUser('visitor', ['assignment.create']);
         $practiceOnly = $this->makeUser('instructor', ['practice.solve']);
-        foreach ([$assignmentOnly, $practiceOnly] as $user) {
-            ContentShare::create(['kind' => 'problem', 'resource_id' => $problem->id, 'recipient_id' => $user->id, 'can_edit' => false, 'created_at' => now()]);
-        }
+        $problem = $this->makeProblem($assignmentOnly);
 
-        // assignment.create: góc nhìn giảng viên (thấy bài của mình và bài được chia sẻ).
+        // assignment.create: góc nhìn giảng viên (thấy bài của mình).
         Sanctum::actingAs($assignmentOnly);
         $ids = collect($this->getJson('/api/problems')->assertOk()->json())->pluck('id');
         $this->assertTrue($ids->contains($problem->id));

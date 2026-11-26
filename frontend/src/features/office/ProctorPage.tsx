@@ -89,10 +89,11 @@ type ProctorNotice = {
 export function ProctorPage() {
   const {session, preferredArea} = useAuth();
   if (!session) return <Navigate to="/login" replace />;
-  if (preferredArea === 'teacher') return <Navigate to="/teacher/exams" replace />;
+  // Khu vực đã có tab Proctoring thì dùng trang đó (cùng nội dung, có thanh điều hướng đúng).
+  if (preferredArea?.tabs.some(tab => tab.path === '/teacher/exams')) return <Navigate to="/teacher/exams" replace />;
   return (
     <>
-      <RoleHeader role={preferredArea === 'office' ? 'office' : preferredArea === 'admin' ? 'admin' : 'student'} />
+      <RoleHeader />
       <ProctorRoomsView />
     </>
   );

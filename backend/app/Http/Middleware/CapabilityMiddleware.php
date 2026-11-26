@@ -25,7 +25,11 @@ class CapabilityMiddleware
             abort(401, 'Unauthorized');
         }
 
-        if (!$this->access->canAny($user, $permissions)) {
+        // `exam.session`: tài khoản thi tạm (token "exam:...") vẫn làm bài trong ca thi, không phụ thuộc quyền tab.
+        $examToken = in_array('exam.session', $permissions, true)
+            && str_starts_with((string) ($user->currentAccessToken()?->name ?? ''), 'exam:');
+
+        if (!$examToken && !$this->access->canAny($user, $permissions)) {
             abort(403, 'Bạn không có quyền thực hiện thao tác này.');
         }
 

@@ -47,6 +47,15 @@ class Assignment extends Model
         'sql_points',
     ];
 
+    /**
+     * Bài tập thường luôn hiển thị điểm cho sinh viên. Chỉ ca thi (examination_id có giá trị) mới theo tùy chọn
+     * "hiển thị điểm khi chấm xong" của kỳ thi; tắt thì sinh viên không thấy điểm trên hệ thống.
+     */
+    public function getShowScoresAfterSubmitAttribute($value): bool
+    {
+        return $this->examination_id === null ? true : (bool) $value;
+    }
+
     protected $casts = [
         'published'                => 'boolean',
         'hints_enabled'            => 'boolean',

@@ -11,7 +11,7 @@ use Tests\Concerns\UsesDefaultRolePermissions;
 use Tests\TestCase;
 
 /**
- * Thẻ bài tập (độ khó + dạng bài). Không còn cột thứ tự: thứ tự hiển thị là thứ tự tạo (created_at),
+ * Thẻ câu hỏi (độ khó + dạng bài). Không còn cột thứ tự: thứ tự hiển thị là thứ tự tạo (created_at),
  * độ khó trước dạng bài. Thẻ mặc định được tạo với created_at cách nhau từng giây để giữ đúng thứ tự soạn sẵn.
  */
 class ExerciseTagTest extends TestCase
@@ -65,7 +65,7 @@ class ExerciseTagTest extends TestCase
 
     public function test_a_new_tag_goes_after_the_existing_tags_of_its_kind_and_difficulties_stay_first(): void
     {
-        $manager = $this->makeAccount('instructor', ['class.manage']);
+        $manager = $this->makeAccount('instructor', ['tag.manage']);
         Sanctum::actingAs($manager);
         $this->getJson('/api/exercise-tags')->assertOk(); // seed mặc định
 
@@ -83,7 +83,7 @@ class ExerciseTagTest extends TestCase
 
     public function test_legacy_order_fields_in_requests_are_ignored_and_editing_keeps_the_position(): void
     {
-        $manager = $this->makeAccount('instructor', ['class.manage']);
+        $manager = $this->makeAccount('instructor', ['tag.manage']);
         Sanctum::actingAs($manager);
         $this->getJson('/api/exercise-tags')->assertOk();
 

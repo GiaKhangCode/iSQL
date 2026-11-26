@@ -7,18 +7,19 @@
   --ux-ease:cubic-bezier(.2,.8,.2,1);
   --ux-spring:cubic-bezier(.34,1.45,.64,1);
 }
-.pane-tabs.workspace-pane-tabs.u039-workspace-tabs { position:relative; display:flex; flex:none; flex-wrap:nowrap; gap:0; min-width:0; min-height:56px; overflow-x:auto; scrollbar-width:none; padding:6px 10px; background:var(--subtle); }
+.pane-tabs.workspace-pane-tabs.u039-workspace-tabs { position:relative; display:flex; flex:none; flex-wrap:nowrap; gap:0; min-width:0; min-height:50px; overflow-x:auto; scrollbar-width:none; padding:0; background:var(--subtle); }
 .u039-workspace-tabs::-webkit-scrollbar { display:none; }
-.u039-workspace-tabs .u039-tabs { position:relative; display:flex; flex:1; min-width:max-content; isolation:isolate; padding:4px; border-radius:999px; background:var(--ux-surface); box-shadow:0 0 0 1px var(--ux-line); }
-.u039-workspace-tabs .workspace-pane-indicator { position:absolute; z-index:-1; left:0; top:4px; bottom:4px; width:var(--tab-width); transform:translateX(var(--tab-x)); border-radius:999px; background:var(--ux-ink); box-shadow:0 8px 16px -10px var(--backdrop); pointer-events:none; transition:transform .5s var(--ux-spring),width .5s var(--ux-spring); }
+/* Tab gạch chân như các tab khác của hệ thống (admin-member-tabs, builder-selected-tabs): chữ xám, tab chọn có chữ và gạch chân màu accent. */
+.u039-workspace-tabs .u039-tabs { position:relative; display:flex; gap:0; flex:1; min-width:max-content; isolation:isolate; padding:0; border-bottom:1px solid var(--border-subtle); }
+.u039-workspace-tabs .workspace-pane-indicator { position:absolute; z-index:1; left:0; bottom:-1px; height:2px; width:var(--tab-width); transform:translateX(var(--tab-x)); background:var(--ux-accent); pointer-events:none; transition:transform .35s var(--ux-ease),width .35s var(--ux-ease); }
 .u039-workspace-tabs .u039-tabs:not([data-ready="true"]) .workspace-pane-indicator { transition:none; }
-.u039-workspace-tabs .u039-tabs > button[role="tab"] { position:relative; flex:1 0 auto; min-width:0; height:36px; border:0; padding:0 10px; border-radius:999px; background:none; color:var(--ux-ink-2); font:inherit; font-size:12px; font-weight:500; white-space:nowrap; cursor:pointer; transition:color .35s var(--ux-ease); }
-.u039-workspace-tabs .u039-tabs > button[role="tab"]:hover { color:var(--ux-ink); }
-.u039-workspace-tabs .u039-tabs > button[role="tab"][aria-selected="true"] { color:var(--ux-surface); background:none; box-shadow:none; }
+.u039-workspace-tabs .u039-tabs > button[role="tab"] { position:relative; flex:1 1 0; min-width:max-content; min-height:48px; border:0; padding:0 12px; text-align:center; background:none; color:var(--ux-ink-2); font:inherit; font-size:15px; font-weight:400; white-space:nowrap; cursor:pointer; transition:color .2s var(--ux-ease); }
+.u039-workspace-tabs .u039-tabs > button[role="tab"]:hover { color:var(--ux-accent); }
+.u039-workspace-tabs .u039-tabs > button[role="tab"][aria-selected="true"] { color:var(--ux-accent); background:none; box-shadow:none; font-weight:600; }
 .u039-workspace-tabs .u039-tabs > button[role="tab"]:focus-visible { outline:2px solid var(--ux-accent); outline-offset:1px; }
 .problem-scroll.u039-workspace-panel { overflow-x:hidden; }
 .u039-workspace-panel:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
-@media (max-width:380px) { .pane-tabs.workspace-pane-tabs.u039-workspace-tabs { padding:6px; } .u039-workspace-tabs .u039-tabs > button[role="tab"] { padding:0 7px; font-size:11px; } }
+@media (max-width:380px) { .u039-workspace-tabs .u039-tabs > button[role="tab"] { padding:0 6px; font-size:13px; } }
 @media (prefers-reduced-motion:reduce) {
   .u039-workspace-tabs .workspace-pane-indicator,.u039-workspace-tabs .u039-tabs > button[role="tab"] { transition:none; }
 }

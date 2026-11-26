@@ -17,11 +17,11 @@ import {
 import type { WorkspacePart } from "@/data/models";
 import { useLanguage } from "@/shared/context/LanguageContext";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
-import { ProblemMarkdown } from "@/shared/components/ProblemMarkdown";
 import { Select } from "@/shared/ui/Select";
 import { GlidingTooltipGroup } from "@/shared/ui/GlidingTooltip";
 import { Dialog } from "@/shared/ui/ui";
 import { WORKSPACE_PARTS, WORKSPACE_PART_LABELS } from "@/shared/lib/workspace/workspaceParts";
+import { questionFullText, questionSummary } from "@/shared/lib/workspace/questionLabel";
 import {
   catalogOf,
   type BuilderProblemDetail,
@@ -34,7 +34,7 @@ import {
 import { BuilderDatabaseReference } from "@/features/teacher/builder/BuilderDatabaseReference";
 import { BuilderManualQuestionPicker } from "@/features/teacher/builder/BuilderManualQuestionPicker";
 import { SCORING_CUSTOM, SCORING_EQUAL, type ScoringMode } from "@/features/teacher/builder/questionScoring";
-import { QuestionPointInput } from "@/features/teacher/builder/BuilderScoring";
+import { PointsField } from "@/features/teacher/builder/BuilderScoring";
 import { useExerciseTags } from "@/features/teacher/problem-editor/QuestionTagSelectors";
 import { toast } from "@/shared/ui/StackingToasts";
 import "@/styles/builder-problem-settings.css";
@@ -582,6 +582,7 @@ export function BuilderInlineSettings({
     for (let i = 1; i <= count; i++) {
       const code = prefix ? `${prefix}${i}` : `${i}`;
       const vQuestions: Partial<Record<WorkspacePart, string[]>> = {};
+      const vGroups: Partial<Record<WorkspacePart, Record<string, string>>> = {};
 
       for (const part of WORKSPACE_PARTS) {
         const rules = [...(autoRules[part] || [])].sort(
@@ -589,21 +590,27 @@ export function BuilderInlineSettings({
         );
         const baseShared = (sharedRules[part] || []).map((r) => r.questionId).filter(Boolean);
         const pickedIds = new Set<string>();
+        const groupOf: Record<string, string> = {};
 
         for (const rule of rules) {
           const excludeSet = new Set([...pickedIds, ...baseShared]);
           const matches = getMatchingQuestions(part, rule, excludeSet);
           const shuffled = [...matches].sort(() => Math.random() - 0.5);
           const toPick = shuffled.slice(0, rule.count);
-          toPick.forEach((q) => pickedIds.add(q.id));
+          toPick.forEach((q) => {
+            pickedIds.add(q.id);
+            groupOf[q.id] = rule.id;
+          });
         }
 
         vQuestions[part] = [...baseShared, ...Array.from(pickedIds)];
+        vGroups[part] = groupOf;
       }
 
       generatedVariants.push({
         code,
         questions: vQuestions,
+        groups: vGroups,
       });
     }
 
@@ -890,12 +897,19 @@ export function BuilderInlineSettings({
 
     const updatedVariants = variants.map((v) => {
       if (v.code === activeVariant.code) {
+        // Câu mới thế chỗ câu cũ nên giữ nhóm (và điểm nhóm) của chỗ đó.
+        const partGroups = { ...(v.groups?.[part] || {}) };
+        if (oldQuestionId in partGroups) {
+          partGroups[newQuestionId] = partGroups[oldQuestionId];
+          delete partGroups[oldQuestionId];
+        }
         return {
           ...v,
           questions: {
             ...v.questions,
             [part]: updatedQuestions,
           },
+          groups: { ...(v.groups || {}), [part]: partGroups },
         };
       }
       return v;
@@ -1025,7 +1039,7 @@ export function BuilderInlineSettings({
         if (!allowed.includes(normalizedQ)) return false;
       }
       if (swapSearchQuery.trim()) {
-        const qText = `${q.name} ${q.description || ""}`.toLowerCase();
+        const qText = (q.description || "").toLowerCase();
         if (!qText.includes(swapSearchQuery.trim().toLowerCase())) {
           return false;
         }
@@ -1125,7 +1139,16 @@ export function BuilderInlineSettings({
               </>
             ) : (
               <>
-                {/* Header Toolbar: 4 Tabs on left, Sinh đề tự động badge on right */}
+                <BuilderDatabaseReference
+                  schema={detail.schema}
+                  datasets={detail.testCases?.length ? detail.testCases : detail.seedData ? [{ seedData: detail.seedData, isHidden: false }] : []}
+                  visibility={visibility}
+                  onVisibilityChange={onVisibilityChange}
+                  datasetVisibility={datasetVisibility}
+                  onDatasetVisibilityChange={onDatasetVisibilityChange}
+                  readOnly={locked}
+                />
+                {/* Header Toolbar: 4 Tabs */}
                 <div className="builder-settings-header-toolbar">
                   <div
                     className="builder-selected-tabs builder-settings-inline-tabs"
@@ -1155,11 +1178,6 @@ export function BuilderInlineSettings({
                         </button>
                       );
                     })}
-                  </div>
-
-                  <div className="builder-auto-gen-badge">
-                    <Sparkles size={13} aria-hidden="true" />
-                    <span><TranslatedText>Sinh đề tự động</TranslatedText></span>
                   </div>
                 </div>
 
@@ -1317,6 +1335,18 @@ export function BuilderInlineSettings({
                             />
                           </div>
 
+                          {scoringMode === SCORING_CUSTOM && (
+                            <div className="builder-auto-gen-field builder-auto-gen-field-points">
+                              <label><TranslatedText>{tr("Points per question")}</TranslatedText></label>
+                              <PointsField
+                                value={rule.points}
+                                label={tr("Points per question")}
+                                disabled={locked}
+                                onChange={(value) => updateRule(activeTab, rule.id, { points: value })}
+                              />
+                            </div>
+                          )}
+
                           <div className="builder-auto-gen-rule-actions">
                             <button
                               type="button"
@@ -1468,14 +1498,23 @@ export function BuilderInlineSettings({
                                   </option>
                                   {matchingOptions.map((q, qIdx) => (
                                     <option key={q.id} value={q.id}>
-                                      {String(qIdx + 1).padStart(2, "0")}. {q.name}
-                                      {q.description
-                                        ? ` - ${q.description.replace(/[\r\n]+/g, " ").slice(0, 50)}`
-                                        : ""}
+                                      {String(qIdx + 1).padStart(2, "0")}. {questionSummary(q.description, 70) || `Câu ${qIdx + 1}`}
                                     </option>
                                   ))}
                                 </Select>
                               </div>
+
+                              {scoringMode === SCORING_CUSTOM && (
+                                <div className="builder-auto-gen-field builder-auto-gen-field-points">
+                                  <label><TranslatedText>{tr("Points")}</TranslatedText></label>
+                                  <PointsField
+                                    value={rule.points}
+                                    label={tr("Points")}
+                                    disabled={locked}
+                                    onChange={(value) => updateSharedRule(activeTab, rule.id, { points: value })}
+                                  />
+                                </div>
+                              )}
 
                               <div className="builder-auto-gen-rule-actions">
                                 <button
@@ -1561,7 +1600,6 @@ export function BuilderInlineSettings({
                         className="button primary teacher-small-button builder-auto-gen-generate-btn"
                         onClick={handleGenerateVariants}
                       >
-                        <Sparkles size={13} aria-hidden="true" />
                         <span><TranslatedText>{tr("Sinh mã đề")}</TranslatedText></span>
                       </button>
                     </div>
@@ -1736,7 +1774,7 @@ export function BuilderInlineSettings({
                                         const isShared = currentSharedSet.has(q.id);
                                         const isDup = duplicateQuestionIds.has(q.id);
                                         const variantDupMsg = isDup
-                                          ? `Câu hỏi '${q.name}' bị trùng lặp trong mã đề. Vui lòng kiểm tra lại cấu hình nhóm câu hỏi hoặc câu chung.`
+                                          ? `Câu hỏi số ${currentIdx} bị trùng lặp trong mã đề. Vui lòng kiểm tra lại cấu hình nhóm câu hỏi hoặc câu chung.`
                                           : undefined;
 
                                         return (
@@ -1753,7 +1791,7 @@ export function BuilderInlineSettings({
                                                 <span className="builder-variant-question-num">
                                                   {String(currentIdx).padStart(2, "0")}.
                                                 </span>
-                                                <span className="builder-variant-question-name">{q.name}</span>
+                                                <span className="builder-variant-question-name">{questionFullText(q.description) || `Câu ${currentIdx}`}</span>
                                               </div>
 
                                               <div className="builder-q-header-badges">
@@ -1770,17 +1808,6 @@ export function BuilderInlineSettings({
                                                 {q.difficulty && (
                                                   <span className="builder-q-tag difficulty">{q.difficulty}</span>
                                                 )}
-                                                {scoringMode === SCORING_CUSTOM && (
-                                                  <QuestionPointInput
-                                                    selection={questionSelection}
-                                                    part={previewPart}
-                                                    questionId={q.id}
-                                                    questionName={q.name}
-                                                    disabled={locked}
-                                                    onChange={onQuestionSelectionChange}
-                                                  />
-                                                )}
-
                                                 <div className="builder-q-menu-container">
                                                   <button
                                                     type="button"
@@ -1818,12 +1845,6 @@ export function BuilderInlineSettings({
                                                 </div>
                                               </div>
                                             </div>
-
-                                            {q.description && (
-                                              <div className="builder-variant-question-desc">
-                                                <ProblemMarkdown>{tr(q.description)}</ProblemMarkdown>
-                                              </div>
-                                            )}
                                           </div>
                                         );
                                       })}
@@ -1860,7 +1881,7 @@ export function BuilderInlineSettings({
             {swapTargetQuestion && (
               <div className="builder-swap-subtitle">
                 <span>
-                  <TranslatedText>Đang thay thế:</TranslatedText> <strong>{swapTargetQuestion.name}</strong>
+                  <TranslatedText>Đang thay thế:</TranslatedText> <strong>{questionSummary(swapTargetQuestion.description, 80) || "Câu hỏi"}</strong>
                 </span>
                 {swapTargetQuestion.difficulty && (
                   <span className="builder-q-tag difficulty">{swapTargetQuestion.difficulty}</span>
@@ -1922,7 +1943,7 @@ export function BuilderInlineSettings({
                   >
                     <div className="builder-swap-candidate-info">
                       <div className="builder-swap-candidate-header">
-                        <span className="builder-swap-candidate-name">{c.name}</span>
+                        <span className="builder-swap-candidate-name">{questionSummary(c.description, 80) || "Câu hỏi"}</span>
                         {c.difficulty && (
                           <span className="builder-q-tag difficulty">{c.difficulty}</span>
                         )}

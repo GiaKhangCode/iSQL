@@ -1,21 +1,23 @@
 import {TranslatedText} from "@/shared/ui/TranslatedText";
 import {useLanguage} from "@/shared/context/LanguageContext";
-import { homeForArea, type Area } from "@/shared/lib/access/areas";
+import { canOpenGroup, EXTRA_AREA, firstTabOfGroup, homeOfArea, type TabGroup } from "@/shared/lib/access/areas";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/providers/AuthContext";
+import { useActiveArea } from "@/app/providers/useActiveArea";
 import {useEffect, type ReactNode} from "react";
+import { AccessCheckScreen } from "@/shared/ui/AccessCheckScreen";
+/** Chặn trang theo mã quyền; `permission` có thể là nhiều mã cách nhau bằng dấu phẩy (đạt khi có ít nhất một). */
 export function CapabilityGuard({permission,children}:{permission:string;children:ReactNode}) {
   const {t}=useLanguage();
 
   const {permissions,permissionsError}=useAuth();
-  if(permissions===null)return <p role="status"><TranslatedText>{t("Checking access…")}</TranslatedText></p>;
+  if(permissions===null)return <AccessCheckScreen compact />;
   if(permissionsError)return <p role="alert">{permissionsError}</p>;
-  if(!permissions.includes(permission))return <p role="alert"><TranslatedText>{t("You do not have permission to use this feature.")}</TranslatedText></p>;
+  if(!permission.split(",").some(code=>permissions.includes(code.trim())))return <p role="alert"><TranslatedText>{t("You do not have permission to use this feature.")}</TranslatedText></p>;
   return <>{children}</>;
 }
 function Checking() {
-  const {t}=useLanguage();
-  return <p role="status"><TranslatedText>{t("Checking access…")}</TranslatedText></p>;
+  return <AccessCheckScreen />;
 }
 
 function Failed({message}:{message:string}) {
@@ -28,9 +30,12 @@ function NoArea() {
   return <p role="alert"><TranslatedText>{t("Your account has no role assigned yet. Please contact an administrator.")}</TranslatedText></p>;
 }
 
-function useRememberArea(area: Area, allowed: boolean) {
+/** Ghi nhớ khu vực đang xem (chỉ ảnh hưởng trang chủ khi vào "/" hoặc sau khi đăng nhập). */
+function useRememberArea(enabled: boolean) {
   const {chooseArea}=useAuth();
-  useEffect(()=>{ if(allowed) chooseArea(area); },[area,allowed]);
+  const area=useActiveArea();
+  const areaId=area?.id;
+  useEffect(()=>{ if(enabled&&areaId) chooseArea(areaId); },[enabled,areaId]);
 }
 
 /** Trang chủ: chuyển tới khu vực ưu tiên của người dùng (đường dẫn "/" và sau khi đăng nhập). */
@@ -41,7 +46,7 @@ export function HomeRedirect() {
   if (permissionsError) return <Failed message={permissionsError} />;
   if (areas === null) return <Checking />;
   if (!preferredArea) return <NoArea />;
-  return <Navigate to={homeForArea(preferredArea)} replace />;
+  return <Navigate to={homeOfArea(preferredArea)} replace />;
 }
 
 function RequireSession() {
@@ -51,23 +56,19 @@ function RequireSession() {
   return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
 }
 
-/** Khu vực sinh viên. Người không có khu vực sinh viên bị chuyển sang khu vực của họ. */
+/**
+ * Các trang của sinh viên (/dashboard, /assignments, /workspace/...). Mỗi trang tự chặn bằng mã quyền của nó
+ * (CapabilityGuard); ở đây chỉ cần đã đăng nhập và có ít nhất một khu vực.
+ */
 export function ProtectedRoute() {
-  const { session, areas, permissions, permissionsError } = useAuth();
-  const location = useLocation();
-  const allowed = Boolean(areas?.includes("student"));
-  useRememberArea("student", allowed && !session?.examSessionId);
+  const { session, areas, permissionsError } = useAuth();
+  useRememberArea(Boolean(session && !session.examSessionId));
   if (!session) return <RequireSession />;
   if (session.examSessionId) return <Outlet />; // tài khoản thi tạm: không có khu vực, chỉ vào phần thi
   if (permissionsError) return <Failed message={permissionsError} />;
   if (areas === null) return <Checking />;
-  if (allowed) return <Outlet />;
-  if (areas.includes("teacher")) {
-    // Giảng viên có quyền luyện tập (practice.solve) vẫn dùng được trang luyện tập và workspace.
-    if (location.pathname.startsWith("/workspace/")) return <CapabilityGuard permission="practice.solve"><Outlet/></CapabilityGuard>;
-    if (location.pathname === "/dashboard" && permissions?.includes("practice.solve")) return <Navigate to="/teacher/practice" replace />;
-  }
-  return <Navigate to="/" replace />;
+  if (areas.length === 0) return <Navigate to="/" replace />;
+  return <Outlet />;
 }
 
 export function PublicOnlyRoute() {
@@ -75,34 +76,45 @@ export function PublicOnlyRoute() {
   return session ? <Navigate to="/" replace /> : <Outlet />;
 }
 
-function AreaRoute({ area }: { area: Area }) {
+/**
+ * Cụm trang /admin, /office hoặc /teacher: vào được khi người dùng có ít nhất một tab của nhóm đó. Trang cụ thể
+ * vẫn bị chặn bằng mã quyền riêng của nó (CapabilityGuard), nên khu vực không còn quyết định việc vào trang.
+ */
+function GroupRoute({ group }: { group: TabGroup }) {
+  const { session, permissions, permissionsError } = useAuth();
+  useRememberArea(Boolean(session && permissions && canOpenGroup(permissions, group)));
+  if (!session) return <RequireSession />;
+  if (permissionsError) return <Failed message={permissionsError} />;
+  if (permissions === null) return <Checking />;
+  return canOpenGroup(permissions, group) ? <Outlet /> : <Navigate to="/" replace />;
+}
+
+/** Trang đầu của một nhóm trang (route index): tab đầu tiên của nhóm mà người dùng được thấy. */
+export function AreaIndex({ area }: { area: TabGroup }) {
+  const { permissions } = useAuth();
+  if (permissions === null) return <Checking />;
+  const first = firstTabOfGroup(permissions, area);
+  return <Navigate to={first ? first.path : "/"} replace />;
+}
+
+/** Trang chủ của khu vực Quyền bổ sung: tab đầu tiên. */
+export function ExtraHome() {
   const { session, areas, permissionsError } = useAuth();
-  const allowed = Boolean(areas?.includes(area));
-  useRememberArea(area, allowed);
   if (!session) return <RequireSession />;
   if (permissionsError) return <Failed message={permissionsError} />;
   if (areas === null) return <Checking />;
-  return allowed ? <Outlet /> : <Navigate to="/" replace />;
+  const extra = areas.find((area) => area.id === EXTRA_AREA);
+  return <Navigate to={extra ? homeOfArea(extra) : "/"} replace />;
 }
 
 export function AdminRoute() {
-  return <AreaRoute area="admin" />;
+  return <GroupRoute group="admin" />;
 }
 
 export function TeacherRoute() {
-  return <AreaRoute area="teacher" />;
+  return <GroupRoute group="teacher" />;
 }
 
-/** Khu vực giáo vụ: cần khu vực office (hoặc siêu quản trị) và ít nhất một quyền quản lý kỳ thi. */
 export function OfficeRoute() {
-  const {t}=useLanguage();
-
-  const {session,areas,permissions,permissionsError,isSuperAdmin}=useAuth();
-  const allowed=Boolean(areas?.includes("office"));
-  useRememberArea("office",allowed);
-  if(!session) return <RequireSession/>;
-  if(permissionsError)return <Failed message={permissionsError}/>;
-  if(areas===null||permissions===null)return <Checking/>;
-  if(!allowed&&!isSuperAdmin) return <Navigate to="/" replace/>;
-  return isSuperAdmin || permissions.some(p=>['examination.manage','exam.credentials','results.grade'].includes(p)) ? <Outlet/> : <p role="alert"><TranslatedText>{t("You do not have examination management permission.")}</TranslatedText></p>;
+  return <GroupRoute group="office" />;
 }

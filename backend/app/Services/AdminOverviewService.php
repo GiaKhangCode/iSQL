@@ -3,39 +3,113 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\Assignment;
 use App\Models\ClassModel;
-use App\Models\Submission;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
+use App\Services\Access\AccessControlService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 
 /**
- * Số liệu cho trang Tổng quan của admin (frontend OverviewPage.tsx).
+ * Dữ liệu trang Tổng quan của admin (frontend OverviewPage.tsx): tình trạng dịch vụ, việc cần xử lý về tài khoản
+ * và quyền, ca thi sắp tới, nhật ký gần đây. Chỉ đưa ra những thứ admin xử lý được; kết quả chấm bài của sinh viên
+ * không thuộc trang này.
  *
- * Khóa JSON là camelCase vì frontend đọc thẳng. Không trả UUID nào để hiển thị: `id` chỉ dùng làm khóa
- * danh sách; mọi thứ người dùng thấy là tên, tiêu đề, thời gian.
+ * Khóa JSON là camelCase vì frontend đọc thẳng. `id` chỉ dùng làm khóa danh sách; mọi thứ hiển thị là tên, tiêu đề,
+ * thời gian.
  */
 class AdminOverviewService
 {
     public const ACTIVITY_LIMIT = 10;
-    public const ERROR_LIMIT = 5;
+    public const NAME_LIMIT = 20;
+    public const EXAM_WINDOW_HOURS = 24;
+    /** Giây chờ kết nối SQL Server khi kiểm tra tình trạng (mặc định của driver quá lâu cho một trang tổng quan). */
+    private const SQL_SERVER_LOGIN_TIMEOUT = 5;
 
-    public function __construct(private readonly LecturerRequestService $lecturerRequests)
+    public function __construct(private readonly AccessControlService $access)
     {
     }
 
-    /** @return array{users: int, classes: int, pendingRequests: int, unassignedClasses: int, submissionsToday: int, gradingErrors: int} */
-    public function stats(): array
+    /** @return array<int, array{key: string, ok: bool, ms: int, detail: ?string}> */
+    public function health(): array
     {
-        $todayStartUtc = now()->utc()->startOfDay();
+        return [
+            $this->check('mysql', fn () => DB::connection()->select('select 1')),
+            $this->check('sqlserver', function () {
+                config(['database.connections.sqlsrv_health' => array_merge(
+                    (array) config('database.connections.sqlsrv'),
+                    ['login_timeout' => self::SQL_SERVER_LOGIN_TIMEOUT],
+                )]);
+                try {
+                    DB::connection('sqlsrv_health')->select('select 1');
+                } finally {
+                    DB::purge('sqlsrv_health');
+                }
+            }),
+            $this->check('redis', fn () => Redis::connection()->ping()),
+        ];
+    }
+
+    /**
+     * Tài khoản đang hoạt động không có quyền nào, những người giữ quyền quản lý phân quyền, và (chỉ với người có
+     * quyền quản lý lớp) số lớp chưa có giảng viên.
+     *
+     * @return array{usersWithoutRole: array{count: int, names: string[]}, accessManagers: array{count: int, names: string[]}, unassignedClasses: ?int}
+     */
+    public function attention(User $viewer): array
+    {
+        $withoutRole = User::where('status', 'Active')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('user_access_roles')->whereColumn('user_access_roles.user_id', 'users.id'))
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('user_permissions')->whereColumn('user_permissions.user_id', 'users.id'));
+        $managers = User::where('status', 'Active')->whereIn('id', $this->access->holdersOf('access.manage'));
 
         return [
-            'users'             => User::count(),
-            'classes'           => ClassModel::where('status', 'Active')->count(),
-            'pendingRequests'   => $this->lecturerRequests->pendingCount(),
-            'unassignedClasses' => $this->unassignedClasses()->count(),
-            'submissionsToday'  => Submission::where('submitted_at', '>=', $todayStartUtc)->count(),
-            'gradingErrors'     => $this->gradingErrorSubmissions()->count(),
+            'usersWithoutRole'  => $this->countWithNames($withoutRole),
+            'accessManagers'    => $this->countWithNames($managers),
+            // Phải khớp danh sách frontend lọc từ /api/admin/classes (lecturer "Unassigned" và không "Archived").
+            'unassignedClasses' => $this->access->can($viewer, 'class.manage')
+                ? ClassModel::whereNull('instructor_id')->where('status', '!=', 'Archived')->count()
+                : null,
         ];
+    }
+
+    /**
+     * Ca thi đã công bố đang diễn ra hoặc mở trong 24 giờ tới (để tránh bảo trì đúng giờ thi). `students` là số tài
+     * khoản thi còn hiệu lực; ca chưa cấp tài khoản thì đếm sinh viên các lớp của ca.
+     *
+     * @return array<int, array{id: string, title: string, opens: ?string, closes: ?string, status: string, students: int}>
+     */
+    public function upcomingExams(): array
+    {
+        $now = now();
+
+        return Assignment::whereNotNull('examination_id')
+            ->where('published', true)
+            ->where('closes', '>', $now)
+            ->where(fn ($q) => $q->whereNull('opens')->orWhere('opens', '<=', $now->copy()->addHours(self::EXAM_WINDOW_HOURS)))
+            ->orderBy('opens')
+            ->orderBy('id')
+            ->get()
+            ->map(function (Assignment $session) use ($now): array {
+                $students = DB::table('exam_admissions')->where('session_id', $session->id)->where('status', '!=', 'revoked')->count();
+                if ($students === 0) {
+                    $students = DB::table('assignment_classes')
+                        ->join('class_enrollments', 'class_enrollments.class_id', '=', 'assignment_classes.class_id')
+                        ->where('assignment_classes.assignment_id', $session->id)
+                        ->distinct()
+                        ->count('class_enrollments.student_id');
+                }
+
+                return [
+                    'id'       => (string) $session->id,
+                    'title'    => (string) $session->title,
+                    'opens'    => $session->opens?->copy()->utc()->toIso8601ZuluString(),
+                    'closes'   => $session->closes?->copy()->utc()->toIso8601ZuluString(),
+                    'status'   => $session->opens && $session->opens->greaterThan($now) ? 'Upcoming' : 'Live',
+                    'students' => $students,
+                ];
+            })
+            ->all();
     }
 
     /**
@@ -59,45 +133,26 @@ class AdminOverviewService
             ->all();
     }
 
-    /**
-     * Các bài nộp lỗi chấm mới nhất. `errorType` là kết quả gốc (frontend tự dịch sang tiếng Việt).
-     *
-     * @return array<int, array{id: string, problemTitle: string, errorType: string, studentName: string, submittedAt: string}>
-     */
-    public function recentGradingErrors(): array
+    /** @return array{key: string, ok: bool, ms: int, detail: ?string} */
+    private function check(string $key, callable $probe): array
     {
-        return $this->gradingErrorSubmissions()
-            ->with(['problem:id,title', 'user:id,name'])
-            ->orderByDesc('submitted_at')
-            ->orderByDesc('id')
-            ->limit(self::ERROR_LIMIT)
-            ->get()
-            ->map(fn (Submission $submission): array => [
-                'id'           => $submission->id,
-                'problemTitle' => $submission->problem?->title ?? 'Không rõ bài toán',
-                'errorType'    => (string) $submission->result,
-                'studentName'  => $submission->user?->name ?? 'Không rõ',
-                'submittedAt'  => $submission->submitted_at ? $submission->submitted_at->utc()->toIso8601ZuluString() : '',
-            ])
-            ->all();
+        $start = microtime(true);
+        $detail = null;
+        try {
+            $probe();
+        } catch (\Throwable $e) {
+            $detail = mb_substr($e->getMessage(), 0, 300);
+        }
+
+        return ['key' => $key, 'ok' => $detail === null, 'ms' => (int) round((microtime(true) - $start) * 1000), 'detail' => $detail];
     }
 
-    /**
-     * Lớp chưa lưu trữ và chưa có giảng viên chính. Phải khớp danh sách mà panel "Classes without a lecturer"
-     * lọc từ /api/admin/classes (lecturer === "Unassigned" và status !== "Archived").
-     *
-     * @return Builder<ClassModel>
-     */
-    private function unassignedClasses(): Builder
+    /** @return array{count: int, names: string[]} */
+    private function countWithNames(\Illuminate\Database\Eloquent\Builder $query): array
     {
-        return ClassModel::whereNull('instructor_id')->where('status', '!=', 'Archived');
-    }
-
-    /** @return Builder<Submission> */
-    private function gradingErrorSubmissions(): Builder
-    {
-        return Submission::where(
-            fn (Builder $query) => $query->where('result', 'like', '%error%')->orWhere('result', 'like', '%timeout%')
-        );
+        return [
+            'count' => (clone $query)->count(),
+            'names' => $query->orderBy('name')->orderBy('id')->limit(self::NAME_LIMIT)->pluck('name')->all(),
+        ];
     }
 }

@@ -1,6 +1,41 @@
 .statistics-page {
   display: grid;
   gap: 24px;
+  /* Không kéo giãn các hàng khi nội dung còn ngắn (đang tải): thẻ bộ lọc giữ đúng chiều cao của nó. */
+  align-content: start;
+}
+
+/* Khung chờ của trang thống kê: cùng bố cục với thẻ KPI và các khung biểu đồ thật. */
+.statistics-skeleton {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+
+.statistics-skeleton-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px 20px;
+  background: #ffffff;
+  border: 1px solid #e8ecf4;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 6px 16px rgba(15, 23, 42, 0.03);
+}
+
+.statistics-skeleton-card .skeleton-line {
+  height: 10px;
+}
+
+.statistics-skeleton-card .skeleton-line.is-value {
+  height: 26px;
+  border-radius: 8px;
+}
+
+.statistics-skeleton-card .skeleton-line.is-chart {
+  height: 220px;
+  border-radius: 12px;
 }
 
 .statistics-header {
@@ -35,6 +70,34 @@
   border: 1px solid #e8ecf4;
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 4px 12px rgba(15, 23, 42, 0.02);
+}
+
+/* Trang thống kê giảng viên: toàn bộ bộ lọc nằm trên một hàng, các ô còn lại chia đều chiều ngang. */
+.statistics-filters.statistics-filters-row {
+  display: grid;
+  grid-template-columns: auto repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.statistics-filters-row .statistics-field {
+  min-width: 0;
+}
+
+.statistics-filters-row .statistics-field input[type="date"] {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .statistics-filters.statistics-filters-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .statistics-filters-row .statistics-kind {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }
 
 .statistics-kind {

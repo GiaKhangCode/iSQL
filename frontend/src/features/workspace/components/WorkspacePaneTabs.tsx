@@ -4,8 +4,8 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode }
 import { useLanguage } from "@/shared/context/LanguageContext";
 import "@/features/workspace/components/WorkspacePaneTabs.css";
 
-export type WorkspacePane = "Description" | "Database" | "Run" | "Submission";
-const panes: WorkspacePane[] = ["Description", "Database", "Run", "Submission"];
+export type WorkspacePane = "Description" | "Database" | "Submission";
+const panes: WorkspacePane[] = ["Description", "Database", "Submission"];
 
 export function WorkspacePaneTabs({ value, onChange, prefix }: { value: WorkspacePane; onChange: (pane: WorkspacePane) => void; prefix: string }) {
   const { t: tr } = useLanguage("workspace");
@@ -40,7 +40,7 @@ export function WorkspacePaneTabs({ value, onChange, prefix }: { value: Workspac
       event.preventDefault();
       onChange(panes[next]);
       root.current?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
-    }}><TranslatedText>{tr(pane === "Run" ? "Recent run" : pane)}</TranslatedText></button>)}
+    }}><TranslatedText>{tr(pane)}</TranslatedText></button>)}
   </div></div>;
 }
 

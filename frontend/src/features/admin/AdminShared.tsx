@@ -5,6 +5,7 @@ import React, { useEffect, useState, useRef, type FormEvent, type ReactNode } fr
 import { Dialog } from "@/shared/ui/ui";
 import { adminService, type AdminUser, type RoleOption } from "@/features/admin/adminService";
 import { teacherService } from "@/shared/api/teacherService";
+import { notify } from "@/shared/ui/notify";
 
 export function PageIntro({ title, sub, children, compact = false }: { title: string; sub?: string; children?: ReactNode; compact?: boolean }) {
   const { t: tr } = useLanguage("admin");
@@ -21,6 +22,16 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   return <label className="admin-field"><span><TranslatedText>{tr(label)}</TranslatedText></span>{children}</label>;
 }
 
+/** Báo kết quả nhập CSV bằng toast; danh sách lỗi từng dòng vẫn hiện trong hộp thoại. */
+function toastImportResult(response: any, tr: (text: string) => string) {
+  const ok = Number(response?.success_count ?? 0);
+  const failed = Number(response?.failed_count ?? 0);
+  const detail = `${tr("Success")}: ${ok} · ${tr("Failed")}: ${failed}`;
+  if (failed === 0) notify.success(tr("Import Complete"), detail);
+  else if (ok === 0) notify.error(tr("Import failed"), detail);
+  else notify.info(tr("Import finished with errors"), detail);
+}
+
 export function Notice({ children }: { children: ReactNode }) {
   return <p className="admin-notice" role="status">{children}</p>;
 }
@@ -33,7 +44,6 @@ export function AddUserDialog({ onClose, onAdd }: { onClose: () => void; onAdd: 
   const [roleId, setRoleId] = useState("");
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -46,12 +56,11 @@ export function AddUserDialog({ onClose, onAdd }: { onClose: () => void; onAdd: 
     event.preventDefault();
     if (!name.trim() || !email.trim() || !password.trim()) return;
     setLoading(true);
-    setError("");
     try {
       const newUser = await adminService.createUser({ name: name.trim(), email: email.trim(), account_type: accountType, role_id: roleId || undefined, password });
       onAdd(newUser);
     } catch (err: any) {
-      setError(err.message || "Failed to create user");
+      notify.fail(tr("Failed to create user"), err, tr);
     } finally {
       setLoading(false);
     }
@@ -63,7 +72,6 @@ export function AddUserDialog({ onClose, onAdd }: { onClose: () => void; onAdd: 
     <Field label={tr("PASSWORD")}><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={tr("Password")} required minLength={8} /></Field>
     <Field label={tr("ACCOUNT TYPE")}><Select value={accountType} onChange={(e) => setAccountType(e.target.value as AdminUser["account_type"])}><option value="student">{tr("Student")}</option><option value="staff">{tr("Staff")}</option></Select></Field>
     <Field label={tr("ROLE")}><Select value={roleId} onChange={(e) => setRoleId(e.target.value)}><option value="">{tr(accountType === "student" ? "Default role (Student)" : "No role yet")}</option>{roleOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</Select></Field>
-    {error && <p className="admin-warning" style={{ margin: 0 }}><TranslatedText>{tr(error)}</TranslatedText></p>}
     <div className="admin-dialog-actions"><button type="button" className="button" onClick={onClose} disabled={loading}><TranslatedText>{tr("Cancel")}</TranslatedText></button><button className="button primary" disabled={loading}><TranslatedText>{loading ? tr("Adding...") : tr("Add user")}</TranslatedText></button></div>
   </form></Dialog>;
 }
@@ -72,7 +80,6 @@ export function BulkImportDialog({ onClose, onSuccess }: { onClose: () => void; 
   const { t: tr } = useLanguage("admin");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [result, setResult] = useState<any>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -81,7 +88,6 @@ export function BulkImportDialog({ onClose, onSuccess }: { onClose: () => void; 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
-      setError("");
     }
   };
 
@@ -101,9 +107,8 @@ export function BulkImportDialog({ onClose, onSuccess }: { onClose: () => void; 
       const droppedFile = e.dataTransfer.files[0];
       if (droppedFile.name.endsWith('.csv')) {
         setFile(droppedFile);
-        setError("");
       } else {
-        setError("Please upload a .csv file");
+        notify.error(tr("Please upload a .csv file"));
       }
     }
   };
@@ -124,18 +129,18 @@ export function BulkImportDialog({ onClose, onSuccess }: { onClose: () => void; 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setError("Please select a CSV file.");
+      notify.error(tr("Please select a CSV file."));
       return;
     }
     setLoading(true);
-    setError("");
     setResult(null);
 
     try {
       const response = await adminService.importUsers(file);
       setResult(response);
+      toastImportResult(response, tr);
     } catch (err: any) {
-      setError(err.message || "Failed to import users");
+      notify.fail(tr("Failed to import users"), err, tr);
     } finally {
       setLoading(false);
     }
@@ -205,8 +210,6 @@ export function BulkImportDialog({ onClose, onSuccess }: { onClose: () => void; 
               </p>
             </div>
 
-            {error && <p className="admin-warning" style={{ margin: "1rem 0 0", textAlign: "center" }}><TranslatedText>{tr(error)}</TranslatedText></p>}
-
             <div className="admin-dialog-actions" style={{ marginTop: "1.5rem" }}>
               <button type="button" className="button" onClick={onClose} disabled={loading}><TranslatedText>{tr("Cancel")}</TranslatedText></button>
               <button className="button primary" disabled={loading || !file}>
@@ -274,7 +277,6 @@ export function BulkImportMembersDialog({ classId, onClose, onSuccess }: { class
   const { t: tr } = useLanguage("admin");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [result, setResult] = useState<any>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -283,7 +285,6 @@ export function BulkImportMembersDialog({ classId, onClose, onSuccess }: { class
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
-      setError("");
     }
   };
 
@@ -303,9 +304,8 @@ export function BulkImportMembersDialog({ classId, onClose, onSuccess }: { class
       const droppedFile = e.dataTransfer.files[0];
       if (droppedFile.name.endsWith('.csv') || droppedFile.name.endsWith('.txt')) {
         setFile(droppedFile);
-        setError("");
       } else {
-        setError("Please upload a .csv or .txt file");
+        notify.error(tr("Please upload a .csv or .txt file"));
       }
     }
   };
@@ -313,18 +313,18 @@ export function BulkImportMembersDialog({ classId, onClose, onSuccess }: { class
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setError("Please select a file.");
+      notify.error(tr("Please select a file."));
       return;
     }
     setLoading(true);
-    setError("");
     setResult(null);
 
     try {
       const response = await teacherService.importClassMembers(classId, file);
       setResult(response);
+      toastImportResult(response, tr);
     } catch (err: any) {
-      setError(err.message || "Failed to import members");
+      notify.fail(tr("Failed to import members"), err, tr);
     } finally {
       setLoading(false);
     }
@@ -379,8 +379,6 @@ export function BulkImportMembersDialog({ classId, onClose, onSuccess }: { class
             <p className="admin-muted" style={{ fontSize: "0.875rem", textAlign: "center", margin: "1rem 0" }}>
               <TranslatedText>{tr("The file can be a comma-separated list of emails or one email per line.")}</TranslatedText>
             </p>
-
-            {error && <p className="admin-warning" style={{ margin: "1rem 0 0", textAlign: "center" }}><TranslatedText>{tr(error)}</TranslatedText></p>}
 
             <div className="admin-dialog-actions" style={{ marginTop: "1.5rem" }}>
               <button type="button" className="button" onClick={onClose} disabled={loading}><TranslatedText>{tr("Cancel")}</TranslatedText></button>

@@ -10,7 +10,8 @@ import "@/features/auth/LoginLayout.css";
 
 const delay = (ms: number) => ({ "--u216-delay": `${ms}ms` }) as CSSProperties;
 
-export function LoginLayout({ children }: { children: ReactNode }) {
+/** Khung chung của đăng nhập và quên mật khẩu. `title`/`subtitle` đã dịch sẵn; bỏ trống là trang đăng nhập. */
+export function LoginLayout({ title, subtitle, children }: { title?: string; subtitle?: string; children: ReactNode }) {
   const { t } = useLanguage("auth");
   const { dark, toggle } = useTheme();
   const [entered, setEntered] = useState(false);
@@ -58,7 +59,7 @@ export function LoginLayout({ children }: { children: ReactNode }) {
               <span className="u216-file"><Code2 size={13} aria-hidden="true" />join-orders.sql</span>
               <span className="u216-run"><Play size={11} fill="currentColor" aria-hidden="true" /><TranslatedText>{t("Run")}</TranslatedText></span>
             </div>
-            <pre><code><i>1</i>  <em>-- Orders per customer</em>{"\n"}<i>2</i>  <strong>SELECT</strong> c.name, COUNT(o.id) <strong>AS</strong> orders{"\n"}<i>3</i>  <strong>FROM</strong> customers c{"\n"}<i>4</i>  <strong>LEFT JOIN</strong> orders o <strong>ON</strong> o.customer_id = c.id{"\n"}<i>5</i>  <strong>GROUP BY</strong> c.name{"\n"}<i>6</i>  <strong>ORDER BY</strong> orders <strong>DESC</strong>;</code></pre>
+            <pre><code><i>1</i>  <em>-- Orders per customer</em>{"\n"}<i>2</i>  <strong>SELECT</strong> c.name, COUNT(o.id) <strong>AS</strong> orders{"\n"}<i>3</i>  <strong>FROM</strong> customers c{"\n"}<i>4</i>  <strong>LEFT JOIN</strong> orders o <strong>ON</strong> o.customer_id = c.id{"\n"}<i>5</i>  <strong>GROUP BY</strong> c.id, c.name{"\n"}<i>6</i>  <strong>ORDER BY</strong> orders <strong>DESC</strong>;</code></pre>
             <div className="u216-results">
               <div className="u216-result-label"><span><CheckCheck size={14} aria-hidden="true" /><TranslatedText>{t("Query result")}</TranslatedText></span><span><TranslatedText>{t("3 rows")}</TranslatedText></span></div>
               <table aria-label={t("Sample query result")}>
@@ -84,11 +85,12 @@ export function LoginLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         <div className="u216-form-content u216-enter" style={delay(300)}>
-          <div className="u216-form-icon" aria-hidden="true"><img src="/favicon.svg" width="40" height="40" alt="" /></div>
           <div className="u216-form-heading">
-            <span>{APP_NAME} <TranslatedText>{t("ACCOUNT")}</TranslatedText></span>
-            <h1 id="u216-login-title"><TranslatedText>{t("Welcome back")}</TranslatedText><span className="u216-heading-dot" aria-hidden="true">.</span></h1>
-            <p><TranslatedText>{t("Sign in to continue practicing SQL.")}</TranslatedText></p>
+            <div className="u216-form-title">
+              <div className="u216-form-icon" aria-hidden="true"><img src="/favicon.svg" width="40" height="40" alt="" /></div>
+              <h1 id="u216-login-title"><TranslatedText>{title ?? t("Sign in to {value0}", { value0: APP_NAME })}</TranslatedText><span className="u216-heading-dot" aria-hidden="true">.</span></h1>
+            </div>
+            <p><TranslatedText>{subtitle ?? t("Use your iSQL account or the exam account issued to you.")}</TranslatedText></p>
           </div>
           {children}
         </div>

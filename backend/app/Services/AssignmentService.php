@@ -26,13 +26,12 @@ class AssignmentService
     }
 
     /**
-     * Xem và quản lý MỌI bài tập/ca thi: siêu quản trị, người xem kết quả mọi lớp (results.view_all) và người
+     * Xem và quản lý MỌI bài tập/ca thi: người xem kết quả mọi lớp (results.view_all) và người
      * lập kỳ thi (examination.manage). Không đọc users.role.
      */
     protected function seesEveryAssignment(User $user): bool
     {
-        return $this->access->isSuperAdmin($user)
-            || $this->access->canAny($user, ['results.view_all', 'examination.manage']);
+        return $this->access->canAny($user, ['results.view_all', 'examination.manage', 'exam.results']);
     }
 
     /** Góc nhìn giảng viên: người soạn bài tập, người chấm bài hoặc người coi thi. Người còn lại là sinh viên. */
@@ -345,7 +344,7 @@ class AssignmentService
             $assignment->ai_allowed = (bool) ($data['ai_allowed'] ?? true);
             $assignment->exam_mode = (bool) ($data['exam_mode'] ?? false);
             $assignment->exam_violation_limit = isset($data['exam_violation_limit']) ? (int) $data['exam_violation_limit'] : 2;
-            $assignment->show_scores_after_submit = (bool) ($data['show_scores_after_submit'] ?? true);
+            $assignment->show_scores_after_submit = true; // bài tập thường luôn hiển thị điểm
             $assignment->max_submissions = isset($data['max_submissions']) ? (int) $data['max_submissions'] : null;
 
             $assignment->save();
@@ -435,7 +434,6 @@ class AssignmentService
             if (array_key_exists('ai_allowed', $data)) $assignment->ai_allowed = (bool) $data['ai_allowed'];
             if (array_key_exists('exam_mode', $data)) $assignment->exam_mode = (bool) $data['exam_mode'];
             if (array_key_exists('exam_violation_limit', $data)) $assignment->exam_violation_limit = (int) $data['exam_violation_limit'];
-            if (array_key_exists('show_scores_after_submit', $data)) $assignment->show_scores_after_submit = (bool) $data['show_scores_after_submit'];
             if (array_key_exists('max_submissions', $data)) $assignment->max_submissions = $data['max_submissions'] ? (int) $data['max_submissions'] : null;
 
             $assignment->save();
@@ -584,18 +582,17 @@ class AssignmentService
             $submissionsQuery->whereIn('user_id', $allowedPracticalStudentIds);
         }
 
+        // Mỗi (sinh viên, bài toán) giữ một lượt đại diện: điểm tự động cao nhất, bằng điểm thì lượt nộp sau cùng
+        // (cùng quy tắc với SubmissionQueryService::studentWork).
         $submissions = $submissionsQuery
-            ->orderBy('submitted_at', 'desc')
+            ->orderByDesc('score')
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('id')
             ->get();
 
         $problemsMap = $problemItems->keyBy('problem_id');
         $usersMap = User::whereIn('id', $submissions->pluck('user_id')->unique())->get()->keyBy('id');
-        $appealsMap = $submissions->isNotEmpty()
-            ? \App\Models\SubmissionAppeal::whereIn('submission_id', $submissions->pluck('id')->all())->get()->keyBy('submission_id')
-            : collect();
-        $regradesMap = $submissions->isNotEmpty()
-            ? \App\Models\SubmissionRegradeAssignment::whereIn('submission_id', $submissions->pluck('id')->all())->get()->keyBy('submission_id')
-            : collect();
+        $regradesMap = \App\Models\ExamRegrade::mapForSubmissions($submissions);
         $regradeUsersMap = $regradesMap->isNotEmpty()
             ? User::whereIn('id', $regradesMap->pluck('assigned_instructor_id')->unique()->all())->get()->keyBy('id')
             : collect();
@@ -614,7 +611,6 @@ class AssignmentService
             $ap = $problemsMap->get($sub->problem_id);
             $u = $usersMap->get($sub->user_id);
             $prob = $ap?->problem;
-            $appeal = $appealsMap->get($sub->id);
             $regrade = $regradesMap->get($sub->id);
             $regradeUser = $regrade ? $regradeUsersMap->get($regrade->assigned_instructor_id) : null;
 
@@ -634,11 +630,7 @@ class AssignmentService
                 'autoScore'      => (float) $sub->score,
                 'evaluatedScore' => $sub->evaluated_score !== null ? (float) $sub->evaluated_score : null,
                 'maxScore'       => $ap ? (float) $ap->points : 10.0,
-                'status'              => $reviewService->reviewStatus($sub, $appeal, $regrade),
-                'appealRequested'     => $appeal !== null,
-                'appealStatus'        => $appeal?->status,
-                'appealReason'        => $appeal?->reason,
-                'appealResolvedAt'    => $appeal && $appeal->resolved_at ? $appeal->resolved_at->toISOString() : null,
+                'status'              => $reviewService->reviewStatus($sub, $regrade),
                 'regradeReviewerId'   => $regrade ? (string) $regrade->assigned_instructor_id : null,
                 'regradeReviewerName' => $regradeUser ? (string) $regradeUser->name : null,
                 'regradeNote'         => $regrade ? $regrade->note : null,
@@ -647,6 +639,9 @@ class AssignmentService
                 'parts'          => $parts,
             ];
         }
+
+        // Danh sách vẫn hiện theo thời gian nộp mới nhất trước (lượt đại diện đã chọn theo điểm ở trên).
+        usort($result, fn ($a, $b) => strcmp((string) $b['submittedAt'], (string) $a['submittedAt']));
 
         // Add eligible students who have not submitted yet
         $eligibleIds = [];
@@ -1064,12 +1059,9 @@ class AssignmentService
             $latestSubs = $latestSubsQuery->get(['id', 'user_id', 'problem_id', 'score', 'evaluated_score']);
 
             $subIds = $latestSubs->pluck('id')->all();
-            $pendingAppeals = !empty($subIds)
-                ? \App\Models\SubmissionAppeal::whereIn('submission_id', $subIds)->whereNull('resolved_at')->pluck('submission_id')->flip()->all()
-                : [];
-            $pendingRegrades = !empty($subIds)
-                ? \App\Models\SubmissionRegradeAssignment::whereIn('submission_id', $subIds)->whereNull('completed_at')->pluck('submission_id')->flip()->all()
-                : [];
+            $pendingRegrades = \App\Models\ExamRegrade::mapForSubmissions($latestSubs)
+                ->filter(fn ($regrade) => $regrade->completed_at === null)
+                ->all();
 
             $seenPairs = [];
             $submittedUsers = [];
@@ -1090,7 +1082,7 @@ class AssignmentService
                 $pctSum += min(100.0, max(0.0, ($effectiveScore / $maxPts) * 100.0));
                 $pctCount++;
 
-                if ($sub->evaluated_score === null || isset($pendingAppeals[$sub->id]) || isset($pendingRegrades[$sub->id])) {
+                if ($sub->evaluated_score === null || isset($pendingRegrades[$sub->id])) {
                     $reviewId ??= $sub->id;
                     $awaitingUsers[$sub->user_id] = true;
                 }
@@ -1317,14 +1309,16 @@ class AssignmentService
 
             $problemDetails = [];
             if ($isOpen && $a->is_exam_session) {
+                // Chưa bắt đầu làm bài thì không lộ tên, độ khó và chủ đề của bài trong đề thi.
+                $started = $attempt || $subs->isNotEmpty();
                 $probs = Problem::whereIn('id', $pIds)->get();
                 foreach ($probs as $p) {
                     $ap = $aProblems->firstWhere('problem_id', $p->id);
                     $problemDetails[] = [
                         'id'         => (string) $p->id,
-                        'title'      => (string) $p->title,
-                        'difficulty' => (string) $p->difficulty,
-                        'topic'      => (string) $p->topic,
+                        'title'      => $started ? (string) $p->title : '',
+                        'difficulty' => $started ? (string) $p->difficulty : '',
+                        'topic'      => $started ? (string) $p->topic : '',
                         'points'     => $ap ? (float) $ap->points : 0.0,
                     ];
                 }
@@ -1397,6 +1391,10 @@ class AssignmentService
         // 4. Problem details catalog for frontend
         $allPIds = [];
         foreach ($assignmentsRes as $ar) {
+            // Ca thi chưa bắt đầu không đưa bài vào danh mục (danh mục có tên và chủ đề).
+            if ($ar['isExamSession'] && $ar['attemptStatus'] === null && array_sum((array) $ar['submissionCounts']) === 0) {
+                continue;
+            }
             foreach ($ar['problemIds'] as $pid) {
                 $allPIds[$pid] = true;
             }

@@ -71,7 +71,7 @@ try{
   assert.deepEqual([...part().options].map(option=>option.textContent),['DDL','DML','DQL','Trigger']);
   assert.equal(part().value,'DDL','Preview starts from the enabled section when editing structure');
   assert.ok(content().querySelector('.problem-active-question').textContent.includes('DDL task 1'));
-  assert.equal(content().querySelector('.problem-question-context').open,false,'Common context stays available without displacing the question');
+  assert.equal(content().querySelector('.problem-question-context').open,true,'The general statement starts expanded and can still be collapsed');
   assert.equal(content().querySelector('.problem-expected-output'),null,'DDL never displays DQL expected output');
   await click(tabs()[1]);
   assert.equal(content().querySelector('.database-schema-panel'),null,'Empty questions do not show pre-created tables');

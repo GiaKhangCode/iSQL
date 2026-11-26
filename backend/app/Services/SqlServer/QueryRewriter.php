@@ -45,6 +45,16 @@ class QueryRewriter
                 }
             }
         }
+        // SELECT ... INTO <bảng> FROM ... cũng tạo ra bảng mới. Nếu không coi tên này là "bảng đã biết", INTO <bảng> không
+        // được gắn tiền tố schema nên bảng bị tạo nhầm vào dbo (dùng chung) và lần chạy sau báo "đã tồn tại".
+        if (preg_match_all('/\bSELECT\b[^;]*?\bINTO\s+(?:(?:\[?dbo\]?|\[?[a-zA-Z_][a-zA-Z0-9_]*\]?)\s*\.\s*)?(?:\[([^\]]+)\]|([a-zA-Z_][a-zA-Z0-9_]*))/is', $stripped, $matches)) {
+            foreach ($matches[1] as $i => $bracketed) {
+                $name = trim($bracketed !== '' ? $bracketed : ($matches[2][$i] ?? ''));
+                if ($name !== '') {
+                    $names[$name] = true;
+                }
+            }
+        }
         return array_keys($names);
     }
 

@@ -7,11 +7,13 @@ use App\Models\Assignment;
 use App\Models\AssignmentProblem;
 use App\Models\Problem;
 use App\Models\Submission;
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\SubmissionGrade;
+use App\Models\SubmissionGradeLog;
+use App\Models\ExamRegrade;
 use App\Models\User;
 use App\Models\WorkspaceSubmissionResult;
 use App\Services\Access\StaffAccess;
+use App\Services\Grading\ExamQuestionSheet;
 
 /**
  * Dựng các phản hồi JSON về bài nộp: một dòng trong danh sách của sinh viên, màn xem chi tiết (cho sinh viên và
@@ -27,6 +29,7 @@ class SubmissionViewService
         protected readonly SubmissionReviewService $reviewService,
         protected readonly StaffAccess $staff,
         protected readonly SubmissionAccessService $access,
+        protected readonly ExamQuestionSheet $questionSheet,
     ) {
     }
 
@@ -37,8 +40,7 @@ class SubmissionViewService
         ?Assignment $activity,
         ?AssignmentProblem $ap,
         ?WorkspaceSubmissionResult $ws,
-        ?SubmissionAppeal $appeal,
-        ?SubmissionRegradeAssignment $regrade = null
+        ?ExamRegrade $regrade = null
     ): array {
         $scoreVisible = !$activity || (bool) $activity->show_scores_after_submit;
         $maxScore = $ap ? (float) $ap->points : 100.0;
@@ -71,10 +73,9 @@ class SubmissionViewService
         $questionId = $questionMeta['questionId'] ?? null;
         $questionScore = isset($questionMeta['score']) ? (float) $questionMeta['score'] : null;
 
+        // Trạng thái phúc khảo của bài thi (khóa appealStatus giữ nguyên tên cho frontend).
         $appealStatus = null;
-        if ($appeal) {
-            $appealStatus = $appeal->resolved_at ? 'Regraded' : 'Awaiting regrade';
-        } elseif ($regrade && $scoreVisible) {
+        if ($regrade && $scoreVisible) {
             $appealStatus = $regrade->completed_at ? 'Regraded' : 'Awaiting regrade';
         } elseif ($scoreVisible && $sub->evaluated_score !== null) {
             $appealStatus = 'Graded';
@@ -115,9 +116,8 @@ class SubmissionViewService
             'submittedScript'  => $questionOnly ? (string) ($sub->query_text ?? '') : null,
             'canAppeal'        => $canAppeal,
             'appealStatus'     => $appealStatus,
-            'appealReason'     => $appeal ? (string) $appeal->reason : null,
-            'appealCreatedAt'  => $appeal && $appeal->created_at ? $appeal->created_at->toISOString() : null,
-            'appealResolvedAt' => $appeal && $appeal->resolved_at ? $appeal->resolved_at->toISOString() : null,
+            'appealCreatedAt'  => $regrade && $scoreVisible && $regrade->assigned_at ? $regrade->assigned_at->toISOString() : null,
+            'appealResolvedAt' => $regrade && $scoreVisible && $regrade->completed_at ? $regrade->completed_at->toISOString() : null,
         ];
     }
 
@@ -139,8 +139,7 @@ class SubmissionViewService
             : ($problem && !empty($problem->workspace_parts) ? $problem->workspace_parts : ['SQL']);
 
         $ws = WorkspaceSubmissionResult::find($sub->id);
-        $appeal = SubmissionAppeal::find($sub->id);
-        $regrade = SubmissionRegradeAssignment::find($sub->id);
+        $regrade = ExamRegrade::forSubmission($sub);
         $regradeReviewer = $regrade ? User::find($regrade->assigned_instructor_id) : null;
 
         $isStaff = $this->staff->isStaff($viewer);
@@ -212,7 +211,7 @@ class SubmissionViewService
             'referenceSolution' => $refSol,
             'studentQuery'      => (string) ($sub->query_text ?? ''),
             'query'             => (string) ($sub->query_text ?? ''),
-            'status'            => $scoresVisible ? $this->reviewService->reviewStatus($sub, $appeal, $regrade) : 'Submitted',
+            'status'            => $scoresVisible ? $this->reviewService->reviewStatus($sub, $regrade) : 'Submitted',
             'isSubmitted'       => true,
             'attempts'          => (string) $officialRows->count(),
             'score'             => $autoScore ?? 0,
@@ -230,7 +229,8 @@ class SubmissionViewService
             'isExam'            => $activity ? (bool) ($activity->examination_id || $activity->exam_mode) : ($sub->source === 'ExamSession'),
             'examinationId'     => $activity && $activity->examination_id ? (string) $activity->examination_id : null,
             'canEditReview'     => $isStaff
-                && $this->staff->canGrade($viewer)
+                && ($this->staff->canGrade($viewer)
+                    || ($regrade && $regrade->assigned_instructor_id === $viewer->id && $this->staff->canRegrade($viewer)))
                 && $this->access->canGradeSubmission($viewer, $sub, $activity)
                 && (!$regrade || $regrade->assigned_instructor_id === $viewer->id),
             'regradeAssignment' => $regrade ? [
@@ -250,12 +250,113 @@ class SubmissionViewService
             'examEvents'        => $events,
             'departureCount'    => $departureCount,
             'schemaName'        => $sub->schema_name,
-            'questionMaxScores' => (object) [],
-            'appealStatus'      => $appeal ? (string) $appeal->status : null,
-            'appealReason'      => $appeal ? (string) $appeal->reason : null,
-            'appealCreatedAt'   => $appeal && $appeal->created_at ? $appeal->created_at->toISOString() : null,
-            'appealResolvedAt'  => $appeal && $appeal->resolved_at ? $appeal->resolved_at->toISOString() : null,
-            'previousEvaluatedScore' => $regrade?->previous_evaluated_score ?? $appeal?->previous_evaluated_score,
+            // Bài thi chấm theo câu: điểm tối đa từng câu (rỗng = chấm một điểm tổng) và điểm/nhận xét chính thức.
+            'questionMaxScores' => (object) (($scoresVisible && $ws && is_array($ws->sections))
+                ? $this->questionSheet->maxScores($sub, $activity, $ap, $ws->sections)
+                : []),
+            'questionGrades'    => (object) (($scoresVisible && $ws && is_array($ws->sections)) ? $this->questionGrades($ws->sections) : []),
+            'appealStatus'      => $regrade ? ($regrade->completed_at ? 'Regraded' : 'Awaiting regrade') : null,
+            'appealCreatedAt'   => $regrade && $regrade->assigned_at ? $regrade->assigned_at->toISOString() : null,
+            'appealResolvedAt'  => $regrade && $regrade->completed_at ? $regrade->completed_at->toISOString() : null,
+            'previousEvaluatedScore' => $regrade?->previous_evaluated_score,
+            // Bản chấm riêng của từng người (lần đầu / phúc khảo); sinh viên chỉ thấy điểm chính thức ở trên.
+            'grades'            => $isStaff ? $this->gradesPayload($sub) : null,
+            // Lịch sử cho nhân sự: các lần chấm tay (mới nhất trước) và các lần nộp từng câu trong kỳ thi.
+            'gradeHistory'      => $isStaff ? $this->gradeHistoryPayload($sub) : [],
+            'questionSubmissions' => $isStaff ? $this->questionSubmissionsPayload($allRows) : [],
+        ];
+    }
+
+    /**
+     * Điểm và nhận xét tay từng câu đang có hiệu lực: "PHẦN:mã câu" => {score, feedback}.
+     *
+     * @param  array<int, array<string, mixed>>  $sections
+     * @return array<string, array{score: float, feedback: string}>
+     */
+    protected function questionGrades(array $sections): array
+    {
+        $grades = [];
+        foreach ($sections as $section) {
+            foreach (($section['questions'] ?? []) as $question) {
+                if (isset($question['manualScore'])) {
+                    $grades[($section['part'] ?? '') . ':' . ($question['id'] ?? '')] = [
+                        'score'    => (float) $question['manualScore'],
+                        'feedback' => (string) ($question['manualFeedback'] ?? ''),
+                    ];
+                }
+            }
+        }
+
+        return $grades;
+    }
+
+    /** @return list<array<string, mixed>> */
+    protected function gradeHistoryPayload(Submission $sub): array
+    {
+        return SubmissionGradeLog::where('submission_id', $sub->id)->with('grader')
+            ->orderByDesc('graded_at')->get()
+            ->map(fn (SubmissionGradeLog $row) => [
+                'kind'           => (string) $row->kind,
+                'graderId'       => $row->grader_id ? (string) $row->grader_id : null,
+                'graderName'     => $row->grader ? (string) $row->grader->name : null,
+                'score'          => $row->score !== null ? (float) $row->score : null,
+                'feedback'       => $row->feedback,
+                'questionScores' => (object) ($row->question_scores ?? []),
+                'questionFeedback' => (object) ($row->question_feedback ?? []),
+                'gradedAt'       => $row->graded_at ? $row->graded_at->toISOString() : null,
+            ])->values()->all();
+    }
+
+    /**
+     * Các lần nộp từng câu (không phải nộp cả bài) của sinh viên cho bài này, mới nhất trước.
+     *
+     * @param  \Illuminate\Support\Collection<int, Submission>  $allRows
+     * @return list<array<string, mixed>>
+     */
+    protected function questionSubmissionsPayload($allRows): array
+    {
+        $results = WorkspaceSubmissionResult::whereIn('submission_id', $allRows->pluck('id'))->get()->keyBy('submission_id');
+        $items = [];
+        foreach ($allRows as $row) {
+            $meta = $results->get($row->id)?->sections[0] ?? null;
+            if (!is_array($meta) || !isset($meta['_questionSubmission'])) {
+                continue;
+            }
+            $items[] = [
+                'id'          => (string) $row->id,
+                'part'        => (string) ($meta['part'] ?? ''),
+                'questionId'  => (string) ($meta['questionId'] ?? ''),
+                'status'      => (string) ($meta['status'] ?? $row->result),
+                'passed'      => (int) ($meta['passed'] ?? 0),
+                'total'       => (int) ($meta['total'] ?? 0),
+                'score'       => $row->score !== null ? (float) $row->score : null,
+                'script'      => (string) ($row->query_text ?? ''),
+                'submittedAt' => $row->submitted_at ? $row->submitted_at->toISOString() : null,
+            ];
+        }
+
+        return array_reverse($items);
+    }
+
+    /**
+     * @return array{initial: ?array, regrade: ?array}
+     */
+    protected function gradesPayload(Submission $sub): array
+    {
+        $rows = SubmissionGrade::where('submission_id', $sub->id)->with('grader')->get()->keyBy('kind');
+        $format = fn (?SubmissionGrade $row) => $row ? [
+            'graderId'       => $row->grader_id ? (string) $row->grader_id : null,
+            'graderName'     => $row->grader ? (string) $row->grader->name : null,
+            'score'          => $row->score !== null ? (float) $row->score : null,
+            'feedback'       => $row->feedback,
+            'questionScores' => (object) ($row->question_scores ?? []),
+            'questionFeedback' => (object) ($row->question_feedback ?? []),
+            'gradedAt'       => $row->graded_at ? $row->graded_at->toISOString() : null,
+        ] : null;
+
+        return [
+            'initial' => $format($rows->get(SubmissionGrade::INITIAL)),
+            'regrade' => $format($rows->get(SubmissionGrade::REGRADE)),
         ];
     }
 
@@ -314,7 +415,6 @@ class SubmissionViewService
             'schemaName'        => null,
             'questionMaxScores' => (object) [],
             'appealStatus'      => null,
-            'appealReason'      => null,
             'appealCreatedAt'   => null,
             'appealResolvedAt'  => null,
         ];
@@ -339,8 +439,8 @@ class SubmissionViewService
                     $allowed = array_flip($selection['SQL']['questionIds']);
                     $sols = $sols->filter(fn ($s) => isset($allowed[$s->id]))->values();
                 }
-                foreach ($sols as $sol) {
-                    $blocks[] = "-- [SQL] {$sol->name}\n" . trim($sol->query);
+                foreach ($sols as $position => $sol) {
+                    $blocks[] = '-- [SQL] Câu ' . ($position + 1) . "\n" . trim($sol->query);
                 }
             } else {
                 $ex = $problem->stageExercises->firstWhere('part', $part);
@@ -349,11 +449,12 @@ class SubmissionViewService
                     $allowed = array_flip($selection[$part]['questionIds']);
                     $questions = array_values(array_filter($questions, fn ($q) => isset($allowed[$q['id'] ?? ''])));
                 }
+                $position = 0;
                 foreach ($questions as $q) {
-                    $name = $q['name'] ?? "{$part}.sql";
                     $ans = trim((string) ($q['answer'] ?? ''));
                     if ($ans !== '') {
-                        $blocks[] = "-- [{$part}] {$name}\n{$ans}";
+                        // Đánh số theo câu có đáp án, khớp với số thứ tự câu trên giao diện.
+                        $blocks[] = "-- [{$part}] Câu " . (++$position) . "\n{$ans}";
                     }
                 }
             }

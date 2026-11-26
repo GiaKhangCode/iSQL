@@ -19,9 +19,10 @@ import type { ProctorOption } from "@/shared/api/examSessions";
 import type { WorkspacePart } from "@/data/models";
 import type { BuilderProblem } from "@/features/teacher/builder/BuilderShared";
 import { WORKSPACE_PARTS } from "@/shared/lib/workspace/workspaceParts";
-import { SCORING_CUSTOM, SCORING_EQUAL, customScoringSummary, examPapers, questionPointsOf, type ScoringMode } from "@/features/teacher/builder/questionScoring";
+import { SCORING_CUSTOM, SCORING_EQUAL, customScoringSummary, examPapers, groupScore, questionPointsOf, type ScoringMode } from "@/features/teacher/builder/questionScoring";
 import { CustomScoreTotal, ScoringModeControl } from "@/features/teacher/builder/BuilderScoring";
 import "@/styles/examinations.css";
+import { notify } from "@/shared/ui/notify";
 
 export type ExaminationSessionPlannerProps = {
   value: ExaminationPlan;
@@ -356,23 +357,23 @@ export function ExaminationSessionPlanner({
 
   function handleSaveModal() {
     if (!modalDate) {
-      alert("Vui lòng chọn ngày thi.");
+      notify.error("Vui lòng chọn ngày thi.");
       return;
     }
     const enabledSlots = modalSlots.filter(s => s.enabled);
     if (!enabledSlots.length) {
-      alert("Vui lòng tích chọn ít nhất 1 ca thi cho ngày này.");
+      notify.error("Vui lòng tích chọn ít nhất 1 ca thi cho ngày này.");
       return;
     }
 
     if (modalMode === "add") {
       if (dates.includes(modalDate)) {
-        alert(`Ngày ${formatDisplayDate(modalDate)} đã có trong lịch thi. Vui lòng chọn ngày khác hoặc cấu hình trực tiếp ngày đó.`);
+        notify.error(`Ngày ${formatDisplayDate(modalDate)} đã có trong lịch thi. Vui lòng chọn ngày khác hoặc cấu hình trực tiếp ngày đó.`);
         return;
       }
     } else if (modalMode === "config" && configSourceDate) {
       if (modalDate !== configSourceDate && dates.includes(modalDate)) {
-        alert(`Ngày ${formatDisplayDate(modalDate)} đã tồn tại trong lịch thi. Vui lòng chọn ngày khác để đổi ngày.`);
+        notify.error(`Ngày ${formatDisplayDate(modalDate)} đã tồn tại trong lịch thi. Vui lòng chọn ngày khác để đổi ngày.`);
         return;
       }
     }
@@ -549,7 +550,7 @@ export function ExaminationSessionPlanner({
   const sessionCustomTotal = useMemo(() => customScoringSummary(sessionProblems.map(item => {
     const selected = selectedQuestions(problemDetails?.[item.id] || null, item.workspaceParts || [], item.questionSelection);
     const ids = Object.fromEntries(Object.entries(selected).map(([part, list]) => [part, list.map(question => question.id)]));
-    return { title: item.id, papers: examPapers(item.questionSelection, ids), points: questionPointsOf(item.questionSelection) };
+    return { title: item.id, papers: examPapers(item.questionSelection, ids), points: questionPointsOf(item.questionSelection), groups: groupScore(item.questionSelection) };
   })).total, [sessionProblems, problemDetails]);
 
   return (
@@ -768,7 +769,13 @@ export function ExaminationSessionPlanner({
                     selected={currentSession.classIds || []}
                     onChange={(classIds) => {
                       onClearError?.();
-                      const kept = Object.fromEntries(Object.entries(currentSession.classProctors || {}).filter(([classId]) => classIds.includes(classId)));
+                      const kept: Record<string, string[]> = Object.fromEntries(Object.entries(currentSession.classProctors || {}).filter(([classId]) => classIds.includes(classId)));
+                      // Lớp mới chọn: giảng viên của lớp là giám thị mặc định.
+                      for (const classId of classIds) {
+                        if (kept[classId]?.length) continue;
+                        const lecturerId = availableClasses.find((item: any) => item.id === classId)?.lecturerId;
+                        if (lecturerId && lecturerId !== "Unassigned") kept[classId] = [String(lecturerId)];
+                      }
                       updateCurrentSession({ classIds, classProctors: kept });
                     }}
                     classes={availableClasses}

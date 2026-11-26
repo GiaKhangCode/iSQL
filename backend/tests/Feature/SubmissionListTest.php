@@ -2,8 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\ExamRegrade;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Laravel\Sanctum\Sanctum;
@@ -117,7 +116,7 @@ class SubmissionListTest extends TestCase
     {
         $problem = $this->makeProblem();
         $visible = $this->makeActivity($this->teacher);
-        $hidden = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false]);
+        $hidden = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         $accepted = $this->makeSubmission($this->student, $problem, $visible, ['result' => 'Accepted']);
         $partial = $this->makeSubmission($this->student, $problem, $visible, ['result' => 'Partial']);
         $masked = $this->makeSubmission($this->student, $problem, $hidden, ['result' => 'Accepted']);
@@ -174,7 +173,6 @@ class SubmissionListTest extends TestCase
         $this->assertNull($row['submittedScript']);
         $this->assertFalse($row['canAppeal']);
         $this->assertNull($row['appealStatus']);
-        $this->assertNull($row['appealReason']);
         $this->assertNotEmpty($row['time']);
         $this->assertNotNull($row['submittedAt']);
     }
@@ -224,7 +222,7 @@ class SubmissionListTest extends TestCase
     public function test_hidden_scores_are_masked(): void
     {
         $problem = $this->makeProblem();
-        $activity = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false]);
+        $activity = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         $sub = $this->makeSubmission($this->student, $problem, $activity, [
             'result' => 'Accepted', 'score' => 9, 'evaluated_score' => 8, 'feedback' => 'Bí mật',
         ]);
@@ -303,31 +301,14 @@ class SubmissionListTest extends TestCase
         $this->assertSame('Graded', $row['appealStatus']);
         $this->assertTrue($row['canAppeal']);
 
-        SubmissionRegradeAssignment::create(['submission_id' => $ungraded->id, 'assigned_instructor_id' => $this->teacher->id, 'assigned_at' => now()]);
+        ExamRegrade::create(['activity_id' => $ungraded->context, 'student_id' => $ungraded->user_id, 'assigned_instructor_id' => $this->teacher->id, 'assigned_at' => now()]);
         $row = $this->list()[0];
         $this->assertSame('Awaiting regrade', $row['appealStatus']);
-        $this->assertFalse($row['canAppeal']);
-
-        SubmissionRegradeAssignment::where('submission_id', $ungraded->id)->update(['completed_at' => now()]);
-        $this->assertSame('Regraded', $this->list()[0]['appealStatus']);
-    }
-
-    public function test_an_appeal_decides_the_status_before_the_regrade_assignment(): void
-    {
-        $sub = $this->examSubmission([], ['evaluated_score' => 7]);
-        $appeal = SubmissionAppeal::create([
-            'submission_id' => $sub->id, 'student_id' => $this->student->id, 'reason' => 'Chấm sai câu 2',
-            'status' => 'pending', 'created_at' => now()->subHour(), 'resolved_at' => null,
-        ]);
-
-        $row = $this->list()[0];
-        $this->assertSame('Awaiting regrade', $row['appealStatus']);
-        $this->assertSame('Chấm sai câu 2', $row['appealReason']);
         $this->assertNotNull($row['appealCreatedAt']);
         $this->assertNull($row['appealResolvedAt']);
         $this->assertFalse($row['canAppeal']);
 
-        $appeal->update(['status' => 'resolved', 'resolved_at' => now()]);
+        ExamRegrade::where('activity_id', $ungraded->context)->where('student_id', $ungraded->user_id)->update(['completed_at' => now()]);
         $row = $this->list()[0];
         $this->assertSame('Regraded', $row['appealStatus']);
         $this->assertNotNull($row['appealResolvedAt']);
@@ -335,15 +316,11 @@ class SubmissionListTest extends TestCase
 
     public function test_regrade_and_grade_status_are_hidden_while_scores_are_hidden(): void
     {
-        $sub = $this->examSubmission(['show_scores_after_submit' => false], ['evaluated_score' => 7]);
+        $sub = $this->examSubmission(['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()], ['evaluated_score' => 7]);
         $this->assertNull($this->list()[0]['appealStatus']);
 
-        SubmissionRegradeAssignment::create(['submission_id' => $sub->id, 'assigned_instructor_id' => $this->teacher->id, 'assigned_at' => now()]);
+        ExamRegrade::create(['activity_id' => $sub->context, 'student_id' => $sub->user_id, 'assigned_instructor_id' => $this->teacher->id, 'assigned_at' => now()]);
         $this->assertNull($this->list()[0]['appealStatus']);
-
-        // Đơn phúc khảo của chính sinh viên thì luôn hiện.
-        SubmissionAppeal::create(['submission_id' => $sub->id, 'student_id' => $this->student->id, 'reason' => 'abcde', 'status' => 'pending', 'created_at' => now()]);
-        $this->assertSame('Awaiting regrade', $this->list()[0]['appealStatus']);
     }
 
     public function test_can_appeal_needs_an_exam_a_visible_official_grade_and_a_context(): void
@@ -371,7 +348,7 @@ class SubmissionListTest extends TestCase
 
     public function test_question_score_is_masked_while_scores_are_hidden(): void
     {
-        $activity = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false]);
+        $activity = $this->makeActivity($this->teacher, ['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()]);
         $sub = $this->makeSubmission($this->student, $this->makeProblem(), $activity);
         $this->questionOnly($sub, 'SQL', 'q1', 60);
 
@@ -408,7 +385,7 @@ class SubmissionListTest extends TestCase
 
     public function test_can_appeal_is_false_when_scores_are_hidden(): void
     {
-        $this->examSubmission(['show_scores_after_submit' => false], ['evaluated_score' => 7]);
+        $this->examSubmission(['show_scores_after_submit' => false, 'examination_id' => 'HIDE-' . uniqid()], ['evaluated_score' => 7]);
 
         $this->assertFalse($this->list()[0]['canAppeal']);
     }

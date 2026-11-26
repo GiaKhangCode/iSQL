@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Activity, AlertTriangle, Award, BarChart3, Clock, Target, Users } from "lucide-react";
 import { teacherService, type TeacherStatistics } from "@/shared/api/teacherService";
 import { useLoad } from "@/shared/hooks/useLoad";
 import { Select } from "@/shared/ui/Select";
 import { MultiSelect } from "@/shared/ui/MultiSelect";
-import { ErrorState, Loading } from "@/shared/ui/ui";
+import { ErrorState } from "@/shared/ui/ui";
+import { SkeletonLine } from "@/shared/ui/LoadingSkeleton";
+import { TranslatedText } from "@/shared/ui/TranslatedText";
 import {
   AreaTrendChart,
   CHART_PALETTE,
@@ -40,6 +41,32 @@ const histogramColor = (label: string) => {
   return CHART_PALETTE.emerald;
 };
 
+/** Khung chờ giữ nguyên bố cục trang: 4 thẻ KPI rồi các khung biểu đồ, thay cho vài dòng mờ. */
+function StatisticsSkeleton() {
+  return (
+    <div className="statistics-skeleton" role="status">
+      <span className="sr-only"><TranslatedText>Đang tải dữ liệu biểu đồ…</TranslatedText></span>
+      <div className="statistics-kpis" aria-hidden="true">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div className="statistics-skeleton-card" key={index}>
+            <SkeletonLine width="54%" />
+            <SkeletonLine className="is-value" width="34%" />
+            <SkeletonLine width="72%" />
+          </div>
+        ))}
+      </div>
+      <div className="statistics-bento" aria-hidden="true">
+        {["col-span-8", "col-span-4", "col-span-6", "col-span-6"].map((span, index) => (
+          <div className={`statistics-skeleton-card ${span}`} key={index}>
+            <SkeletonLine width="38%" />
+            <SkeletonLine className="is-chart" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function StatisticsPage() {
   const [kind, setKind] = useState<Kind>("all");
   const [term, setTerm] = useState("");
@@ -53,28 +80,9 @@ export function StatisticsPage() {
     [kind, term, classIds.join("|"), activityIds.join("|"), dateFrom, dateTo]
   );
 
-  const resetAll = () => {
-    setKind("all");
-    setTerm("");
-    setClassIds([]);
-    setActivityIds([]);
-    setDateFrom("");
-    setDateTo("");
-  };
-
   return (
     <section className="teacher-page statistics-page">
-      <div className="statistics-header">
-        <div>
-          <h1>Dashboard Giảng viên</h1>
-          <p>Theo dõi kết quả học tập, tiến độ tham gia và điểm yếu kỹ năng SQL của các lớp phụ trách.</p>
-        </div>
-        <button type="button" className="button" onClick={resetAll}>
-          Đặt lại bộ lọc
-        </button>
-      </div>
-
-      <div className="statistics-filters" role="group" aria-label="Bộ lọc thống kê giảng viên">
+      <div className="statistics-filters statistics-filters-row" role="group" aria-label="Bộ lọc thống kê giảng viên">
         <div className="statistics-kind" role="group" aria-label="Loại hoạt động">
           {([
             ["all", "Tất cả"],
@@ -162,22 +170,13 @@ export function StatisticsPage() {
       {error ? (
         <ErrorState title="Không thể tải dữ liệu thống kê" message={error} onRetry={() => window.location.reload()} />
       ) : !data ? (
-        <Loading variant="inline" rows={6} label="Đang tải dữ liệu biểu đồ…" />
+        <StatisticsSkeleton />
       ) : (
         <div className={`statistics-body${loading ? " is-refreshing" : ""}`} aria-busy={loading}>
           <TeacherKpis data={data} />
 
           {/* Mục 1: Tổng quan chất lượng & Kết quả học tập */}
-          <section className="statistics-section" aria-labelledby="teacher-sec-1">
-            <div className="statistics-section-head">
-              <span className="statistics-section-badge" aria-hidden="true">
-                <BarChart3 size={18} />
-              </span>
-              <div>
-                <h2 id="teacher-sec-1">Tổng quan chất lượng &amp; Kết quả học tập</h2>
-                <p>Đánh giá phân bố điểm số và tỷ lệ sinh viên đạt chuẩn trong phạm vi giảng dạy.</p>
-              </div>
-            </div>
+          <section className="statistics-section" aria-label="Tổng quan chất lượng và kết quả học tập">
             <div className="statistics-bento">
               <article className="statistics-card col-span-8">
                 <header>
@@ -228,16 +227,7 @@ export function StatisticsPage() {
           </section>
 
           {/* Mục 2: Xu hướng làm bài & Cơ cấu bài nộp */}
-          <section className="statistics-section" aria-labelledby="teacher-sec-2">
-            <div className="statistics-section-head">
-              <span className="statistics-section-badge" aria-hidden="true">
-                <Activity size={18} />
-              </span>
-              <div>
-                <h2 id="teacher-sec-2">Xu hướng làm bài &amp; Cơ cấu kết quả nộp</h2>
-                <p>Theo dõi mật độ nộp bài theo thời gian và tỷ lệ bài đạt tối đa / một phần.</p>
-              </div>
-            </div>
+          <section className="statistics-section" aria-label="Xu hướng làm bài và cơ cấu kết quả nộp">
             <div className="statistics-bento">
               <article className="statistics-card col-span-8">
                 <header>
@@ -274,16 +264,7 @@ export function StatisticsPage() {
           </section>
 
           {/* Mục 3: So sánh lớp học, Kỹ năng SQL & Tiến độ hoạt động */}
-          <section className="statistics-section" aria-labelledby="teacher-sec-3">
-            <div className="statistics-section-head">
-              <span className="statistics-section-badge" aria-hidden="true">
-                <Target size={18} />
-              </span>
-              <div>
-                <h2 id="teacher-sec-3">Lớp học phụ trách &amp; Kỹ năng SQL cần cải thiện</h2>
-                <p>Đối chiếu kết quả từng lớp, nhận diện dạng bài hay sai và kiểm tra tiến độ hoàn thành hoạt động.</p>
-              </div>
-            </div>
+          <section className="statistics-section" aria-label="Lớp học phụ trách và kỹ năng SQL">
             <div className="statistics-bento">
               <article className="statistics-card col-span-7">
                 <header>
@@ -403,7 +384,6 @@ function TeacherKpis({ data }: { data: TeacherStatistics }) {
       note: `${participants} đã nộp (${pct(participants, students)}%)`,
       accent: CHART_PALETTE.indigo,
       tint: "#eef2ff",
-      Icon: Users,
     },
     {
       label: "Điểm trung bình",
@@ -411,7 +391,6 @@ function TeacherKpis({ data }: { data: TeacherStatistics }) {
       note: `Thang 10 · Tỷ lệ đạt ${passRate}%`,
       accent: CHART_PALETTE.emerald,
       tint: "#ecfdf5",
-      Icon: Award,
     },
     {
       label: "Dưới trung bình (< 5.0)",
@@ -419,7 +398,6 @@ function TeacherKpis({ data }: { data: TeacherStatistics }) {
       note: participants ? `${pct(below, participants)}% SV đã nộp` : "Chưa có dữ liệu",
       accent: CHART_PALETTE.rose,
       tint: "#fff1f2",
-      Icon: AlertTriangle,
     },
     {
       label: "Bài chờ chấm tay",
@@ -427,13 +405,12 @@ function TeacherKpis({ data }: { data: TeacherStatistics }) {
       note: `${data.kpis.submissions ?? 0} lượt nộp chính thức`,
       accent: CHART_PALETTE.amber,
       tint: "#fffbeb",
-      Icon: Clock,
     },
   ];
 
   return (
     <dl className="statistics-kpis">
-      {items.map(({ label, value, note, accent, tint, Icon }) => (
+      {items.map(({ label, value, note, accent, tint }) => (
         <div
           className="statistics-kpi"
           key={label}
@@ -441,9 +418,6 @@ function TeacherKpis({ data }: { data: TeacherStatistics }) {
         >
           <div className="statistics-kpi-top">
             <dt>{label}</dt>
-            <span className="statistics-kpi-icon" aria-hidden="true">
-              <Icon size={18} />
-            </span>
           </div>
           <dd>
             <span className="statistics-kpi-value">{value}</span>

@@ -1,4 +1,3 @@
-import {ShareContentButton} from "@/features/teacher/ContentSharing";
 import {Select} from "@/shared/ui/Select";
 import { importLibraryBundle, librarySectionCount, type LibraryImportOptions } from "@/shared/lib/sql/libraryBundleImport";
 import { TranslatedText } from "@/shared/ui/TranslatedText";
@@ -31,6 +30,8 @@ import "@/styles/problem-workspace.css";
 import { TeacherSchemaDiagram } from "@/features/teacher/problem-editor/TeacherSchemaDiagram";
 import { ProblemRichTextEditor } from "@/features/teacher/problem-editor/ProblemRichTextEditor";
 import { DatasetDataPreview, databaseLibraryDatasets, parseProblemTopics, problemPayloadWasSaved } from "@/features/teacher/problem-editor/ProblemEditorHelpers";
+import { notify } from "@/shared/ui/notify";
+import { questionLabel } from "@/shared/lib/workspace/questionLabel";
 
 function getNaturalDatabaseId(allEntries: TeacherDatabaseLibraryEntry[], targetId: string): string {
   const sorted = [...allEntries].sort((a, b) => {
@@ -353,7 +354,6 @@ export function ProblemEditorPage() {
   const splitLayoutRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const canEdit = selectedId === "new" || (problem?.canEdit ?? true);
   const canDelete = selectedId !== "new" && Boolean(problem?.canDelete);
 
@@ -423,12 +423,12 @@ export function ProblemEditorPage() {
   async function deleteProblem() {
     if (selectedId === "new" || !canDelete || deleteBusy || saving || validating) return;
     setDeleteBusy(true);
-    setDeleteError("");
     try {
       await teacherService.deleteProblem(selectedId);
+      notify.success(tr("Problem deleted"), problem ? `${problem.number} · ${problem.title}` : undefined);
       navigate("/teacher/problems", { replace: true });
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : "Could not delete this problem.");
+      notify.fail(tr("Could not delete this problem."), error, tr);
     } finally {
       setDeleteBusy(false);
     }
@@ -468,7 +468,7 @@ export function ProblemEditorPage() {
   const previewLibraryDataset = previewLibraryDatasets[libraryPreviewDatasetIndex] ?? previewLibraryDatasets[0] ?? null;
   const previewLibraryTables = previewLibraryEntry ? parseDatabaseSchema(previewLibraryEntry.createTableSql || "") : [];
   const previewQuestions: ProblemQuestion[] = previewPart === "SQL" ? (problem.sqlSolutions || []).map(solution => ({
-    id: solution.id, name: solution.name, description: solution.description, hasSetup:Boolean(solution.setupSql?.trim()),
+    id: solution.id, description: solution.description, hasSetup:Boolean(solution.setupSql?.trim()),
     expectedSamples: solution.expectedOutputVisible === false ? [] : (problem.testCases || []).flatMap((dataset, index) => {
       const table = solution.expectedOutputs?.[index];
       return !dataset.isHidden && table ? [{ dataset: index + 1, table }] : [];
@@ -480,10 +480,8 @@ export function ProblemEditorPage() {
   const pageSections: { id: string; label: string; tab?: "structure" | "schema" | "datasets" | "solution" | "trigger"; nested?: boolean }[] = [
     { id: "basic-information", label: "Basic information" },
     { id: "problem-statement", label: "Problem content" },
-    { id: "database", label: "Database" },
-    ...(databaseTab === "structure" ? databaseSetupTab === "tables" ? [
-      { id: "database-sql-input", label: "Database SQL input", tab: "structure" as const, nested: true },
-    ] : [
+    { id: "database", label: "Question set" },
+    ...(databaseTab === "structure" ? databaseSetupTab === "tables" ? [] : [
       { id: "database-setup-panel-data", label: "Initial data", tab: "structure" as const, nested: true },
     ] : databaseTab === "schema" ? [
       { id: "database-ddl-questions", label: "DDL questions", tab: "schema" as const, nested: true },
@@ -590,6 +588,15 @@ export function ProblemEditorPage() {
     if (!problem.title.trim()) {
       setSaveState("Enter a title before saving.");
       toast.show({ variant: "error", title: tr("Enter a title before saving.") });
+      return;
+    }
+    // Câu trigger phải có ít nhất một kịch bản kiểm tra (backend cũng chặn).
+    const triggerQuestions = problem.triggerExercise?.questions || [];
+    const triggerWithoutScenario = triggerQuestions
+      .find(question => question.answer.trim() && !(question.probes || []).some(probe => probe.trim()));
+    if (triggerWithoutScenario) {
+      setSaveState("Each trigger question needs at least one test scenario.");
+      toast.show({ variant: "error", title: tr("Each trigger question needs at least one test scenario."), description: questionLabel(triggerQuestions.indexOf(triggerWithoutScenario), triggerWithoutScenario.description, tr("Question")) });
       return;
     }
 
@@ -733,7 +740,6 @@ export function ProblemEditorPage() {
             ><TranslatedText>{tr(section.label)}</TranslatedText></a>
           ))}
           <div className="teacher-problem-navigation-actions">
-            {canEdit && selectedId!=="new"&&<ShareContentButton kind="problem" id={selectedId}/>}
             <button
               className="button teacher-problem-preview-action"
               type="button"
@@ -748,7 +754,7 @@ export function ProblemEditorPage() {
                 setPreviewOpen(true);
               }}
             ><TranslatedText>{tr("Preview")}</TranslatedText></button>
-            {canDelete && <button className="button teacher-danger-button" type="button" disabled={saving || validating || deleteBusy} onClick={() => { setDeleteError(""); setConfirmDelete(true); }}><TranslatedText>{tr("Delete")}</TranslatedText></button>}
+            {canDelete && <button className="button teacher-danger-button" type="button" disabled={saving || validating || deleteBusy} onClick={() => setConfirmDelete(true)}><TranslatedText>{tr("Delete")}</TranslatedText></button>}
           </div>
         </nav>
         <section className="teacher-problem-card teacher-editor-details">
@@ -790,9 +796,6 @@ export function ProblemEditorPage() {
           <section id="problem-statement" className="teacher-problem-details-section teacher-problem-content-section">
             <TeacherSectionTitle title={tr("Problem content")} />
           <div className="teacher-field teacher-long-text-field">
-            <div className="teacher-long-text-heading">
-              <span><TranslatedText>{tr("STATEMENT")}</TranslatedText></span>
-            </div>
             <ProblemRichTextEditor
               value={problem.statement}
               label={tr("Problem statement")}
@@ -805,7 +808,7 @@ export function ProblemEditorPage() {
         <section id="database" className="teacher-problem-database-section">
           <div className="teacher-problem-database-heading">
             <div className="teacher-problem-database-heading-left">
-              <TeacherSectionTitle title={tr("Database")} />
+              <TeacherSectionTitle title={tr("Question set")} />
             </div>
 
             <span className="teacher-database-dialect-badge">SQL Server</span>
@@ -836,6 +839,11 @@ export function ProblemEditorPage() {
           </GlidingTooltipGroup>
           </div>
           {databaseTab === "structure" && <section id="database-panel-structure" role="tabpanel" className="teacher-validation-section">
+            {hasDatabase && <div className="teacher-database-selected-bar">
+              <span title={databaseLibraryTitle}><Database size={14} aria-hidden="true" />{databaseLibraryTitle || tr("Unnamed")}</span>
+              {canEdit && <button className="button" type="button" onClick={() => void openDatabaseLibrary()}><Download size={13} aria-hidden="true" /><TranslatedText>{tr("Choose from library")}</TranslatedText></button>}
+              {canEdit && <button className="button" type="button" onClick={createNewDatabase}><Plus size={13} aria-hidden="true" /><TranslatedText>{tr("Create new")}</TranslatedText></button>}
+            </div>}
             <div className="teacher-database-setup-toolbar">
               <div className="teacher-database-setup-tabs" role="tablist" aria-label={tr("Database setup")}>
                 <span className="teacher-database-setup-indicator" aria-hidden="true" style={{ transform: `translateX(${databaseSetupTab === "data" ? 100 : 0}%)` }} />
@@ -851,15 +859,10 @@ export function ProblemEditorPage() {
                     setDatabaseSetupTab(next);
                     document.getElementById(`database-setup-tab-${next}`)?.focus();
                   }}
-                ><TranslatedText>{tr(tab === "tables" ? "Table structure" : "Initial data")}</TranslatedText></button>)}
+                ><TranslatedText>{tr(tab === "tables" ? "Tables" : "Initial data")}</TranslatedText></button>)}
               </div>
 
             </div>
-            {hasDatabase && <div className="teacher-database-selected-bar">
-              <span title={databaseLibraryTitle}><Database size={14} aria-hidden="true" />{databaseLibraryTitle || tr("Database")}</span>
-              {canEdit && <button className="button" type="button" onClick={() => void openDatabaseLibrary()}><Download size={13} aria-hidden="true" /><TranslatedText>{tr("Choose from library")}</TranslatedText></button>}
-              {canEdit && <button className="button" type="button" onClick={createNewDatabase}><Plus size={13} aria-hidden="true" /><TranslatedText>{tr("New database")}</TranslatedText></button>}
-            </div>}
             {!hasDatabase && <div className="teacher-database-empty-state" role="status">
               <Database size={26} aria-hidden="true" />
               <strong><TranslatedText>{tr("No database selected")}</TranslatedText></strong>
@@ -871,16 +874,14 @@ export function ProblemEditorPage() {
             </div>}
             {hasDatabase && databaseSetupTab === "tables" && <div id="database-setup-panel-tables" role="tabpanel" aria-labelledby="database-setup-tab-tables">
               <div id="database-sql-input" className="teacher-problem-navigation-target">
-                <p className="teacher-seed-summary"><TranslatedText>{tr("Tables come from the database library. To change them, edit the database in the library.")}</TranslatedText></p>
                 {schemaTables.length > 0
-                  ? <TeacherSchemaDiagram tables={schemaTables} />
+                  ? <TeacherSchemaDiagram tables={schemaTables} showTitle={false} />
                   : <p className="teacher-schema-diagram-message is-error"><TranslatedText>{tr("No CREATE TABLE statements in this database.")}</TranslatedText></p>}
               </div>
             </div>}
             {hasDatabase && databaseSetupTab === "data" && <div id="database-setup-panel-data" role="tabpanel" aria-labelledby="database-setup-tab-data" className="teacher-test-cases-section">
-              <p className="teacher-seed-summary"><TranslatedText>{tr("Initial datasets come from the database library. To change them, edit the database in the library.")}</TranslatedText></p>
               {datasetDrafts.map((dataset, index) => <section key={index} className="teacher-database-readonly-dataset">
-                <h4>{tr("Dataset {value0}", { value0: index + 1 })} · {dataset.fileName}{dataset.isHidden ? <small> · <TranslatedText>{tr("Hidden dataset")}</TranslatedText></small> : null}</h4>
+                <h4>{tr("Dataset {value0}", { value0: index + 1 })}{dataset.isHidden ? <small> · <TranslatedText>{tr("Hidden dataset")}</TranslatedText></small> : null}</h4>
                 <DatasetDataPreview datasetNumber={index + 1} seedData={dataset.sql} />
               </section>)}
             </div>}
@@ -1029,7 +1030,7 @@ export function ProblemEditorPage() {
                       <span className="teacher-database-import-item-icon"><Database size={16} aria-hidden="true" /></span>
                       <span className="teacher-database-import-item-copy">
                         <strong>{entry.title}</strong>
-                        <small>{entry.createTableFileName || entry.title} · <TranslatedText>{tr("{value0} datasets", { value0: datasetCount })}</TranslatedText></small>
+                        <small><TranslatedText>{tr("{value0} datasets", { value0: datasetCount })}</TranslatedText></small>
                       </span>
                       <button className="button teacher-database-import-preview-button" type="button" aria-pressed={isSelected} onClick={() => {
                         setLibraryPreviewEntryId(entry.id);
@@ -1044,7 +1045,7 @@ export function ProblemEditorPage() {
               <div className="teacher-database-import-preview">
                 {previewLibraryEntry ? <>
                   <header className="teacher-database-import-preview-heading">
-                    <div><strong>{previewLibraryEntry.title}</strong><span>{previewLibraryEntry.createTableFileName || previewLibraryEntry.title}</span></div>
+                    <div><strong>{previewLibraryEntry.title}</strong></div>
                     <span className="teacher-database-import-preview-badge"><Database size={12} aria-hidden="true" />SQL Server</span>
                   </header>
                   <div className="teacher-database-import-preview-sections">
@@ -1060,7 +1061,7 @@ export function ProblemEditorPage() {
                         <label>
                           <span><TranslatedText>{tr("Select test dataset")}</TranslatedText></span>
                           <Select value={libraryPreviewDatasetIndex} onChange={(event) => setLibraryPreviewDatasetIndex(Number(event.target.value))}>
-                            {previewLibraryDatasets.map((dataset, index) => <option key={`${dataset.fileName}-${index}`} value={index}>{tr("Dataset {value0}", { value0: index + 1 })} · {dataset.fileName}</option>)}
+                            {previewLibraryDatasets.map((dataset, index) => <option key={`${dataset.fileName}-${index}`} value={index}>{tr("Dataset {value0}", { value0: index + 1 })}</option>)}
                           </Select>
                         </label>
                       </div>
@@ -1109,7 +1110,6 @@ export function ProblemEditorPage() {
           <div className="teacher-preview-dialog">
             <p><TranslatedText>{tr("Delete")}</TranslatedText> <strong>{problem.number} · {problem.title}</strong>?</p>
             <p className="muted"><TranslatedText>{tr("This cannot be undone. Related submissions and saved drafts will also be removed.")}</TranslatedText></p>
-            {deleteError && <p className="teacher-state-failed" role="alert"><TranslatedText>{tr(deleteError)}</TranslatedText></p>}
             <div className="teacher-dialog-actions">
               <button className="button" type="button" disabled={deleteBusy} onClick={() => setConfirmDelete(false)}><TranslatedText>{tr("Cancel")}</TranslatedText></button>
               <button className="button teacher-danger-button" type="button" disabled={deleteBusy} onClick={() => void deleteProblem()}><TranslatedText>{deleteBusy ? tr("Deleting…") : tr("Delete")}</TranslatedText></button>

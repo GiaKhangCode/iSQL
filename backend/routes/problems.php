@@ -25,6 +25,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/{id}/submit', [ProblemController::class, 'submit']);
     Route::post('/{id}/workspace/run', [ProblemController::class, 'runWorkspace']);
     Route::post('/{id}/workspace/database', [ProblemController::class, 'questionDatabase']);
+    Route::post('/{id}/workspace/expected-output', [ProblemController::class, 'expectedOutput']);
+    Route::post('/{id}/workspace/current', [ProblemController::class, 'studentDatabase']);
+    Route::post('/{id}/workspace/reset', [ProblemController::class, 'resetStudentDatabase']);
     Route::post('/{id}/workspace/submit', [ProblemController::class, 'submitWorkspace']);
     Route::post('/{id}/workspace/questions/submit', [ProblemController::class, 'submitWorkspaceQuestion']);
 });

@@ -58,8 +58,6 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
   const selectedUser = users.find((user) => user.id === selectedUserId);
   const actor = assignment?.actor || selectedUser?.account_type || "";
   const allRoles = useMemo(() => [...systemRoles, ...customRoles], [systemRoles, customRoles]);
-  // Super-admin role: always holds everything, so direct grants add nothing.
-  const isSuper = allRoles.some((role) => role.readOnly && assigned.includes(role.id));
   const savedRoleIds = assignment?.roleGroupIds || [];
   const savedDirect = assignment?.directPermissions || [];
   const dirty = Boolean(assignment) && (!sameSet(assigned, savedRoleIds) || !sameSet(direct, savedDirect));
@@ -194,19 +192,16 @@ export const UserRoleAssignmentPanel: React.FC<UserRoleAssignmentPanelProps> = (
                   );
                 })}
               </div>
-              {isSuper && <p className="assigned-role-empty">Vai trò Quản trị đã có toàn bộ quyền (trừ chấm bài) nên không cần gán thêm quyền riêng.</p>}
               {allRoles.length === 0 && <p className="assigned-role-empty">Chưa có vai trò nào. Hãy tạo ở tab “Vai trò”.</p>}
 
-              {!isSuper && (
-                <details className="direct-permissions" open={direct.length > 0 || undefined}>
-                  <summary>
-                    <span className="direct-permissions-title">Quyền riêng cho tài khoản này</span>
-                    <span className="direct-permissions-count">{direct.length ? `${direct.length} quyền` : "Chưa có"}</span>
-                  </summary>
-                  <p className="direct-permissions-hint">Chỉ áp dụng cho {selectedUser.name}, cộng thêm vào vai trò ở trên mà không cần tạo vai trò mới.</p>
-                  <PermissionPicker groups={groups} value={direct} onChange={setDirect} readOnly={busy} />
-                </details>
-              )}
+              <details className="direct-permissions" open={direct.length > 0 || undefined}>
+                <summary>
+                  <span className="direct-permissions-title">Quyền riêng cho tài khoản này</span>
+                  <span className="direct-permissions-count">{direct.length ? `${direct.length} quyền` : "Chưa có"}</span>
+                </summary>
+                <p className="direct-permissions-hint">Chỉ áp dụng cho {selectedUser.name}, cộng thêm vào vai trò ở trên mà không cần tạo vai trò mới.</p>
+                <PermissionPicker groups={groups} value={direct} onChange={setDirect} readOnly={busy} />
+              </details>
 
               {(
                 <div className="assigned-save-bar">

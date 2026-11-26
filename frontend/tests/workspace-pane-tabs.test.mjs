@@ -68,7 +68,7 @@ try {
   assert.equal(input.value, 'SELECT 1');
   assert.equal(document.querySelectorAll('textarea').length, 1, 'Panel transitions never clone the SQL editor');
   await act(async () => tabs()[1].dispatchEvent(new dom.window.KeyboardEvent('keydown', {key:'End',bubbles:true})));
-  assert.equal(document.activeElement, tabs()[3]);
+  assert.equal(document.activeElement, tabs()[2]);
   assert.equal(tabs().filter(tab => tab.tabIndex === 0).length, 1);
   await act(async () => root.unmount()); root = null;
   assert.equal(motionListeners.size, 0, 'Unmount must clean up motion listeners');

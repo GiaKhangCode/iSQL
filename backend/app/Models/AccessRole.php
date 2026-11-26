@@ -16,16 +16,14 @@ class AccessRole extends Model
 
     protected $table = 'access_roles';
 
-    protected $fillable = ['slug', 'name', 'is_super'];
-
-    protected $casts = ['is_super' => 'boolean'];
+    protected $fillable = ['slug', 'name'];
 
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_access_roles', 'access_role_id', 'user_id')->withTimestamps();
     }
 
-    /** Mã quyền đã lưu của vai trò (siêu quản trị không lưu, xem AccessControlService). */
+    /** Mã quyền đã lưu của vai trò (không có vai trò nào tự cấp mọi quyền). */
     public function permissionCodes(): array
     {
         return DB::table('access_role_permissions')

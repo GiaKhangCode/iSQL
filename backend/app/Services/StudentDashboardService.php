@@ -5,29 +5,20 @@ namespace App\Services;
 use App\Models\Problem;
 use App\Models\Submission;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Số liệu cho trang tổng quan của sinh viên.
- *
- * Thời gian trong DB và ứng dụng đều là UTC. Biểu đồ hoạt động theo ngày được quy đổi sang
- * NGÀY ĐỊA PHƯƠNG của sinh viên bằng $tzOffset (số phút UTC trừ giờ địa phương, giống
- * Date.getTimezoneOffset() của trình duyệt).
  */
 class StudentDashboardService
 {
-    /** Số tuần gần nhất đưa vào biểu đồ hoạt động. */
-    private const ACTIVITY_WEEKS = 26;
-
     /**
      * @return array<string, mixed>
      */
-    public function getDashboard(User $user, int $tzOffset = 0): array
+    public function getDashboard(User $user): array
     {
         $solvedProblemIds = $this->solvedProblemIds($user);
         $difficultyCounts = $this->solvedByDifficulty($solvedProblemIds);
-        $submissionsPerDay = $this->submissionsPerDay($user, $tzOffset);
 
         return [
             'user'                => $user,
@@ -37,8 +28,6 @@ class StudentDashboardService
             'hard'                => (int) ($difficultyCounts['Hard'] ?? 0),
             'continuing'          => $this->continuingProblems($user, $solvedProblemIds),
             'deadlines'           => [],
-            'submissionsPerDay'   => $submissionsPerDay,
-            'submissions_per_day' => $submissionsPerDay,
             'recent_submissions'  => $this->recentSubmissions($user),
         ];
     }
@@ -102,35 +91,6 @@ class StudentDashboardService
     }
 
     /**
-     * Số bài nộp mỗi ngày địa phương trong ACTIVITY_WEEKS tuần gần nhất, ngày tăng dần.
-     *
-     * @return \Illuminate\Support\Collection<int, array{date: string, count: int}>
-     */
-    private function submissionsPerDay(User $user, int $tzOffset)
-    {
-        // Mốc bắt đầu tính theo ngày địa phương rồi quy đổi lại UTC để lọc trong DB.
-        $startUtc = $this->localNow($tzOffset)
-            ->subWeeks(self::ACTIVITY_WEEKS)
-            ->startOfDay()
-            ->addMinutes($tzOffset);
-
-        // $tzOffset là int (đã ép kiểu) nên đưa thẳng vào SQL là an toàn; không dùng tham số
-        // ? vì MySQL (ONLY_FULL_GROUP_BY) coi biểu thức ở SELECT và GROUP BY là khác nhau.
-        $localDate = "DATE(DATE_SUB(submitted_at, INTERVAL {$tzOffset} MINUTE))";
-
-        return Submission::where('user_id', $user->id)
-            ->where('submitted_at', '>=', $startUtc)
-            ->selectRaw("{$localDate} as date, COUNT(*) as count")
-            ->groupByRaw($localDate)
-            ->orderBy('date', 'asc')
-            ->get()
-            ->map(fn ($row) => [
-                'date'  => (string) $row->date,
-                'count' => (int) $row->count,
-            ]);
-    }
-
-    /**
      * 10 bài nộp mới nhất kèm bài toán.
      */
     private function recentSubmissions(User $user)
@@ -140,13 +100,5 @@ class StudentDashboardService
             ->orderBy('submitted_at', 'desc')
             ->limit(10)
             ->get();
-    }
-
-    /**
-     * Thời điểm hiện tại theo giờ địa phương của sinh viên (biểu diễn bằng Carbon, không gắn múi giờ thật).
-     */
-    private function localNow(int $tzOffset): Carbon
-    {
-        return now()->utc()->subMinutes($tzOffset);
     }
 }

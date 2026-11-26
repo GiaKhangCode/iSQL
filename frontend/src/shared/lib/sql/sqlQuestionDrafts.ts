@@ -1,8 +1,18 @@
 // Stable solution IDs keep answers attached when questions are renamed or reordered.
-export function readQuestionDrafts(script: string, ids: string[]): Record<string, string> {
+/**
+ * Tách bản nháp nhiều câu thành từng câu.
+ * `keepTrailing`: dùng cho ô soạn thảo. Giữ nguyên dòng trống/khoảng trắng cuối của câu đang gõ (chỉ bỏ đúng dấu
+ * ngăn cách "\n\n" do writeQuestionDrafts thêm vào). Nếu cắt khoảng trắng cuối, giá trị đưa lại cho CodeMirror sẽ khác
+ * nội dung đang gõ, CodeMirror ghi đè cả văn bản: dòng vừa gõ biến mất và con trỏ nhảy về đầu.
+ */
+export function readQuestionDrafts(script: string, ids: string[], options: { keepTrailing?: boolean } = {}): Record<string, string> {
   const markers = [...script.matchAll(/^-- solution:([^\r\n]+)(?:\r?\n|$)/gm)];
   if (!markers.length) return ids[0] ? { [ids[0]]: script } : {};
-  return Object.fromEntries(markers.map((match, index) => [match[1], script.slice((match.index || 0) + match[0].length, markers[index + 1]?.index ?? script.length).trimEnd()]));
+  return Object.fromEntries(markers.map((match, index) => {
+    const next = markers[index + 1];
+    const body = script.slice((match.index || 0) + match[0].length, next?.index ?? script.length);
+    return [match[1], options.keepTrailing ? (next ? body.replace(/\r?\n\r?\n$/, "") : body) : body.trimEnd()];
+  }));
 }
 export function writeQuestionDrafts(answers: Record<string, string>, ids: string[]) {
   return ids.map(id => `-- solution:${id}\n${answers[id] || ""}`).join("\n\n");

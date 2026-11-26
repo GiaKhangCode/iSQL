@@ -606,6 +606,23 @@
 .teacher-problem-page .teacher-exercise-question .teacher-solution-run-row > .button.primary { background:color-mix(in srgb,var(--accent) 9%,var(--teacher-form-input)); border-color:color-mix(in srgb,var(--accent) 24%,var(--teacher-form-border)); color:var(--accent); box-shadow:none; }
 .teacher-problem-page .teacher-exercise-question .teacher-solution-run-row > .button.primary:hover:not(:disabled) { background:color-mix(in srgb,var(--accent) 16%,var(--teacher-form-input)); }
 .teacher-stage-setup-hint { display:block; color:var(--muted); font-size:10px; line-height:15px; }
+.teacher-grading-options { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin:8px 0 4px; }
+.teacher-grading-option { display:inline-flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); }
+.teacher-grading-option .app-select { min-width:240px; }
+.teacher-grading-check input[type="checkbox"] { flex:none; width:15px; height:15px; min-width:0; min-height:0; margin:0; padding:0; accent-color:var(--accent); }
+.teacher-grading-check { margin:6px 0; color:var(--text); }
+/* Ô tick nằm cùng hàng với chữ, căn trái; selector dài hơn để không bị luật label/input chung ghi đè. */
+.teacher-problem-page .teacher-grading-option.teacher-grading-check { display:flex; flex-direction:row; align-items:center; justify-content:flex-start; justify-self:start; align-self:flex-start; gap:8px; width:fit-content; max-width:100%; margin:10px 0; text-align:left; font-size:12px; line-height:18px; cursor:pointer; }
+.teacher-problem-page .teacher-grading-option.teacher-grading-check input[type="checkbox"] { flex:none; width:16px; height:16px; min-width:16px; min-height:16px; margin:0; padding:0; accent-color:var(--accent); cursor:pointer; }
+/* Ô "Thứ tự dòng": nhãn và danh sách chọn nằm cùng một hàng, nhãn căn trái không xuống dòng. */
+.teacher-problem-page .teacher-grading-option:not(.teacher-grading-check) { display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:10px; margin:0; text-align:left; font-size:12px; line-height:18px; color:var(--text); }
+.teacher-problem-page .teacher-grading-option:not(.teacher-grading-check) > span:not(.app-select) { flex:none; white-space:nowrap; }
+/* Danh sách chọn có chiều rộng cố định, nếu để 100% thì tràn khỏi nhãn và đè lên ô "Bỏ qua tên cột". */
+.teacher-problem-page .teacher-grading-option:not(.teacher-grading-check) { flex:0 1 auto; max-width:100%; }
+.teacher-problem-page .teacher-grading-option:not(.teacher-grading-check) .app-select { flex:none; width:380px; min-width:240px; max-width:100%; }
+.teacher-problem-page .teacher-grading-options { gap:10px 24px; margin:12px 0 8px; }
+.teacher-problem-page .teacher-grading-option.teacher-grading-check input[type="checkbox"]:disabled,
+.teacher-problem-page .teacher-grading-option.teacher-grading-check:has(input:disabled) { cursor:not-allowed; }
 .teacher-stage-run-result { min-width:0; margin:12px 0 0; padding:0; color:var(--muted); font-size:11px; }
 .teacher-stage-run-result.is-error { color:var(--danger); }
 .teacher-stage-run-summary { flex:1 1 240px; min-width:0; margin:0; line-height:1.7; overflow-wrap:anywhere; }
@@ -664,6 +681,10 @@
 .teacher-schema-key-badge { display:inline-flex; align-items:center; gap:2px; flex:none; padding:2px 3px; border-radius:3px; font-size:7px; font-weight:600; }
 .teacher-schema-key-badge.is-pk { background:var(--warning-subtle); color:var(--warning); }
 .teacher-schema-key-badge.is-fk { background:var(--accent-subtle); color:var(--accent); }
+.teacher-schema-constraint-tag { flex:0 1 auto; min-width:0; overflow:hidden; padding:2px 5px; border-radius:3px; background:var(--subtle); box-shadow:inset 0 0 0 1px var(--border); color:var(--muted); font-size:8px; font-weight:600; line-height:1.3; text-overflow:ellipsis; white-space:nowrap; }
+.teacher-schema-constraint-tag.is-not-null { background:var(--danger-subtle, var(--subtle)); color:var(--danger, var(--muted)); }
+.teacher-schema-constraint-tag.is-unique { background:var(--accent-subtle); color:var(--accent); }
+.teacher-schema-constraint-tag.is-default { background:var(--warning-subtle); color:var(--warning); }
 .teacher-schema-diagram-type { flex:none; max-width:110px; overflow:hidden; color:var(--muted); font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
 .teacher-problem-database-section .teacher-reference-section { padding-top:16px; }
 .teacher-problem-database-section .teacher-validation-run { padding-bottom:0; }
@@ -990,6 +1011,14 @@
 .teacher-database-readonly-dataset { display:grid; gap:8px; min-width:0; margin-top:14px; }
 .teacher-database-readonly-dataset > h4 { margin:0; color:var(--text); font-size:12px; font-weight:600; }
 .teacher-database-readonly-dataset > h4 small { color:var(--muted); font-weight:400; }
-.teacher-database-selected-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0 4px; }
+.teacher-database-selected-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:4px 0 14px; }
 .teacher-database-selected-bar > span { display:inline-flex; align-items:center; gap:6px; margin-right:auto; min-width:0; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-size:12px; font-weight:600; }
 .teacher-database-selected-bar .button { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:6px 10px; font-size:11px; }
+/* Kịch bản thử của câu Trigger: ô soạn thảo chiếm hết chiều ngang, nút xóa nằm bên phải, căn trên. */
+.teacher-trigger-scenarios { display:grid; gap:10px; margin:8px 0 12px; }
+.teacher-trigger-scenarios > .teacher-question-answer-label { margin:0; }
+.teacher-trigger-scenarios > .teacher-stage-setup-hint { margin:0; }
+.teacher-trigger-scenario { display:flex; align-items:flex-start; gap:8px; }
+.teacher-trigger-scenario > :first-child { flex:1; min-width:0; }
+.teacher-trigger-scenario > .icon-button { flex:none; width:32px; height:32px; margin-top:4px; }
+.teacher-trigger-scenarios > .teacher-small-button { justify-self:start; }

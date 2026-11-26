@@ -68,7 +68,7 @@ function FeaturedExamSessionCard({ examSession, onOpen, sentinel = false }: {
     onOpen={() => onOpen(examSession)} sentinel={sentinel}
     label={tr("Open {value0} exam session details", { value0: examSession.title })}
   >
-    <div className="u049-top"><span className="u049-tag"><TranslatedText>{tr(examSession.status).toLocaleUpperCase(uiLocale)}</TranslatedText> · SQL</span></div>
+    <div className="u049-top"><span className="u049-tag"><TranslatedText>{tr(examSession.status).toLocaleUpperCase(uiLocale)}</TranslatedText></span></div>
     <div className="u049-body">
       <div className="u049-k">{examSession.scope}</div>
       <h3 className="u049-t">{examSession.title}</h3>

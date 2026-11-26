@@ -43,6 +43,21 @@
 .u048.exam-session-list-region .hall-of-fame { position:static; align-self:start; padding:18px; max-height:none; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface); }
 .u048.exam-session-list-region .hall-of-fame > .fame-description { margin-bottom:8px; padding-bottom:12px; border-bottom-color:var(--border-subtle); font-size:11px; }
 .u048.exam-session-list-region .hall-of-fame .fame-row { border-bottom-color:var(--border-subtle); }
+/* Danh sách kỳ thi của sinh viên (không có cột bên): tab và bộ lọc cùng một hàng, danh sách chiếm hết chiều ngang. */
+.u048.exam-session-list-region.exam-session-list-simple .exam-session-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.u048.exam-session-list-region.exam-session-list-simple .u048-tw { flex:1 1 380px; min-width:0; }
+.u048.exam-session-list-region.exam-session-list-simple .list-search-host { flex:1 1 220px; width:auto; min-width:180px; max-width:340px; }
+.u048.exam-session-list-region.exam-session-list-simple .list-sort-control { flex:0 0 160px; min-width:0; max-width:none; }
+.u048.exam-session-list-region.exam-session-list-simple .list-date-filters { flex:0 0 150px; min-width:0; }
+.u048.exam-session-list-region.exam-session-list-simple .exam-session-toolbar :is(.list-search-host, .u027-search, .u027-field, .u027-select, .list-date-filter > summary) { box-sizing:border-box; min-height:44px; height:44px; }
+/* Ô nhập nằm trong khung .u027-field (đã có viền): bỏ chiều cao/viền riêng để không tràn ra khỏi khung. */
+.u048.exam-session-list-region.exam-session-list-simple .exam-session-toolbar .u027-input { height:100%; min-height:0; padding:0; border:0; background:transparent; }
+.u048.exam-session-list-region.exam-session-list-simple .exam-session-columns { display:block; }
+@media (max-width:760px) {
+  .u048.exam-session-list-region.exam-session-list-simple .u048-tw { flex-basis:100%; }
+  .u048.exam-session-list-region.exam-session-list-simple .list-search-host { flex-basis:100%; max-width:none; }
+  .u048.exam-session-list-region.exam-session-list-simple .list-sort-control, .u048.exam-session-list-region.exam-session-list-simple .list-date-filters { flex:1 1 140px; }
+}
 @media (max-width:760px) {
   .u048.exam-session-list-region .exam-session-toolbar, .u048.exam-session-list-region .exam-session-columns { gap:12px; }
   .u048.exam-session-list-region .u048-tabs { padding:0 6px; }

@@ -14,7 +14,7 @@ class UserSeeder extends Seeder
         User::firstOrCreate(
             ['email' => 'admin@uit.edu.vn'],
             [
-                'name'            => 'System Administrator',
+                'name'            => 'Quản trị viên hệ thống',
                 'initials'        => 'AD',
                 'hashed_password' => Hash::make('password123'),
                 'account_type'    => 'staff',
@@ -28,7 +28,7 @@ class UserSeeder extends Seeder
         User::firstOrCreate(
             ['email' => 'teacher@uit.edu.vn'],
             [
-                'name'            => 'Dr. Nguyen Van A',
+                'name'            => 'Tạ Việt Phương',
                 'initials'        => 'NA',
                 'hashed_password' => Hash::make('password123'),
                 'account_type'    => 'staff',
@@ -42,7 +42,7 @@ class UserSeeder extends Seeder
         User::firstOrCreate(
             ['email' => 'student@gm.uit.edu.vn'],
             [
-                'name'            => 'Tran Thi B',
+                'name'            => 'Ngô Bá Khá',
                 'initials'        => 'TB',
                 'hashed_password' => Hash::make('password123'),
                 'account_type'    => 'student',

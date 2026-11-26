@@ -24,7 +24,7 @@ class UpdateUserRequest extends FormRequest
             'name'       => 'sometimes|required|string|max:255',
             'initials'   => 'sometimes|nullable|string|max:10',
             'account_type' => ['sometimes', 'required', Rule::in(User::ACCOUNT_TYPES)],
-            'status'     => 'sometimes|required|in:Active,Inactive,Pending',
+            'status'     => 'sometimes|required|in:Active,Inactive',
             'department' => 'sometimes|nullable|string|max:255',
         ];
     }

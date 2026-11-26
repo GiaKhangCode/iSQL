@@ -63,7 +63,6 @@
 }
 .roles-banner.is-ok { color: var(--accent); background: var(--accent-subtle); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
 .roles-banner.is-error { color: #b91c1c; background: color-mix(in srgb, #dc2626 10%, var(--surface)); border: 1px solid color-mix(in srgb, #dc2626 30%, transparent); }
-.roles-loading { margin: 0; color: var(--muted); font-size: 12px; }
 
 /* ---- Roles tab layout ---------------------------------------------------- */
 .roles-main-layout {
@@ -250,6 +249,9 @@
 }
 .user-search-pane { display: flex; flex-direction: column; padding: 14px; gap: 10px; position: sticky; top: 12px; }
 .user-search-box { display: flex; flex-direction: column; gap: 8px; }
+/* Trong cột dọc, flex-basis 220px của .user-search-field thành chiều cao 220px: bỏ để ô tìm kiếm gọn lại. */
+.user-search-box .user-search-field { flex: 0 0 auto; min-height: 34px; }
+.user-search-box .user-search-field input { height: 32px; padding: 0; border: 0; box-shadow: none; }
 .user-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .user-filter-chip { padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-subtle); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
 .user-filter-chip:hover { color: var(--text); background: var(--subtle); }

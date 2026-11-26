@@ -44,14 +44,6 @@ class AccessControlTest extends TestCase
         ]);
     }
 
-    private function sortedSuperCodes(): array
-    {
-        $codes = PermissionCatalog::superCodes();
-        sort($codes);
-
-        return $codes;
-    }
-
     private function role(string $slug): AccessRole
     {
         return AccessRole::where('slug', $slug)->firstOrFail();
@@ -69,18 +61,26 @@ class AccessControlTest extends TestCase
 
     // ───────────────────────── seed ─────────────────────────
 
-    public function test_seeds_the_five_default_roles_with_derived_areas(): void
+    public function test_seeds_the_five_default_roles_each_with_exactly_its_own_permissions(): void
     {
-        $expected = [
-            'student' => ['student'], 'instructor' => ['teacher'], 'faculty_office' => ['office'],
-            'admin' => ['admin', 'office', 'teacher'], 'department_head' => ['office', 'teacher'],
-        ];
-        foreach ($expected as $slug => $areas) {
-            $user = $this->give($this->makeUser(), $slug);
-            $this->assertSame($areas, $this->access->areasOf($user), $slug);
+        // DB dev có thể đã bị sửa quyền qua trang Vai trò: đặt về mặc định trước khi so sánh.
+        foreach (\Database\Seeders\AccessRoleSeeder::DEFAULT_ROLES as $slug => [, $permissions]) {
+            $this->role($slug)->syncPermissions($permissions);
         }
-        $this->assertTrue($this->role('admin')->is_super);
-        $this->assertFalse($this->role('instructor')->is_super);
+        $this->access->forget();
+        $this->assertSame(['access.manage', 'class.manage', 'system.overview', 'user.manage'], $this->role('admin')->permissionCodes());
+
+        foreach (\Database\Seeders\AccessRoleSeeder::DEFAULT_ROLES as $slug => [$name, $permissions]) {
+            $user = $this->give($this->makeUser(), $slug);
+            $sorted = $permissions;
+            sort($sorted);
+
+            $this->assertSame($sorted, $this->access->permissionsOf($user), $slug);
+            $roles = $this->access->rolesOf($user);
+            $this->assertCount(1, $roles, $slug);
+            $this->assertSame($this->role($slug)->name, $roles[0]['name']);
+            $this->assertSame($sorted, $roles[0]['permissions'], 'mỗi vai trò là một khu vực kèm quyền của chính nó');
+        }
     }
 
     public function test_seeder_is_idempotent(): void
@@ -173,7 +173,8 @@ class AccessControlTest extends TestCase
     public function test_default_role_permissions(): void
     {
         $student = $this->give($this->makeUser(), 'student');
-        $this->assertSame(['practice.solve'], $this->access->permissionsOf($student));
+        $this->assertSame(['assignment.do', 'practice.solve', 'submission.view'], $this->access->permissionsOf($student));
+        $this->assertSame(['Sinh viên'], array_column($this->access->rolesOf($student), 'name'));
 
         $teacher = $this->give($this->makeUser(), 'instructor');
         $this->assertTrue($this->access->can($teacher, 'results.grade'));
@@ -184,36 +185,55 @@ class AccessControlTest extends TestCase
         $head = $this->give($this->makeUser(), 'department_head');
         $this->assertTrue($this->access->can($head, 'results.view_all'));
         $this->assertFalse($this->access->can($head, 'results.grade'), 'trưởng bộ môn không chấm');
+        $this->assertTrue($this->access->can($head, 'tag.manage'), 'trưởng bộ môn quản lý thẻ câu hỏi');
+        $this->assertFalse($this->access->can($teacher, 'tag.manage'));
 
         $office = $this->give($this->makeUser(), 'faculty_office');
         $this->assertTrue($this->access->can($office, 'examination.manage'));
         $this->assertFalse($this->access->can($office, 'access.manage'));
     }
 
-    public function test_multiple_roles_union_permissions_and_areas(): void
+    public function test_multiple_roles_union_permissions_and_each_role_is_its_own_area(): void
     {
         $user = $this->give($this->makeUser(), 'student', 'faculty_office');
 
         $this->assertTrue($this->access->can($user, 'practice.solve'));
         $this->assertTrue($this->access->can($user, 'examination.manage'));
-        $this->assertSame(['office'], $this->access->areasOf($user));
+
+        $roles = collect($this->access->rolesOf($user))->keyBy('name');
+        $this->assertSame(['Giáo vụ khoa', 'Sinh viên'], $roles->keys()->sort()->values()->all());
+        $this->assertNotContains('examination.manage', $roles['Sinh viên']['permissions'], 'quyền của vai trò này không lẫn sang khu vực của vai trò kia');
+        $this->assertContains('examination.manage', $roles['Giáo vụ khoa']['permissions']);
     }
 
-    public function test_areas_are_derived_from_permissions(): void
+    public function test_a_new_role_becomes_a_new_area_with_its_own_permissions(): void
     {
-        $cases = [
-            [[], []],
-            [['practice.solve'], ['student']],
-            [['practice.solve', 'results.grade'], ['teacher']],
-            [['assignment.create'], ['teacher']],
-            [['exam.credentials'], ['office']],
-            [['examination.manage', 'problem.create'], ['office', 'teacher']],
-            [['class.manage', 'practice.solve'], ['admin']],
-            [['access.manage', 'examination.manage', 'problem.share'], ['admin', 'office', 'teacher']],
-        ];
-        foreach ($cases as [$permissions, $expected]) {
-            $this->assertSame($expected, PermissionCatalog::areasFor($permissions), json_encode($permissions));
-        }
+        $role = AccessRole::create(['name' => 'Trợ giảng ' . uniqid()]);
+        $role->syncPermissions(['results.grade', 'exam.proctor', 'not.a.permission']);
+        $user = $this->makeUser();
+        $user->accessRoles()->attach($role->id);
+        $this->access->forget($user->id);
+
+        $this->assertSame(
+            [['id' => (string) $role->id, 'name' => $role->name, 'permissions' => ['exam.proctor', 'results.grade']]],
+            $this->access->rolesOf($user),
+            'mã quyền không có trong danh mục bị bỏ qua',
+        );
+
+        $role->syncPermissions(['results.grade', 'exam.proctor', 'statistics.view']);
+        $this->access->forget($user->id);
+        $this->assertSame(['exam.proctor', 'results.grade', 'statistics.view'], $this->access->rolesOf($user)[0]['permissions'], 'gán thêm quyền thì khu vực có thêm quyền đó');
+    }
+
+    public function test_direct_permissions_are_not_part_of_any_role(): void
+    {
+        $user = $this->give($this->makeUser(), 'student');
+        DB::table('user_permissions')->insert(['user_id' => $user->id, 'permission' => 'statistics.view']);
+        $this->access->forget($user->id);
+
+        $this->assertSame(['statistics.view'], $this->access->directPermissionsOf($user));
+        $this->assertContains('statistics.view', $this->access->permissionsOf($user));
+        $this->assertNotContains('statistics.view', $this->access->rolesOf($user)[0]['permissions']);
     }
 
     public function test_direct_permissions_are_added_on_top_of_roles(): void
@@ -227,53 +247,60 @@ class AccessControlTest extends TestCase
         $this->assertTrue($this->access->can($user, 'problem.create'));
     }
 
-    public function test_super_admin_has_everything_except_grading(): void
+    public function test_admin_role_has_only_its_four_permissions_and_nothing_implicit(): void
     {
         $admin = $this->give($this->makeUser(), 'admin');
 
-        $this->assertTrue($this->access->isSuperAdmin($admin));
-        $this->assertSame($this->sortedSuperCodes(), $this->access->permissionsOf($admin));
-        $this->assertFalse($this->access->can($admin, 'results.grade'));
-        $this->assertTrue($this->access->can($admin, 'access.manage'));
-        $this->assertSame(['admin', 'office', 'teacher'], $this->access->areasOf($admin));
-
-        DB::table('user_permissions')->insert(['user_id' => $admin->id, 'permission' => 'results.grade']);
-        $this->access->forget($admin->id);
-        $this->assertTrue($this->access->can($admin, 'results.grade'), 'quyền do chính tài khoản được cấp riêng thì được giữ (cộng gộp)');
+        $this->assertSame(['access.manage', 'class.manage', 'system.overview', 'user.manage'], $this->access->permissionsOf($admin));
+        foreach (['examination.manage', 'problem.create', 'results.grade', 'tag.manage', 'practice.solve'] as $code) {
+            $this->assertFalse($this->access->can($admin, $code), $code);
+        }
     }
 
-    public function test_admin_role_never_grants_grading_but_does_not_remove_it_from_other_roles(): void
+    public function test_admin_role_is_edited_like_any_other_role(): void
+    {
+        $this->role('admin')->syncPermissions(['access.manage', 'examination.manage']);
+        $admin = $this->give($this->makeUser(), 'admin');
+
+        $this->assertSame(['access.manage', 'examination.manage'], $this->access->permissionsOf($admin));
+    }
+
+    public function test_roles_combine_permissions_without_removing_any(): void
     {
         $both = $this->give($this->makeUser(), 'admin', 'instructor');
 
-        $this->assertTrue($this->access->isSuperAdmin($both));
         $this->assertTrue($this->access->can($both, 'results.grade'), 'vai trò Giảng viên cấp quyền chấm');
         $this->assertTrue($this->access->can($both, 'access.manage'), 'vai trò Admin cấp quyền quản trị');
 
-        // Gộp đủ: mỗi quyền của từng vai trò đều có mặt trong kết quả.
-        $expected = array_unique(array_merge(PermissionCatalog::superCodes(), $this->role('instructor')->permissionCodes()));
+        $expected = array_unique(array_merge($this->role('admin')->permissionCodes(), $this->role('instructor')->permissionCodes()));
         sort($expected);
         $this->assertSame($expected, $this->access->permissionsOf($both));
-
-        $adminOnly = $this->give($this->makeUser(), 'admin');
-        $this->assertFalse($this->access->can($adminOnly, 'results.grade'));
+        $this->assertCount(2, $this->access->rolesOf($both));
     }
 
-    public function test_super_role_ignores_stored_permission_rows(): void
+    public function test_last_active_access_manager_is_detected_through_roles_and_direct_grants(): void
     {
-        $this->role('admin')->syncPermissions(['practice.solve']);
-        $admin = $this->give($this->makeUser(), 'admin');
+        $manager = $this->give($this->makeUser(), 'admin');
+        DB::table('user_access_roles')->whereIn('access_role_id', [$this->role('admin')->id])->where('user_id', '!=', $manager->id)->delete();
+        DB::table('user_permissions')->where('permission', 'access.manage')->delete();
+        $this->access->forget();
 
-        $this->assertSame($this->sortedSuperCodes(), $this->access->permissionsOf($admin));
+        $this->assertTrue($this->access->isLastActiveAccessManager($manager));
+
+        $second = $this->makeUser();
+        DB::table('user_permissions')->insert(['user_id' => $second->id, 'permission' => 'access.manage']);
+        $this->access->forget();
+
+        $this->assertFalse($this->access->isLastActiveAccessManager($manager), 'còn người khác giữ quyền (gán riêng) nên không phải người cuối');
+        $this->assertTrue($this->access->hasActiveHolder('access.manage', $manager->id));
     }
 
-    public function test_inactive_and_pending_accounts_have_no_permissions(): void
+    public function test_inactive_accounts_have_no_permissions(): void
     {
-        foreach (['Inactive', 'Pending'] as $status) {
+        foreach (['Inactive'] as $status) {
             $user = $this->give($this->makeUser('visitor', $status), 'admin', 'instructor');
             $this->assertSame([], $this->access->permissionsOf($user), $status);
-            $this->assertSame([], $this->access->areasOf($user), $status);
-            $this->assertFalse($this->access->isSuperAdmin($user), $status);
+            $this->assertSame([], $this->access->rolesOf($user), $status);
         }
     }
 
@@ -283,7 +310,7 @@ class AccessControlTest extends TestCase
         DB::table('access_role_permissions')->insert(['access_role_id' => $role->id, 'permission' => 'contest.create']);
         $student = $this->give($this->makeUser(), 'student');
 
-        $this->assertSame(['practice.solve'], $this->access->permissionsOf($student));
+        $this->assertSame(['assignment.do', 'practice.solve', 'submission.view'], $this->access->permissionsOf($student));
         $this->assertFalse($this->access->can($student, 'contest.create'));
     }
 
@@ -315,11 +342,11 @@ class AccessControlTest extends TestCase
         $this->assertTrue($this->access->can($user, 'problem.create'));
     }
 
-    public function test_catalog_has_no_contest_permission_and_super_codes_exclude_grading(): void
+    public function test_catalog_has_no_contest_permission(): void
     {
         $this->assertFalse(PermissionCatalog::isValid('contest.create'));
-        $this->assertNotContains('results.grade', PermissionCatalog::superCodes());
         $this->assertContains('results.grade', PermissionCatalog::codes());
+        $this->assertContains('tag.manage', PermissionCatalog::codes());
     }
 
     // ───────────────────────── middleware capability: ─────────────────────────

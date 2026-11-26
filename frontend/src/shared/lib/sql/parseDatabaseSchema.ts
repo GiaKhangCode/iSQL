@@ -178,5 +178,41 @@ export function parseDatabaseSchema(schema: string): SchemaTable[] {
     if (table) table.primaryKeys = [...new Set([...table.primaryKeys, ...primaryKeyMatch[2].split(",").map(unquote)])];
   }
 
+  // ALTER TABLE ... ADD [CONSTRAINT x] UNIQUE (cols): ràng buộc UNIQUE thêm sau khi tạo bảng.
+  const alterUnique = new RegExp(
+    String.raw`\bALTER\s+TABLE\s+(${identifier})\s+ADD\s+(?:CONSTRAINT\s+${identifier}\s+)?UNIQUE\s*(?:(?:NON)?CLUSTERED\s*)?\(([^)]+)\)`,
+    "gi",
+  );
+  let uniqueMatch: RegExpExecArray | null;
+  while ((uniqueMatch = alterUnique.exec(schema))) {
+    const table = tables.find((candidate) => candidate.name.toLowerCase() === tableName(uniqueMatch![1]).toLowerCase());
+    if (table) table.constraints.push(`UNIQUE (${uniqueMatch[2].split(",").map((name) => `[${unquote(name)}]`).join(",")})`);
+  }
+
+  // ALTER TABLE ... ADD [CONSTRAINT x] DEFAULT <giá trị> FOR cột: giá trị mặc định thêm sau khi tạo bảng.
+  const alterDefault = new RegExp(
+    String.raw`\bALTER\s+TABLE\s+(${identifier})\s+ADD\s+(?:CONSTRAINT\s+${identifier}\s+)?DEFAULT\s+([\s\S]+?)\s+FOR\s+(${identifier})`,
+    "gi",
+  );
+  let defaultMatch: RegExpExecArray | null;
+  while ((defaultMatch = alterDefault.exec(schema))) {
+    const table = tables.find((candidate) => candidate.name.toLowerCase() === tableName(defaultMatch![1]).toLowerCase());
+    if (table) table.constraints.push(`DEFAULT [${unquote(defaultMatch[3])}] = ${defaultMatch[2].trim()}`);
+  }
+
+  // ALTER TABLE ... ALTER COLUMN c <kiểu> NOT NULL: cột đổi thành NOT NULL sau khi tạo bảng.
+  const alterNotNull = new RegExp(
+    String.raw`\bALTER\s+TABLE\s+(${identifier})\s+ALTER\s+COLUMN\s+(${identifier})\s+([^;]*?)\b(NOT\s+NULL|NULL)\b`,
+    "gi",
+  );
+  let notNullMatch: RegExpExecArray | null;
+  while ((notNullMatch = alterNotNull.exec(schema))) {
+    const table = tables.find((candidate) => candidate.name.toLowerCase() === tableName(notNullMatch![1]).toLowerCase());
+    const column = table?.columns.find((candidate) => candidate.name.toLowerCase() === unquote(notNullMatch![2]).toLowerCase());
+    if (!column) continue;
+    const withoutNullability = column.constraints.replace(/\bNOT\s+NULL\b|\bNULL\b/gi, "").trim();
+    column.constraints = `${/^NOT/i.test(notNullMatch[4]) ? "NOT NULL" : "NULL"} ${withoutNullability}`.trim();
+  }
+
   return tables;
 }

@@ -22,7 +22,9 @@ const GROUPS: PermissionGroup[] = [
     label: "Luyện tập",
     hint: "Dành cho người học",
     permissions: [
-      { code: "practice.solve", label: "Luyện tập bài toán", description: "Giải và nộp bài trong thư viện bài luyện tập." },
+      { code: "practice.solve", label: "Luyện tập bài toán", description: "Giải và nộp bài trong thư viện bài luyện tập (tab Tổng quan của sinh viên)." },
+      { code: "assignment.do", label: "Làm bài tập được giao", description: "Xem và làm bài tập, ca thi được giao (tab Bài tập của sinh viên)." },
+      { code: "submission.view", label: "Xem bài nộp của mình", description: "Xem lịch sử bài nộp của chính mình (tab Bài nộp của sinh viên)." },
     ],
   },
   {
@@ -31,9 +33,8 @@ const GROUPS: PermissionGroup[] = [
     hint: "Soạn nội dung giảng dạy",
     permissions: [
       { code: "problem.create", label: "Tạo và chỉnh sửa bài toán", description: "Tạo bài toán mới; sửa và xóa bài toán của mình." },
-      { code: "problem.share", label: "Chia sẻ bài toán", description: "Chia sẻ bài toán của mình cho giảng viên khác." },
+      { code: "tag.manage", label: "Quản lý thẻ câu hỏi", description: "Tạo, sửa, xóa thẻ câu hỏi (dạng bài, độ khó) dùng khi soạn bài." },
       { code: "library.manage", label: "Quản lý thư viện CSDL", description: "Tạo, sửa, xóa cơ sở dữ liệu mẫu trong thư viện." },
-      { code: "library.share", label: "Chia sẻ thư viện CSDL", description: "Chia sẻ cơ sở dữ liệu mẫu cho giảng viên khác." },
     ],
   },
   {
@@ -54,6 +55,10 @@ const GROUPS: PermissionGroup[] = [
     permissions: [
       { code: "results.grade", label: "Chấm bài và xem kết quả", description: "Xem bài làm, chấm điểm, công bố điểm và phúc khảo trong phạm vi được phụ trách." },
       { code: "results.view_all", label: "Xem kết quả mọi lớp", description: "Xem bài làm và thống kê của tất cả các lớp, không chấm điểm (dành cho trưởng bộ môn)." },
+      { code: "statistics.view", label: "Thống kê lớp phụ trách", description: "Xem thống kê các lớp mình phụ trách (tab Thống kê của giảng viên)." },
+      { code: "results.regrade", label: "Chấm phúc khảo", description: "Được phân công và chấm phúc khảo (tab Phúc khảo của giảng viên)." },
+      { code: "exam.results", label: "Xem kết quả kỳ thi", description: "Xem kết quả các kỳ thi (tab Kết quả thi của giáo vụ)." },
+      { code: "statistics.faculty", label: "Thống kê toàn khoa", description: "Xem thống kê toàn khoa (tab Thống kê của giáo vụ)." },
     ],
   },
   {
@@ -72,6 +77,8 @@ const GROUPS: PermissionGroup[] = [
     label: "Quản trị hệ thống",
     hint: "Cẩn trọng khi cấp",
     permissions: [
+      { code: "system.overview", label: "Tổng quan quản trị", description: "Xem trang Tổng quan quản trị (tình trạng dịch vụ, việc cần xử lý, nhật ký)." },
+      { code: "sandbox.cleanup", label: "Dọn schema sinh viên", description: "Xóa schema bài làm trên SQL Server khi kết thúc học phần (trong trang Tổng quan quản trị).", sensitive: true },
       { code: "access.manage", label: "Quản lý vai trò và phân quyền", description: "Tạo vai trò, sửa quyền và gán vai trò cho mọi người dùng.", sensitive: true },
     ],
   },

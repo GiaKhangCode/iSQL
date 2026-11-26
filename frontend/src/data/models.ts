@@ -25,7 +25,7 @@ export type Problem = {
   databaseStructureVisible?: boolean;
   databaseDescription?: DatabaseRelationDescription[];
   databaseDescriptionVisible?: boolean;
-  sqlChecks?: { hasSetup?: boolean; id: string; name: string; timeLimitMs: number; description?: string; expectedSamples?: ExpectedOutputSample[] }[];
+  sqlChecks?: { hasSetup?: boolean; id: string; timeLimitMs: number; description?: string; expectedSamples?: ExpectedOutputSample[]; expectedVisible?: boolean }[];
   triggerChecks?: { kind?: "schema" | "seed"; id: string; name: string; description?: string; startFrom?: "empty" | "structure" | "provided"; hasSetup?: boolean; gradingMode?: "exact" | "behavior" }[];
   ddlChecks?: { id: string; name: string; description?: string; kind?: "schema" | "seed"; startFrom?: "empty" | "structure" | "provided"; hasSetup?: boolean }[];
   dmlChecks?: { id: string; name: string; description?: string; kind?: "schema" | "seed"; startFrom?: "empty" | "structure" | "provided"; hasSetup?: boolean }[];
@@ -139,7 +139,6 @@ export type Submission = {
   query?: string;
   database?: string;
   appealStatus?: string;
-  appealReason?: string | null;
   appealCreatedAt?: string | null;
   appealResolvedAt?: string | null;
   canAppeal?: boolean;

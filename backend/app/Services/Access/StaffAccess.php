@@ -19,12 +19,11 @@ class StaffAccess
 
     /**
      * Xem mọi bài tập, ca thi, kết quả và thống kê, không bị giới hạn theo lớp mình dạy:
-     * siêu quản trị, người xem kết quả mọi lớp (results.view_all), người lập kỳ thi (examination.manage).
+     * người xem kết quả mọi lớp (results.view_all), người lập kỳ thi (examination.manage), người xem kết quả thi.
      */
     public function seesEverything(User $user): bool
     {
-        return $this->access->isSuperAdmin($user)
-            || $this->access->canAny($user, ['results.view_all', 'examination.manage']);
+        return $this->access->canAny($user, ['results.view_all', 'examination.manage', 'exam.results']);
     }
 
     /**
@@ -35,10 +34,29 @@ class StaffAccess
     {
         return $this->access->canAny($user, [
             'results.grade', 'results.view_all', 'examination.manage', 'exam.proctor', 'assignment.create',
+            'results.regrade', 'exam.results',
         ]);
     }
 
-    /** Chấm bài, công bố điểm, xử lý phúc khảo. Vai trò Admin không tự có quyền này. */
+    /** Tab Thống kê của giảng viên (thống kê các lớp mình phụ trách; ai xem mọi lớp thì thấy mọi lớp). */
+    public function canViewStatistics(User $user): bool
+    {
+        return $this->access->can($user, 'statistics.view');
+    }
+
+    /** Tab Thống kê toàn khoa của giáo vụ. */
+    public function canViewFacultyStatistics(User $user): bool
+    {
+        return $this->access->can($user, 'statistics.faculty');
+    }
+
+    /** Được phân công và chấm phúc khảo (tab Phúc khảo). */
+    public function canRegrade(User $user): bool
+    {
+        return $this->access->can($user, 'results.regrade');
+    }
+
+    /** Chấm bài, công bố điểm, xử lý phúc khảo. */
     public function canGrade(User $user): bool
     {
         return $this->access->can($user, 'results.grade');
@@ -56,14 +74,14 @@ class StaffAccess
         return $this->access->canAny($user, ['exam.proctor', 'examination.manage']);
     }
 
-    /** Tiền tố đường dẫn giao diện nơi người này xem bài chấm: /admin, /office hoặc /teacher. */
+    /**
+     * Tiền tố đường dẫn giao diện nơi người này xem bài chấm: /teacher (tab Chấm bài) hoặc /office (tab Kết quả thi,
+     * khi người này không có quyền chấm).
+     */
     public function reviewAreaPrefix(User $user): string
     {
-        $areas = $this->access->areasOf($user);
-        foreach (['admin' => '/admin', 'office' => '/office'] as $area => $prefix) {
-            if (in_array($area, $areas, true)) {
-                return $prefix;
-            }
+        if (! $this->access->can($user, 'results.grade') && $this->access->can($user, 'exam.results')) {
+            return '/office';
         }
 
         return '/teacher';

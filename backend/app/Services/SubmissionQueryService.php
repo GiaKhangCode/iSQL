@@ -6,8 +6,7 @@ use App\Models\Assignment;
 use App\Models\AssignmentProblem;
 use App\Models\Problem;
 use App\Models\Submission;
-use App\Models\SubmissionAppeal;
-use App\Models\SubmissionRegradeAssignment;
+use App\Models\ExamRegrade;
 use App\Models\User;
 use App\Models\WorkspaceSubmissionResult;
 use App\Services\Access\StaffAccess;
@@ -85,8 +84,7 @@ class SubmissionQueryService
 
         $subIds = $subs->pluck('id')->all();
         $wsMap = !empty($subIds) ? WorkspaceSubmissionResult::whereIn('submission_id', $subIds)->get()->keyBy('submission_id') : collect([]);
-        $appealsMap = !empty($subIds) ? SubmissionAppeal::whereIn('submission_id', $subIds)->get()->keyBy('submission_id') : collect([]);
-        $regradesMap = !empty($subIds) ? SubmissionRegradeAssignment::whereIn('submission_id', $subIds)->get()->keyBy('submission_id') : collect([]);
+        $regradesMap = ExamRegrade::mapForSubmissions($subs);
 
         $out = [];
         foreach ($subs as $sub) {
@@ -100,7 +98,6 @@ class SubmissionQueryService
                 $activity,
                 $ap,
                 $wsMap->get($sub->id),
-                $appealsMap->get($sub->id),
                 $regradesMap->get($sub->id)
             );
             if ($resultFilter !== '' && ($formatted['result'] ?? '') !== $resultFilter) {
@@ -122,7 +119,8 @@ class SubmissionQueryService
     }
 
     /**
-     * Bài làm của một sinh viên cho một bài của hoạt động: lần nộp chính thức mới nhất, hoặc bản nháp nếu chưa nộp.
+     * Bài làm của một sinh viên cho một bài của hoạt động: lần nộp chính thức có điểm tự động cao nhất
+     * (bằng điểm thì lấy lần nộp sau cùng), hoặc bản nháp nếu chưa nộp.
      */
     public function studentWork(User $user, string $activityId, string $studentId, string $problemId): array
     {
@@ -142,7 +140,9 @@ class SubmissionQueryService
             ->whereDoesntHave('workspaceResult', function ($q) {
                 $q->whereRaw("JSON_EXTRACT(sections, '$[0]._questionSubmission.part') IS NOT NULL");
             })
+            ->orderByDesc('score')
             ->orderByDesc('submitted_at')
+            ->orderByDesc('id')
             ->first();
 
         if ($sub) {
@@ -158,7 +158,7 @@ class SubmissionQueryService
     public function inspect(User $user, string $id, ?string $part, string $questionId): array
     {
         $sub = Submission::findOrFail($id);
-        abort_unless($this->access->canGradeSubmission($user, $sub, null, true), 403, 'Chỉ Giảng viên và Admin mới có quyền đối chiếu bài nộp.');
+        abort_unless($this->access->canGradeSubmission($user, $sub), 403, 'Chỉ Giảng viên và Admin mới có quyền đối chiếu bài nộp.');
 
         $problem = Problem::with(['testCases.scripts', 'sqlSolutions', 'stageExercises'])->findOrFail($sub->problem_id);
         $part = strtoupper((string) ($part ?? 'SQL'));

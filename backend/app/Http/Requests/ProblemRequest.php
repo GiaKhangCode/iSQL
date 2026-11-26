@@ -48,14 +48,43 @@ class ProblemRequest extends FormRequest
             'expected_output_visible'      => 'sometimes|nullable|boolean',
             'sqlSolutions'                 => 'sometimes|nullable|array',
             'sqlSolutions.*.id'            => 'sometimes|nullable|string|max:50',
-            'sqlSolutions.*.name'          => 'sometimes|nullable|string|max:120',
             'sqlSolutions.*.timeLimitMs'   => 'sometimes|nullable|integer|min:100|max:60000',
             'sqlSolutions.*.time_limit_ms' => 'sometimes|nullable|integer|min:100|max:60000',
+            // Mỗi trường con phải được khai báo: validated() bỏ các khóa con không có quy tắc.
+            'sqlSolutions.*.query'             => 'sometimes|nullable|string',
+            'sqlSolutions.*.description'       => 'sometimes|nullable|string',
+            'sqlSolutions.*.setupSql'          => 'sometimes|nullable|string',
+            'sqlSolutions.*.setup_sql'         => 'sometimes|nullable|string',
+            'sqlSolutions.*.enabled'           => 'sometimes|nullable|boolean',
+            'sqlSolutions.*.expectedOutputs'   => 'sometimes|nullable|array',
+            'sqlSolutions.*.expected_outputs'  => 'sometimes|nullable|array',
+            'sqlSolutions.*.expectedOutputVisible'=> 'sometimes|nullable|boolean',
+            'sqlSolutions.*.expected_output_visible'=> 'sometimes|nullable|boolean',
+            'sqlSolutions.*.difficulty'        => 'sometimes|nullable|string|max:50',
+            'sqlSolutions.*.category'          => 'sometimes|nullable|string|max:255',
+            'sqlSolutions.*.checkRowOrder'     => 'sometimes|nullable|boolean',
+            'sqlSolutions.*.check_row_order'   => 'sometimes|nullable|boolean',
+            'sqlSolutions.*.ignoreColumnNames' => 'sometimes|nullable|boolean',
+            'sqlSolutions.*.ignore_column_names'=> 'sometimes|nullable|boolean',
             'sql_solutions'                => 'sometimes|nullable|array',
             'sql_solutions.*.id'           => 'sometimes|nullable|string|max:50',
-            'sql_solutions.*.name'         => 'sometimes|nullable|string|max:120',
             'sql_solutions.*.timeLimitMs'  => 'sometimes|nullable|integer|min:100|max:60000',
             'sql_solutions.*.time_limit_ms'=> 'sometimes|nullable|integer|min:100|max:60000',
+            'sql_solutions.*.query'            => 'sometimes|nullable|string',
+            'sql_solutions.*.description'      => 'sometimes|nullable|string',
+            'sql_solutions.*.setupSql'         => 'sometimes|nullable|string',
+            'sql_solutions.*.setup_sql'        => 'sometimes|nullable|string',
+            'sql_solutions.*.enabled'          => 'sometimes|nullable|boolean',
+            'sql_solutions.*.expectedOutputs'  => 'sometimes|nullable|array',
+            'sql_solutions.*.expected_outputs' => 'sometimes|nullable|array',
+            'sql_solutions.*.expectedOutputVisible'=> 'sometimes|nullable|boolean',
+            'sql_solutions.*.expected_output_visible'=> 'sometimes|nullable|boolean',
+            'sql_solutions.*.difficulty'       => 'sometimes|nullable|string|max:50',
+            'sql_solutions.*.category'         => 'sometimes|nullable|string|max:255',
+            'sql_solutions.*.checkRowOrder'    => 'sometimes|nullable|boolean',
+            'sql_solutions.*.check_row_order'  => 'sometimes|nullable|boolean',
+            'sql_solutions.*.ignoreColumnNames'=> 'sometimes|nullable|boolean',
+            'sql_solutions.*.ignore_column_names'=> 'sometimes|nullable|boolean',
             'triggerExercise'              => 'sometimes|nullable|array',
             'trigger_exercise'             => 'sometimes|nullable|array',
             'ddlExercise'                  => 'sometimes|nullable|array',
@@ -111,15 +140,11 @@ class ProblemRequest extends FormRequest
                     $ids = [];
                     foreach ($exercise['questions'] as $question) {
                         $id = (string) ($question['id'] ?? '');
-                        $name = (string) ($question['name'] ?? '');
                         if (str_starts_with($id, '__base_')) {
                             $v->errors()->add($field, 'Question IDs starting with __base_ are reserved.');
                         }
                         if (mb_strlen($id) > 50) {
                             $v->errors()->add($field, 'Question ID cannot exceed 50 characters.');
-                        }
-                        if (mb_strlen($name) > 120) {
-                            $v->errors()->add($field, 'Question file name cannot exceed 120 characters.');
                         }
                         if ($id !== '') {
                             $ids[] = $id;

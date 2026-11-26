@@ -29,83 +29,13 @@ class AuthTest extends TestCase
                  ->assertJsonValidationErrors(['email', 'password']);
     }
 
-    public function test_student_can_register_successfully(): void
+    public function test_self_registration_is_closed(): void
     {
-        $payload = [
-            'name'     => 'Nguyen Van Test',
-            'email'    => 'student_test_' . uniqid() . '@gm.uit.edu.vn',
-            'password' => 'Password123!',
-        ];
+        $email = 'closed_' . uniqid() . '@gm.uit.edu.vn';
 
-        $response = $this->postJson('/api/auth/register', $payload);
-
-        $response->assertStatus(201)
-                 ->assertJsonStructure([
-                     'access_token',
-                     'token_type',
-                     'user' => ['id', 'email', 'name', 'account_type', 'roles', 'status'],
-                 ])
-                 ->assertJsonMissingPath('user.role')
-                 ->assertJsonMissingPath('user.technical_role')
-                 ->assertJsonPath('user.account_type', 'student');
-
-        $this->assertDatabaseHas('users', [
-            'email'        => $payload['email'],
-            'account_type' => 'student',
-        ]);
-        $user = User::where('email', $payload['email'])->firstOrFail();
-        $this->assertSame(['student'], $user->accessRoles()->pluck('slug')->all(), 'nhận vai trò Sinh viên lúc đăng ký');
-    }
-
-    public function test_register_fails_with_duplicate_email(): void
-    {
-        $email = 'duplicate_' . uniqid() . '@gm.uit.edu.vn';
-        User::create([
-            'name'            => 'First User',
-            'email'           => $email,
-            'hashed_password' => Hash::make('password123'),
-            ...AccountFixture::for('student'),
-            'status'          => 'Active',
-            'initials'        => 'FU',
-        ]);
-
-        $response = $this->postJson('/api/auth/register', [
-            'name'     => 'Second User',
-            'email'    => $email,
-            'password' => 'password123',
-        ]);
-
-        $response->assertStatus(422)
-                 ->assertJsonValidationErrors(['email']);
-    }
-
-    public function test_lecturer_can_register(): void
-    {
-        $payload = [
-            'name'       => 'Lecturer Test',
-            'email'      => 'lecturer_test_' . uniqid() . '@uit.edu.vn',
-            'password'   => 'Password123!',
-            'department' => 'Software Engineering',
-        ];
-
-        $response = $this->postJson('/api/auth/register-lecturer', $payload);
-
-        $response->assertStatus(201)
-                 ->assertJsonStructure([
-                     'access_token',
-                     'token_type',
-                     'user' => ['id', 'email', 'name', 'account_type', 'roles', 'department'],
-                 ])
-                 ->assertJsonPath('user.account_type', 'staff');
-
-        $this->assertDatabaseHas('users', [
-            'email'        => $payload['email'],
-            'account_type' => 'staff',
-            'status'       => 'Pending',
-            'department'   => 'Software Engineering',
-        ]);
-        $user = User::where('email', $payload['email'])->firstOrFail();
-        $this->assertSame(['instructor'], $user->accessRoles()->pluck('slug')->all(), 'nhận vai trò Giảng viên, hiệu lực sau khi duyệt');
+        $this->postJson('/api/auth/register', ['name' => 'Closed', 'email' => $email, 'password' => 'Password123!'])
+            ->assertNotFound();
+        $this->assertDatabaseMissing('users', ['email' => $email]);
     }
 
     public function test_login_success_with_valid_credentials(): void

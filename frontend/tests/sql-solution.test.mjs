@@ -83,8 +83,6 @@ try {
   const tableTab=async()=>{await api.act(async()=>document.querySelector('[aria-controls="database-panel-structure"]').click());await api.act(async()=>document.getElementById('database-setup-tab-tables').click());};
   assert.equal(cards().length,1);
   assert.ok(setup(),'DQL has the same independent preparation editor as DDL/DML');
-  await api.act(async()=>api.change(document.querySelector('.teacher-sql-filename-input'),'answer'));
-  assert.equal(api.state()[0].name,'answer.sql');
   await api.act(async()=>api.change(document.querySelector('.teacher-solution-limit input'),'7000'));
   assert.equal(api.state()[0].timeLimitMs,7000);
   await api.act(async()=>api.change(setup(),'SELECT * INTO T1 FROM T;'));
@@ -107,7 +105,7 @@ try {
   await api.act(async()=>complete({status:'Success',table:{name:'Result',columns:['n'],rows:[[3]]}}));
   assert.deepEqual(api.state()[0].expectedOutputs,[],'Editing preparation invalidates old results and prevents a stale run from publishing');
   await api.act(async()=>[...document.querySelectorAll('button')].find(button=>button.textContent==='Add question').click());
-  assert.equal(api.state().length,2);assert.equal(api.state()[1].name,'DQL2.sql');
+  assert.equal(api.state().length,2);
   assert.ok(!api.state()[1].setupSql,'A new question never inherits another question preparation');
   const descriptions=document.querySelectorAll('.database-description-question-body textarea');
   await api.act(async()=>api.change(descriptions[1],'List products from China.'));

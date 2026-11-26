@@ -44,7 +44,7 @@ try{
  assert.equal(imports.problem.statement,target.statement);
  assert.equal(imports.problem.sqlSolutions.length,2);
  assert.equal(imports.problem.sqlSolutions[1].setupSql,'SELECT * INTO T1 FROM T;','DQL preparation survives selective library imports');
- assert.equal(imports.problem.sqlSolutions[1].name,'Q_2.sql','Append resolves filenames without touching current question');
+ assert.equal(imports.problem.sqlSolutions[1].name,undefined,'Imported questions carry no name any more');
  assert.notEqual(imports.problem.dmlExercise.questions[0].id,'dml');
  assert.equal(imports.problem.dmlExercise.questions[0].setupDdl,source.bundle.dmlExercise.questions[0].setupDdl);
  assert.equal(imports.problem.dmlExercise.questions[0].setupDml,source.bundle.dmlExercise.questions[0].setupDml);
